@@ -10,30 +10,48 @@ type Team = {
   group_name: string;
 };
 
+type Group = {
+  id: string;
+  name: string;
+  sort_order: number;
+};
+
 export default function EquiposPage() {
-  const grupos = ["Grupo A", "Grupo B", "Grupo C", "Grupo D"];
+  const [groups, setGroups] = useState<Group[]>([]);
   const [grupoAbierto, setGrupoAbierto] = useState("");
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function cargarEquipos() {
-      const { data, error } = await supabase
+    async function cargarDatos() {
+      const { data: groupsData } = await supabase
+        .from("groups")
+        .select("id, name, sort_order")
+        .order("sort_order", { ascending: true });
+
+      const { data: teamsData, error: teamsError } = await supabase
         .from("teams")
         .select("id, name, group_name")
         .order("group_name", { ascending: true })
         .order("name", { ascending: true });
 
-      if (error) {
-        console.error("Error cargando equipos:", error);
+      if (teamsError) {
+        console.error("Error cargando equipos:", teamsError);
       } else {
-        setTeams(data ?? []);
+        setTeams((teamsData ?? []) as Team[]);
+      }
+
+      const grupos = (groupsData ?? []) as Group[];
+      setGroups(grupos);
+
+      if (grupos.length > 0) {
+        setGrupoAbierto(grupos[0].name);
       }
 
       setLoading(false);
     }
 
-    cargarEquipos();
+    cargarDatos();
   }, []);
 
   return (
@@ -49,32 +67,41 @@ export default function EquiposPage() {
           <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
             Torneo Fútbol 7 Astrabudua
           </p>
-          <h1 className="mt-2 text-center text-3xl font-black">
-            Equipos
-          </h1>
+          <h1 className="mt-2 text-center text-3xl font-black">Equipos</h1>
         </div>
 
         {loading ? (
           <div className="mt-6 rounded-2xl bg-white/95 p-5 font-bold shadow">
             Cargando equipos...
           </div>
+        ) : groups.length === 0 ? (
+          <div className="mt-6 rounded-2xl bg-white/95 p-5 font-bold shadow">
+            Todavía no hay grupos creados.
+          </div>
         ) : (
           <div className="mt-6 space-y-3">
-            {grupos.map((grupo) => {
-              const abierto = grupoAbierto === grupo;
+            {groups.map((grupo) => {
+              const abierto = grupoAbierto === grupo.name;
               const equiposGrupo = teams.filter(
-                (team) => team.group_name === grupo
+                (team) => team.group_name === grupo.name
               );
 
               return (
-                <div key={grupo} className="overflow-hidden rounded-2xl bg-white/95 shadow">
+                <div
+                  key={grupo.id}
+                  className="overflow-hidden rounded-2xl bg-white/95 shadow"
+                >
                   <button
-                    onClick={() => setGrupoAbierto(abierto ? "" : grupo)}
+                    onClick={() =>
+                      setGrupoAbierto(abierto ? "" : grupo.name)
+                    }
                     className={`flex w-full items-center justify-between p-4 text-left ${
-                      abierto ? "bg-red-600 text-white" : "bg-white/95 text-slate-900"
+                      abierto
+                        ? "bg-red-600 text-white"
+                        : "bg-white/95 text-slate-900"
                     }`}
                   >
-                    <p className="text-lg font-black">{grupo}</p>
+                    <p className="text-lg font-black">{grupo.name}</p>
 
                     <span
                       className={`text-2xl font-black ${
@@ -87,19 +114,25 @@ export default function EquiposPage() {
 
                   {abierto && (
                     <div className="space-y-3 border-t border-slate-100 p-4 pt-3">
-                      {equiposGrupo.map((team) => (
-                        <Link
-                          href={`/equipos/${team.id}`}
-                          key={team.id}
-                          className="flex items-center gap-3 rounded-xl bg-slate-50 p-3 transition active:scale-[0.98]"
-                        >
-                          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-100 text-sm font-black text-red-600">
-                            {team.name.slice(0, 2).toUpperCase()}
-                          </div>
+                      {equiposGrupo.length === 0 ? (
+                        <p className="rounded-xl bg-slate-50 p-3 text-sm font-bold text-slate-500">
+                          No hay equipos en este grupo.
+                        </p>
+                      ) : (
+                        equiposGrupo.map((team) => (
+                          <Link
+                            href={`/equipos/${team.id}`}
+                            key={team.id}
+                            className="flex items-center gap-3 rounded-xl bg-slate-50 p-3 transition active:scale-[0.98]"
+                          >
+                            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-100 text-sm font-black text-red-600">
+                              {team.name.slice(0, 2).toUpperCase()}
+                            </div>
 
-                          <p className="font-bold">{team.name}</p>
-                        </Link>
-                      ))}
+                            <p className="font-bold">{team.name}</p>
+                          </Link>
+                        ))
+                      )}
                     </div>
                   )}
                 </div>

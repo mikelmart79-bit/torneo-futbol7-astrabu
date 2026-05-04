@@ -57,22 +57,43 @@ export default function InicioPage() {
           </h1>
         </div>
 
-        <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
-          <p className="text-sm font-black uppercase text-red-600">
-            Próximo partido
-          </p>
+        <div className="mt-6 overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
+          <div className="bg-red-600 px-5 py-3 text-center">
+            <p className="text-sm font-black uppercase tracking-widest text-white">
+              Próximo partido
+            </p>
+          </div>
 
           {partido ? (
-            <>
-              <div className="mt-3">
-                <p className="text-xl font-black">{partido.home_team?.name}</p>
-                <p className="text-xl font-black">{partido.away_team?.name}</p>
-              </div>
+            <div className="p-5">
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                <div className="text-left">
+                  <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-lg font-black text-emerald-700">
+                    {partido.home_team?.name?.slice(0, 2).toUpperCase()}
+                  </div>
+                  <p className="text-center text-base font-black leading-tight">
+                    {partido.home_team?.name}
+                  </p>
+                </div>
 
-              <div className="mt-2 text-right">
-                <p className="text-sm text-slate-500">{partido.match_date}</p>
-                <p className="text-lg font-black">{partido.match_time}</p>
-                <p className="text-sm text-slate-500">{partido.field}</p>
+                <div className="rounded-2xl bg-slate-900 px-4 py-3 text-center text-white shadow-lg">
+                  <p className="text-xs font-black uppercase text-slate-300">
+                    {partido.match_date}
+                  </p>
+                  <p className="text-2xl font-black">{partido.match_time}</p>
+                  <p className="text-xs font-bold text-slate-300">
+                    {partido.field}
+                  </p>
+                </div>
+
+                <div className="text-right">
+                  <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-red-100 text-lg font-black text-red-600">
+                    {partido.away_team?.name?.slice(0, 2).toUpperCase()}
+                  </div>
+                  <p className="text-center text-base font-black leading-tight">
+                    {partido.away_team?.name}
+                  </p>
+                </div>
               </div>
 
               <a
@@ -81,9 +102,9 @@ export default function InicioPage() {
               >
                 Ver resultados
               </a>
-            </>
+            </div>
           ) : (
-            <p className="mt-3 text-sm text-slate-500">
+            <p className="p-5 text-sm text-slate-500">
               No hay partidos próximos
             </p>
           )}

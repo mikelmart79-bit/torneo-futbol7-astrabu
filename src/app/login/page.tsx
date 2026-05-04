@@ -1,9 +1,13 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 export default function LoginPage() {
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect") || "/inicio";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mensaje, setMensaje] = useState("");
@@ -24,18 +28,21 @@ export default function LoginPage() {
         setMensaje("Usuario creado. Ya puedes iniciar sesión.");
         setModoRegistro(false);
       }
-    } else {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
 
-      if (error) {
-        setMensaje("Credenciales incorrectas");
-      } else {
-        window.location.href = "/inicio";
-      }
+      return;
     }
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      setMensaje("Credenciales incorrectas");
+      return;
+    }
+
+    window.location.href = redirectTo;
   }
 
   return (
@@ -62,7 +69,7 @@ export default function LoginPage() {
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-xl border p-3 mb-3"
+            className="mb-3 w-full rounded-xl border p-3"
           />
 
           <input
@@ -70,7 +77,7 @@ export default function LoginPage() {
             placeholder="Contraseña"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-xl border p-3 mb-3"
+            className="mb-3 w-full rounded-xl border p-3"
           />
 
           <button
@@ -84,9 +91,7 @@ export default function LoginPage() {
             onClick={() => setModoRegistro(!modoRegistro)}
             className="mt-3 w-full text-sm font-bold text-slate-600"
           >
-            {modoRegistro
-              ? "Ya tengo cuenta"
-              : "Crear cuenta nueva"}
+            {modoRegistro ? "Ya tengo cuenta" : "Crear cuenta nueva"}
           </button>
 
           {mensaje && (

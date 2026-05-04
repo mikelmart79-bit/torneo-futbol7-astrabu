@@ -94,7 +94,7 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
             )}
 
             <a
-              href="/login"
+              href="/login?redirect=/admin"
               className="mt-5 block w-full rounded-xl bg-red-600 py-3 text-center font-black text-white shadow"
             >
               Ir a login

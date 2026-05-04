@@ -3,6 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
+type Group = {
+  id: string;
+  name: string;
+  sort_order: number;
+};
+
 type Team = {
   id: string;
   name: string;
@@ -49,7 +55,8 @@ function normalizarEquipo(
 }
 
 export default function FaseGruposPage() {
-  const [grupoActivo, setGrupoActivo] = useState("Grupo A");
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [grupoActivo, setGrupoActivo] = useState("");
   const [clasificacionAbierta, setClasificacionAbierta] = useState(false);
   const [jornadaAbierta, setJornadaAbierta] = useState("");
 
@@ -58,6 +65,18 @@ export default function FaseGruposPage() {
 
   useEffect(() => {
     async function cargarDatos() {
+      const { data: groupsData } = await supabase
+        .from("groups")
+        .select("id, name, sort_order")
+        .order("sort_order", { ascending: true });
+
+      const grupos = (groupsData ?? []) as Group[];
+      setGroups(grupos);
+
+      if (grupos.length > 0) {
+        setGrupoActivo(grupos[0].name);
+      }
+
       const { data: teamsData } = await supabase
         .from("teams")
         .select("id, name, group_name")
@@ -96,15 +115,7 @@ export default function FaseGruposPage() {
     cargarDatos();
   }, []);
 
-  const grupos = useMemo(() => {
-    const encontrados = Array.from(
-      new Set(teams.map((team) => team.group_name).filter(Boolean) as string[])
-    );
-
-    return encontrados.length > 0
-      ? encontrados
-      : ["Grupo A", "Grupo B", "Grupo C", "Grupo D"];
-  }, [teams]);
+  const grupos = useMemo(() => groups.map((group) => group.name), [groups]);
 
   const teamsGrupo = teams.filter((team) => team.group_name === grupoActivo);
 
@@ -211,212 +222,229 @@ export default function FaseGruposPage() {
           </h1>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-3">
-          {grupos.map((grupo) => (
-            <button
-              key={grupo}
-              onClick={() => setGrupoActivo(grupo)}
-              className={`rounded-2xl px-4 py-4 text-sm font-black shadow ${
-                grupoActivo === grupo
-                  ? "bg-red-600 text-white"
-                  : "bg-white/95 text-slate-800"
-              }`}
-            >
-              {grupo}
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-5 overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
-          <button
-            onClick={() => setClasificacionAbierta(!clasificacionAbierta)}
-            className="flex w-full items-center justify-between bg-red-600 px-5 py-4 text-left text-white"
-          >
-            <div>
-              <p className="text-xs font-black uppercase tracking-widest">
-                Clasificación
-              </p>
-              <p className="text-sm font-bold">{grupoActivo}</p>
+        {grupos.length === 0 ? (
+          <div className="mt-6 rounded-2xl bg-white/95 p-5 font-bold shadow">
+            Todavía no hay grupos creados.
+          </div>
+        ) : (
+          <>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              {grupos.map((grupo) => (
+                <button
+                  key={grupo}
+                  onClick={() => setGrupoActivo(grupo)}
+                  className={`rounded-2xl px-4 py-4 text-sm font-black shadow ${
+                    grupoActivo === grupo
+                      ? "bg-red-600 text-white"
+                      : "bg-white/95 text-slate-800"
+                  }`}
+                >
+                  {grupo}
+                </button>
+              ))}
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-red-600">
-                Top 2
-              </span>
-              <span className="text-2xl font-black">
-                {clasificacionAbierta ? "−" : "+"}
-              </span>
-            </div>
-          </button>
+            <div className="mt-5 overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
+              <button
+                onClick={() => setClasificacionAbierta(!clasificacionAbierta)}
+                className="flex w-full items-center justify-between bg-red-600 px-5 py-4 text-left text-white"
+              >
+                <div>
+                  <p className="text-xs font-black uppercase tracking-widest">
+                    Clasificación
+                  </p>
+                  <p className="text-sm font-bold">{grupoActivo}</p>
+                </div>
 
-          {clasificacionAbierta && (
-            <div className="p-3">
-              <div className="grid grid-cols-[1fr_28px_28px_28px_28px_42px_40px] border-b border-slate-200 pb-2 text-[11px] font-black text-slate-500">
-                <span>Equipo</span>
-                <span className="text-center">PJ</span>
-                <span className="text-center">G</span>
-                <span className="text-center">E</span>
-                <span className="text-center">P</span>
-                <span className="text-center">+/-</span>
-                <span className="text-center">PTS</span>
-              </div>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-red-600">
+                    Top 2
+                  </span>
+                  <span className="text-2xl font-black">
+                    {clasificacionAbierta ? "−" : "+"}
+                  </span>
+                </div>
+              </button>
 
-              <div className="divide-y divide-slate-100">
-                {clasificacion.map((row, index) => {
-                  const clasificado = index < 2;
+              {clasificacionAbierta && (
+                <div className="p-3">
+                  <div className="grid grid-cols-[1fr_28px_28px_28px_28px_42px_40px] border-b border-slate-200 pb-2 text-[11px] font-black text-slate-500">
+                    <span>Equipo</span>
+                    <span className="text-center">PJ</span>
+                    <span className="text-center">G</span>
+                    <span className="text-center">E</span>
+                    <span className="text-center">P</span>
+                    <span className="text-center">+/-</span>
+                    <span className="text-center">PTS</span>
+                  </div>
 
-                  return (
-                    <div
-                      key={row.teamId}
-                      className={`grid grid-cols-[1fr_28px_28px_28px_28px_42px_40px] items-center rounded-xl py-3 text-xs ${
-                        clasificado
-                          ? "my-1 bg-emerald-50 ring-1 ring-emerald-200"
-                          : ""
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${
+                  <div className="divide-y divide-slate-100">
+                    {clasificacion.map((row, index) => {
+                      const clasificado = index < 2;
+
+                      return (
+                        <div
+                          key={row.teamId}
+                          className={`grid grid-cols-[1fr_28px_28px_28px_28px_42px_40px] items-center rounded-xl py-3 text-xs ${
                             clasificado
-                              ? "bg-emerald-600 text-white"
-                              : "bg-slate-100 text-slate-500"
+                              ? "my-1 bg-emerald-50 ring-1 ring-emerald-200"
+                              : ""
                           }`}
                         >
-                          {index + 1}
-                        </span>
-                        <span className="font-black leading-tight">
-                          {row.team}
-                        </span>
-                      </div>
-
-                      <span className="text-center font-bold">{row.pj}</span>
-                      <span className="text-center font-bold">{row.g}</span>
-                      <span className="text-center font-bold">{row.e}</span>
-                      <span className="text-center font-bold">{row.p}</span>
-                      <span
-                        className={`text-center font-black ${
-                          row.dg > 0
-                            ? "text-emerald-700"
-                            : row.dg < 0
-                            ? "text-red-600"
-                            : "text-slate-600"
-                        }`}
-                      >
-                        {row.dg > 0 ? `+${row.dg}` : row.dg}
-                      </span>
-                      <span className="text-center font-black text-red-600">
-                        {row.pts}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="mt-6 overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
-          <div className="bg-slate-950 px-5 py-3 text-white">
-            <p className="text-sm font-black uppercase tracking-widest">
-              Partidos del grupo
-            </p>
-          </div>
-
-          <div className="space-y-3 p-4">
-            {jornadas.length === 0 ? (
-              <p className="text-sm text-slate-500">
-                No hay partidos cargados en este grupo.
-              </p>
-            ) : (
-              jornadas.map((jornada) => {
-                const abierta = jornadaAbierta === jornada.nombre;
-
-                return (
-                  <div
-                    key={jornada.nombre}
-                    className="overflow-hidden rounded-2xl bg-slate-50 shadow-sm"
-                  >
-                    <button
-                      onClick={() =>
-                        setJornadaAbierta(abierta ? "" : jornada.nombre)
-                      }
-                      className="flex w-full items-center justify-between px-4 py-4 text-left"
-                    >
-                      <div>
-                        <p className="text-lg font-black">{jornada.nombre}</p>
-                        <p className="text-sm font-semibold text-slate-500">
-                          {jornada.fecha}
-                        </p>
-                      </div>
-
-                      <span className="text-2xl font-black text-red-600">
-                        {abierta ? "−" : "+"}
-                      </span>
-                    </button>
-
-                    {abierta && (
-                      <div className="space-y-3 border-t border-slate-200 p-4">
-                        {jornada.partidos.map((match) => {
-                          const finalizado =
-                            match.home_score !== null &&
-                            match.away_score !== null;
-
-                          return (
-                            <div
-                              key={match.id}
-                              className="rounded-2xl bg-white p-4 shadow"
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${
+                                clasificado
+                                  ? "bg-emerald-600 text-white"
+                                  : "bg-slate-100 text-slate-500"
+                              }`}
                             >
-                              <div className="flex items-center justify-between gap-3">
-                                <div className="flex-1">
-                                  <p className="text-base font-black leading-tight">
-                                    {match.home_team?.name}
-                                  </p>
-                                  <p className="text-xs font-black uppercase text-slate-400">
-                                    vs
-                                  </p>
-                                  <p className="text-base font-black leading-tight">
-                                    {match.away_team?.name}
-                                  </p>
-                                </div>
+                              {index + 1}
+                            </span>
+                            <span className="font-black leading-tight">
+                              {row.team}
+                            </span>
+                          </div>
 
-                                <div className="min-w-20 rounded-2xl bg-slate-950 px-3 py-2 text-center text-white shadow">
-                                  {finalizado ? (
-                                    <p className="text-2xl font-black">
-                                      {match.home_score} - {match.away_score}
-                                    </p>
-                                  ) : (
-                                    <p className="text-lg font-black text-red-400">
-                                      {match.match_time}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
+                          <span className="text-center font-bold">{row.pj}</span>
+                          <span className="text-center font-bold">{row.g}</span>
+                          <span className="text-center font-bold">{row.e}</span>
+                          <span className="text-center font-bold">{row.p}</span>
+                          <span
+                            className={`text-center font-black ${
+                              row.dg > 0
+                                ? "text-emerald-700"
+                                : row.dg < 0
+                                ? "text-red-600"
+                                : "text-slate-600"
+                            }`}
+                          >
+                            {row.dg > 0 ? `+${row.dg}` : row.dg}
+                          </span>
+                          <span className="text-center font-black text-red-600">
+                            {row.pts}
+                          </span>
+                        </div>
+                      );
+                    })}
 
-                              <div className="mt-3 flex items-center justify-between text-sm font-semibold text-slate-500">
-                                <span>
-                                  {match.match_time} · {match.field}
-                                </span>
-                                <span
-                                  className={`rounded-full px-3 py-1 text-xs font-black ${
-                                    finalizado
-                                      ? "bg-emerald-100 text-emerald-700"
-                                      : "bg-red-100 text-red-600"
-                                  }`}
-                                >
-                                  {finalizado ? "Finalizado" : "Pendiente"}
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                    {clasificacion.length === 0 && (
+                      <p className="p-4 text-sm font-bold text-slate-500">
+                        No hay equipos en este grupo.
+                      </p>
                     )}
                   </div>
-                );
-              })
-            )}
-          </div>
-        </div>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
+              <div className="bg-slate-950 px-5 py-3 text-white">
+                <p className="text-sm font-black uppercase tracking-widest">
+                  Partidos del grupo
+                </p>
+              </div>
+
+              <div className="space-y-3 p-4">
+                {jornadas.length === 0 ? (
+                  <p className="text-sm text-slate-500">
+                    No hay partidos cargados en este grupo.
+                  </p>
+                ) : (
+                  jornadas.map((jornada) => {
+                    const abierta = jornadaAbierta === jornada.nombre;
+
+                    return (
+                      <div
+                        key={jornada.nombre}
+                        className="overflow-hidden rounded-2xl bg-slate-50 shadow-sm"
+                      >
+                        <button
+                          onClick={() =>
+                            setJornadaAbierta(abierta ? "" : jornada.nombre)
+                          }
+                          className="flex w-full items-center justify-between px-4 py-4 text-left"
+                        >
+                          <div>
+                            <p className="text-lg font-black">
+                              {jornada.nombre}
+                            </p>
+                            <p className="text-sm font-semibold text-slate-500">
+                              {jornada.fecha}
+                            </p>
+                          </div>
+
+                          <span className="text-2xl font-black text-red-600">
+                            {abierta ? "−" : "+"}
+                          </span>
+                        </button>
+
+                        {abierta && (
+                          <div className="space-y-3 border-t border-slate-200 p-4">
+                            {jornada.partidos.map((match) => {
+                              const finalizado =
+                                match.home_score !== null &&
+                                match.away_score !== null;
+
+                              return (
+                                <div
+                                  key={match.id}
+                                  className="rounded-2xl bg-white p-4 shadow"
+                                >
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div className="flex-1">
+                                      <p className="text-base font-black leading-tight">
+                                        {match.home_team?.name}
+                                      </p>
+                                      <p className="text-xs font-black uppercase text-slate-400">
+                                        vs
+                                      </p>
+                                      <p className="text-base font-black leading-tight">
+                                        {match.away_team?.name}
+                                      </p>
+                                    </div>
+
+                                    <div className="min-w-20 rounded-2xl bg-slate-950 px-3 py-2 text-center text-white shadow">
+                                      {finalizado ? (
+                                        <p className="text-2xl font-black">
+                                          {match.home_score} -{" "}
+                                          {match.away_score}
+                                        </p>
+                                      ) : (
+                                        <p className="text-lg font-black text-red-400">
+                                          {match.match_time}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="mt-3 flex items-center justify-between text-sm font-semibold text-slate-500">
+                                    <span>
+                                      {match.match_time} · {match.field}
+                                    </span>
+                                    <span
+                                      className={`rounded-full px-3 py-1 text-xs font-black ${
+                                        finalizado
+                                          ? "bg-emerald-100 text-emerald-700"
+                                          : "bg-red-100 text-red-600"
+                                      }`}
+                                    >
+                                      {finalizado ? "Finalizado" : "Pendiente"}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </section>
     </main>
   );

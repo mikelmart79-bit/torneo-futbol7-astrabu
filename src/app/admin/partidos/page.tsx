@@ -1,7 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+
+type Group = {
+  id: string;
+  name: string;
+  sort_order: number;
+};
 
 type Match = {
   id: string;
@@ -31,8 +37,9 @@ function normalizarEquipo(
 }
 
 export default function AdminPartidosPage() {
+  const [groups, setGroups] = useState<Group[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
-  const [grupoActivo, setGrupoActivo] = useState("Grupo A");
+  const [grupoActivo, setGrupoActivo] = useState("");
   const [partidoId, setPartidoId] = useState("");
   const [golesLocal, setGolesLocal] = useState("");
   const [golesVisitante, setGolesVisitante] = useState("");
@@ -47,21 +54,19 @@ export default function AdminPartidosPage() {
 
   const partido = partidosGrupo.find((match) => match.id === partidoId);
 
-  const grupos = useMemo(() => {
-    const encontrados = Array.from(
-      new Set(matches.map((match) => match.group_name).filter(Boolean))
-    );
-
-    return encontrados.length > 0
-      ? encontrados
-      : ["Grupo A", "Grupo B", "Grupo C", "Grupo D"];
-  }, [matches]);
-
   useEffect(() => {
-    cargarPartidos();
+    cargarDatos();
   }, []);
 
-  async function cargarPartidos() {
+  async function cargarDatos() {
+    const { data: groupsData } = await supabase
+      .from("groups")
+      .select("id, name, sort_order")
+      .order("sort_order", { ascending: true });
+
+    const grupos = (groupsData ?? []) as Group[];
+    setGroups(grupos);
+
     const { data, error } = await supabase
       .from("matches")
       .select(`
@@ -98,17 +103,17 @@ export default function AdminPartidosPage() {
 
     setMatches(partidos);
 
-    if (partidos.length > 0) {
-      const primerGrupo = partidos[0].group_name || "Grupo A";
-      const primerPartido = partidos.find(
-        (match) => match.group_name === primerGrupo
-      );
+    const primerGrupo =
+      grupos[0]?.name || partidos[0]?.group_name || "";
 
-      setGrupoActivo(primerGrupo);
+    setGrupoActivo(primerGrupo);
 
-      if (primerPartido) {
-        seleccionarPartido(primerPartido);
-      }
+    const primerPartido = partidos.find(
+      (match) => match.group_name === primerGrupo
+    );
+
+    if (primerPartido) {
+      seleccionarPartido(primerPartido);
     }
 
     setLoading(false);
@@ -123,6 +128,14 @@ export default function AdminPartidosPage() {
     setMensaje("");
   }
 
+  function limpiarPartido() {
+    setPartidoId("");
+    setGolesLocal("");
+    setGolesVisitante("");
+    setEstado("Pendiente");
+    setMvpOpen(false);
+  }
+
   function cambiarGrupo(grupo: string) {
     setGrupoActivo(grupo);
 
@@ -133,11 +146,7 @@ export default function AdminPartidosPage() {
     if (primerPartidoGrupo) {
       seleccionarPartido(primerPartidoGrupo);
     } else {
-      setPartidoId("");
-      setGolesLocal("");
-      setGolesVisitante("");
-      setEstado("Pendiente");
-      setMvpOpen(false);
+      limpiarPartido();
     }
   }
 
@@ -177,7 +186,7 @@ export default function AdminPartidosPage() {
       } - ${visitante ?? "-"} ${partido.away_team?.name ?? "Visitante"}`
     );
 
-    await cargarPartidos();
+    await cargarDatos();
   }
 
   return (
@@ -201,6 +210,10 @@ export default function AdminPartidosPage() {
         <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
           {loading ? (
             <p className="font-bold">Cargando partidos...</p>
+          ) : groups.length === 0 ? (
+            <p className="rounded-2xl bg-slate-100 p-4 font-bold text-slate-500">
+              Todavía no hay grupos creados.
+            </p>
           ) : (
             <>
               <label className="text-sm font-black uppercase text-slate-500">
@@ -212,9 +225,9 @@ export default function AdminPartidosPage() {
                 onChange={(event) => cambiarGrupo(event.target.value)}
                 className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
               >
-                {grupos.map((grupo) => (
-                  <option key={grupo} value={grupo}>
-                    {grupo}
+                {groups.map((grupo) => (
+                  <option key={grupo.id} value={grupo.name}>
+                    {grupo.name}
                   </option>
                 ))}
               </select>

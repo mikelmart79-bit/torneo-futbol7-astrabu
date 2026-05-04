@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 
 type Rule = {
   id: string;
-  text: string;
+  rule_text: string;
   sort_order: number;
 };
 
@@ -24,7 +24,7 @@ export default function AdminNormativaPage() {
   async function cargarNormativa() {
     const { data } = await supabase
       .from("rules")
-      .select("id, text, sort_order")
+      .select("id, rule_text, sort_order")
       .order("sort_order", { ascending: true });
 
     const rows = (data ?? []) as Rule[];
@@ -37,7 +37,7 @@ export default function AdminNormativaPage() {
 
   function cargarEnFormulario(rule: Rule) {
     setSelectedId(rule.id);
-    setTexto(rule.text);
+    setTexto(rule.rule_text);
     setOrden(rule.sort_order.toString());
     setMensaje("");
   }
@@ -56,7 +56,7 @@ export default function AdminNormativaPage() {
     }
 
     const payload = {
-      text: texto.trim(),
+      rule_text: texto.trim(),
       sort_order: Number(orden) || 1,
     };
 
@@ -103,9 +103,7 @@ export default function AdminNormativaPage() {
             <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
               Torneo Fútbol 7 Astrabudua
             </p>
-            <h1 className="mt-2 text-center text-3xl font-black">
-              Normativa
-            </h1>
+            <h1 className="mt-2 text-center text-3xl font-black">Normativa</h1>
           </div>
 
           <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
@@ -116,7 +114,9 @@ export default function AdminNormativaPage() {
             <select
               value={selectedId}
               onChange={(event) => {
-                const rule = rules.find((item) => item.id === event.target.value);
+                const rule = rules.find(
+                  (item) => item.id === event.target.value
+                );
                 if (rule) cargarEnFormulario(rule);
                 if (!event.target.value) nuevaRegla();
               }}
@@ -125,7 +125,7 @@ export default function AdminNormativaPage() {
               <option value="">Nueva regla</option>
               {rules.map((rule) => (
                 <option key={rule.id} value={rule.id}>
-                  {rule.sort_order}. {rule.text.slice(0, 45)}
+                  {rule.sort_order}. {rule.rule_text.slice(0, 45)}
                 </option>
               ))}
             </select>

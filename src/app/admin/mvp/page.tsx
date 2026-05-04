@@ -50,13 +50,32 @@ function normalizarEquipo(
 
 export default function AdminMvpPage() {
   const [matches, setMatches] = useState<Match[]>([]);
+  const [grupoActivo, setGrupoActivo] = useState("Grupo A");
   const [selectedMatchId, setSelectedMatchId] = useState("");
   const [players, setPlayers] = useState<Player[]>([]);
   const [votes, setVotes] = useState<Vote[]>([]);
   const [mensaje, setMensaje] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const selectedMatch = matches.find((match) => match.id === selectedMatchId);
+  const grupos = useMemo(() => {
+    const encontrados = Array.from(
+      new Set(matches.map((match) => match.group_name).filter(Boolean))
+    );
+
+    return encontrados.length > 0
+      ? encontrados
+      : ["Grupo A", "Grupo B", "Grupo C", "Grupo D"];
+  }, [matches]);
+
+  const matchesGrupo = matches.filter(
+    (match) => match.group_name === grupoActivo
+  );
+
+  const selectedMatch = matchesGrupo.find(
+    (match) => match.id === selectedMatchId
+  );
+
+  const totalVotos = votes.length;
 
   useEffect(() => {
     cargarPartidos();
@@ -103,8 +122,17 @@ export default function AdminMvpPage() {
     setMatches(partidos);
 
     if (partidos.length > 0) {
-      setSelectedMatchId(partidos[0].id);
-      await cargarDatosPartido(partidos[0]);
+      const primerGrupo = partidos[0].group_name || "Grupo A";
+      const primerPartido = partidos.find(
+        (match) => match.group_name === primerGrupo
+      );
+
+      setGrupoActivo(primerGrupo);
+
+      if (primerPartido) {
+        setSelectedMatchId(primerPartido.id);
+        await cargarDatosPartido(primerPartido);
+      }
     }
 
     setLoading(false);
@@ -125,6 +153,23 @@ export default function AdminMvpPage() {
     setPlayers((playersData ?? []) as Player[]);
     setVotes((votesData ?? []) as Vote[]);
     setMensaje("");
+  }
+
+  async function cambiarGrupo(grupo: string) {
+    setGrupoActivo(grupo);
+
+    const primerPartidoGrupo = matches.find(
+      (match) => match.group_name === grupo
+    );
+
+    if (primerPartidoGrupo) {
+      setSelectedMatchId(primerPartidoGrupo.id);
+      await cargarDatosPartido(primerPartidoGrupo);
+    } else {
+      setSelectedMatchId("");
+      setPlayers([]);
+      setVotes([]);
+    }
   }
 
   async function cambiarPartido(id: string) {
@@ -169,7 +214,7 @@ export default function AdminMvpPage() {
       .eq("match_id", selectedMatch.id);
 
     if (error) {
-      setMensaje("No se han podido borrar los votos.");
+      setMensaje(`No se han podido borrar los votos: ${error.message}`);
       return;
     }
 
@@ -255,8 +300,6 @@ export default function AdminMvpPage() {
     );
   }
 
-  const totalVotos = useMemo(() => votes.length, [votes]);
-
   return (
     <AdminGuard>
       <main className="relative min-h-screen overflow-hidden bg-black text-slate-900">
@@ -286,6 +329,22 @@ export default function AdminMvpPage() {
             ) : (
               <>
                 <label className="text-sm font-black uppercase text-slate-500">
+                  Grupo
+                </label>
+
+                <select
+                  value={grupoActivo}
+                  onChange={(event) => cambiarGrupo(event.target.value)}
+                  className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
+                >
+                  {grupos.map((grupo) => (
+                    <option key={grupo} value={grupo}>
+                      {grupo}
+                    </option>
+                  ))}
+                </select>
+
+                <label className="mt-5 block text-sm font-black uppercase text-slate-500">
                   Partido
                 </label>
 
@@ -294,67 +353,74 @@ export default function AdminMvpPage() {
                   onChange={(event) => cambiarPartido(event.target.value)}
                   className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
                 >
-                  {matches.map((match) => (
+                  {matchesGrupo.map((match) => (
                     <option key={match.id} value={match.id}>
-                      {match.group_name} · {match.home_team?.name} vs{" "}
-                      {match.away_team?.name} · {match.match_date}
+                      {match.home_team?.name ?? "Local"} vs{" "}
+                      {match.away_team?.name ?? "Visitante"} ·{" "}
+                      {match.match_date} · {match.match_time}
                     </option>
                   ))}
                 </select>
 
-                {selectedMatch && (
-                  <div className="mt-5 rounded-2xl bg-slate-100 p-4">
-                    <p className="text-sm font-black text-red-600">
-                      {selectedMatch.group_name}
-                    </p>
-                    <h2 className="mt-1 text-xl font-black">
-                      {selectedMatch.home_team?.name} vs{" "}
-                      {selectedMatch.away_team?.name}
-                    </h2>
-                    <p className="mt-1 text-sm font-semibold text-slate-500">
-                      {selectedMatch.match_date} · {selectedMatch.match_time} ·{" "}
-                      {selectedMatch.field}
-                    </p>
-                    <p className="mt-2 text-sm font-black">
-                      Estado votación:{" "}
-                      <span
-                        className={
-                          selectedMatch.mvp_open
-                            ? "text-emerald-700"
-                            : "text-red-600"
-                        }
+                {selectedMatch ? (
+                  <>
+                    <div className="mt-5 rounded-2xl bg-slate-100 p-4">
+                      <p className="text-sm font-black text-red-600">
+                        {selectedMatch.group_name}
+                      </p>
+                      <h2 className="mt-1 text-xl font-black">
+                        {selectedMatch.home_team?.name} vs{" "}
+                        {selectedMatch.away_team?.name}
+                      </h2>
+                      <p className="mt-1 text-sm font-semibold text-slate-500">
+                        {selectedMatch.match_date} ·{" "}
+                        {selectedMatch.match_time} · {selectedMatch.field}
+                      </p>
+                      <p className="mt-2 text-sm font-black">
+                        Estado votación:{" "}
+                        <span
+                          className={
+                            selectedMatch.mvp_open
+                              ? "text-emerald-700"
+                              : "text-red-600"
+                          }
+                        >
+                          {selectedMatch.mvp_open ? "Abierta" : "Cerrada"}
+                        </span>
+                      </p>
+                      <p className="mt-1 text-sm font-bold text-slate-500">
+                        Total votos: {totalVotos}
+                      </p>
+                    </div>
+
+                    <div className="mt-5 grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => cambiarEstadoMvp(true)}
+                        className="rounded-xl bg-emerald-600 py-3 font-black text-white shadow"
                       >
-                        {selectedMatch.mvp_open ? "Abierta" : "Cerrada"}
-                      </span>
-                    </p>
-                    <p className="mt-1 text-sm font-bold text-slate-500">
-                      Total votos: {totalVotos}
-                    </p>
-                  </div>
+                        Abrir
+                      </button>
+
+                      <button
+                        onClick={() => cambiarEstadoMvp(false)}
+                        className="rounded-xl bg-red-600 py-3 font-black text-white shadow"
+                      >
+                        Cerrar
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={borrarVotos}
+                      className="mt-3 w-full rounded-xl bg-slate-900 py-3 font-black text-white shadow"
+                    >
+                      Borrar votos del partido
+                    </button>
+                  </>
+                ) : (
+                  <p className="mt-5 rounded-2xl bg-slate-100 p-4 font-bold text-slate-500">
+                    No hay partidos cargados en este grupo.
+                  </p>
                 )}
-
-                <div className="mt-5 grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => cambiarEstadoMvp(true)}
-                    className="rounded-xl bg-emerald-600 py-3 font-black text-white shadow"
-                  >
-                    Abrir
-                  </button>
-
-                  <button
-                    onClick={() => cambiarEstadoMvp(false)}
-                    className="rounded-xl bg-red-600 py-3 font-black text-white shadow"
-                  >
-                    Cerrar
-                  </button>
-                </div>
-
-                <button
-                  onClick={borrarVotos}
-                  className="mt-3 w-full rounded-xl bg-slate-900 py-3 font-black text-white shadow"
-                >
-                  Borrar votos del partido
-                </button>
 
                 {mensaje && (
                   <div className="mt-4 rounded-xl bg-emerald-100 p-3 text-sm font-bold text-emerald-800">

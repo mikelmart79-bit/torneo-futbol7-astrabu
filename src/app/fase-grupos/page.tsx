@@ -22,6 +22,11 @@ type Match = {
   away_team: { id: string; name: string } | null;
 };
 
+type RawMatch = Omit<Match, "home_team" | "away_team"> & {
+  home_team: { id: string; name: string }[] | { id: string; name: string } | null;
+  away_team: { id: string; name: string }[] | { id: string; name: string } | null;
+};
+
 type Row = {
   teamId: string;
   team: string;
@@ -35,11 +40,6 @@ type Row = {
   pts: number;
 };
 
-type RawMatch = Omit<Match, "home_team" | "away_team"> & {
-  home_team: { id: string; name: string }[] | { id: string; name: string } | null;
-  away_team: { id: string; name: string }[] | { id: string; name: string } | null;
-};
-
 function normalizarEquipo(
   equipo: RawMatch["home_team"]
 ): { id: string; name: string } | null {
@@ -50,6 +50,9 @@ function normalizarEquipo(
 
 export default function FaseGruposPage() {
   const [grupoActivo, setGrupoActivo] = useState("Grupo A");
+  const [clasificacionAbierta, setClasificacionAbierta] = useState(false);
+  const [jornadaAbierta, setJornadaAbierta] = useState("Jornada 1");
+
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
 
@@ -78,13 +81,13 @@ export default function FaseGruposPage() {
         .order("match_date", { ascending: true })
         .order("match_time", { ascending: true });
 
-      const partidosNormalizados: Match[] = ((matchesData as unknown as RawMatch[]) || []).map(
-        (match) => ({
-          ...match,
-          home_team: normalizarEquipo(match.home_team),
-          away_team: normalizarEquipo(match.away_team),
-        })
-      );
+      const partidosNormalizados: Match[] = (
+        (matchesData as unknown as RawMatch[]) || []
+      ).map((match) => ({
+        ...match,
+        home_team: normalizarEquipo(match.home_team),
+        away_team: normalizarEquipo(match.away_team),
+      }));
 
       setTeams((teamsData as Team[]) || []);
       setMatches(partidosNormalizados);
@@ -104,7 +107,10 @@ export default function FaseGruposPage() {
   }, [teams]);
 
   const teamsGrupo = teams.filter((team) => team.group_name === grupoActivo);
-  const matchesGrupo = matches.filter((match) => match.group_name === grupoActivo);
+
+  const matchesGrupo = matches.filter(
+    (match) => match.group_name === grupoActivo
+  );
 
   const clasificacion = useMemo(() => {
     const tabla: Row[] = teamsGrupo.map((team) => ({
@@ -137,8 +143,10 @@ export default function FaseGruposPage() {
 
       local.pj += 1;
       visitante.pj += 1;
+
       local.gf += match.home_score;
       local.gc += match.away_score;
+
       visitante.gf += match.away_score;
       visitante.gc += match.home_score;
 
@@ -168,6 +176,23 @@ export default function FaseGruposPage() {
     });
   }, [teamsGrupo, matchesGrupo]);
 
+  const jornadas = useMemo(() => {
+    const fechas = Array.from(
+      new Set(matchesGrupo.map((match) => match.match_date))
+    ).sort();
+
+    return fechas.map((fecha, index) => ({
+      nombre: `Jornada ${index + 1}`,
+      fecha,
+      partidos: matchesGrupo.filter((match) => match.match_date === fecha),
+    }));
+  }, [matchesGrupo]);
+
+  useEffect(() => {
+    setClasificacionAbierta(false);
+    setJornadaAbierta("Jornada 1");
+  }, [grupoActivo]);
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-black text-slate-900">
       <img
@@ -186,12 +211,12 @@ export default function FaseGruposPage() {
           </h1>
         </div>
 
-        <div className="mt-5 flex gap-2 overflow-x-auto pb-2">
+        <div className="mt-5 grid grid-cols-2 gap-3">
           {grupos.map((grupo) => (
             <button
               key={grupo}
               onClick={() => setGrupoActivo(grupo)}
-              className={`whitespace-nowrap rounded-full px-5 py-3 text-sm font-black shadow ${
+              className={`rounded-2xl px-4 py-4 text-sm font-black shadow ${
                 grupoActivo === grupo
                   ? "bg-red-600 text-white"
                   : "bg-white/95 text-slate-800"
@@ -203,82 +228,91 @@ export default function FaseGruposPage() {
         </div>
 
         <div className="mt-5 overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
-          <div className="flex items-center justify-between bg-red-600 px-5 py-3 text-white">
+          <button
+            onClick={() => setClasificacionAbierta(!clasificacionAbierta)}
+            className="flex w-full items-center justify-between bg-red-600 px-5 py-4 text-left text-white"
+          >
             <div>
               <p className="text-xs font-black uppercase tracking-widest">
                 Clasificación
               </p>
               <p className="text-sm font-bold">{grupoActivo}</p>
             </div>
-            <p className="rounded-full bg-white px-3 py-1 text-xs font-black text-red-600">
-              Top 2
-            </p>
-          </div>
 
-          <div className="p-3">
-            <div className="grid grid-cols-[1fr_24px_24px_24px_24px_28px_28px_34px_36px] border-b border-slate-200 pb-2 text-[11px] font-black text-slate-500">
-              <span>Equipo</span>
-              <span className="text-center">PJ</span>
-              <span className="text-center">G</span>
-              <span className="text-center">E</span>
-              <span className="text-center">P</span>
-              <span className="text-center">GF</span>
-              <span className="text-center">GC</span>
-              <span className="text-center">+/-</span>
-              <span className="text-center">PTS</span>
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-red-600">
+                Top 2
+              </span>
+              <span className="text-2xl font-black">
+                {clasificacionAbierta ? "−" : "+"}
+              </span>
             </div>
+          </button>
 
-            <div className="divide-y divide-slate-100">
-              {clasificacion.map((row, index) => {
-                const clasificado = index < 2;
+          {clasificacionAbierta && (
+            <div className="p-3">
+              <div className="grid grid-cols-[1fr_28px_28px_28px_28px_42px_40px] border-b border-slate-200 pb-2 text-[11px] font-black text-slate-500">
+                <span>Equipo</span>
+                <span className="text-center">PJ</span>
+                <span className="text-center">G</span>
+                <span className="text-center">E</span>
+                <span className="text-center">P</span>
+                <span className="text-center">+/-</span>
+                <span className="text-center">PTS</span>
+              </div>
 
-                return (
-                  <div
-                    key={row.teamId}
-                    className={`grid grid-cols-[1fr_24px_24px_24px_24px_28px_28px_34px_36px] items-center rounded-xl py-3 text-xs ${
-                      clasificado
-                        ? "my-1 bg-emerald-50 ring-1 ring-emerald-200"
-                        : ""
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${
-                          clasificado
-                            ? "bg-emerald-600 text-white"
-                            : "bg-slate-100 text-slate-500"
-                        }`}
-                      >
-                        {index + 1}
-                      </span>
-                      <span className="font-black leading-tight">{row.team}</span>
-                    </div>
+              <div className="divide-y divide-slate-100">
+                {clasificacion.map((row, index) => {
+                  const clasificado = index < 2;
 
-                    <span className="text-center font-bold">{row.pj}</span>
-                    <span className="text-center font-bold">{row.g}</span>
-                    <span className="text-center font-bold">{row.e}</span>
-                    <span className="text-center font-bold">{row.p}</span>
-                    <span className="text-center font-bold">{row.gf}</span>
-                    <span className="text-center font-bold">{row.gc}</span>
-                    <span
-                      className={`text-center font-black ${
-                        row.dg > 0
-                          ? "text-emerald-700"
-                          : row.dg < 0
-                          ? "text-red-600"
-                          : "text-slate-600"
+                  return (
+                    <div
+                      key={row.teamId}
+                      className={`grid grid-cols-[1fr_28px_28px_28px_28px_42px_40px] items-center rounded-xl py-3 text-xs ${
+                        clasificado
+                          ? "my-1 bg-emerald-50 ring-1 ring-emerald-200"
+                          : ""
                       }`}
                     >
-                      {row.dg > 0 ? `+${row.dg}` : row.dg}
-                    </span>
-                    <span className="text-center font-black text-red-600">
-                      {row.pts}
-                    </span>
-                  </div>
-                );
-              })}
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${
+                            clasificado
+                              ? "bg-emerald-600 text-white"
+                              : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          {index + 1}
+                        </span>
+                        <span className="font-black leading-tight">
+                          {row.team}
+                        </span>
+                      </div>
+
+                      <span className="text-center font-bold">{row.pj}</span>
+                      <span className="text-center font-bold">{row.g}</span>
+                      <span className="text-center font-bold">{row.e}</span>
+                      <span className="text-center font-bold">{row.p}</span>
+                      <span
+                        className={`text-center font-black ${
+                          row.dg > 0
+                            ? "text-emerald-700"
+                            : row.dg < 0
+                            ? "text-red-600"
+                            : "text-slate-600"
+                        }`}
+                      >
+                        {row.dg > 0 ? `+${row.dg}` : row.dg}
+                      </span>
+                      <span className="text-center font-black text-red-600">
+                        {row.pts}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="mt-6 overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
@@ -289,60 +323,94 @@ export default function FaseGruposPage() {
           </div>
 
           <div className="space-y-3 p-4">
-            {matchesGrupo.length === 0 ? (
+            {jornadas.length === 0 ? (
               <p className="text-sm text-slate-500">
                 No hay partidos cargados en este grupo.
               </p>
             ) : (
-              matchesGrupo.map((match) => {
-                const finalizado =
-                  match.home_score !== null && match.away_score !== null;
+              jornadas.map((jornada) => {
+                const abierta = jornadaAbierta === jornada.nombre;
 
                 return (
                   <div
-                    key={match.id}
-                    className="rounded-2xl bg-slate-50 p-4 shadow-sm"
+                    key={jornada.nombre}
+                    className="overflow-hidden rounded-2xl bg-slate-50 shadow-sm"
                   >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex-1">
-                        <p className="text-base font-black leading-tight">
-                          {match.home_team?.name}
-                        </p>
-                        <p className="text-xs font-black uppercase text-slate-400">
-                          vs
-                        </p>
-                        <p className="text-base font-black leading-tight">
-                          {match.away_team?.name}
+                    <button
+                      onClick={() =>
+                        setJornadaAbierta(abierta ? "" : jornada.nombre)
+                      }
+                      className="flex w-full items-center justify-between px-4 py-4 text-left"
+                    >
+                      <div>
+                        <p className="text-lg font-black">{jornada.nombre}</p>
+                        <p className="text-sm font-semibold text-slate-500">
+                          {jornada.fecha}
                         </p>
                       </div>
 
-                      <div className="min-w-20 rounded-2xl bg-white px-3 py-2 text-center shadow">
-                        {finalizado ? (
-                          <p className="text-2xl font-black text-slate-950">
-                            {match.home_score} - {match.away_score}
-                          </p>
-                        ) : (
-                          <p className="text-lg font-black text-red-600">
-                            {match.match_time}
-                          </p>
-                        )}
-                      </div>
-                    </div>
+                      <span className="text-2xl font-black text-red-600">
+                        {abierta ? "−" : "+"}
+                      </span>
+                    </button>
 
-                    <div className="mt-3 flex items-center justify-between text-sm font-semibold text-slate-500">
-                      <span>
-                        {match.match_date} · {match.field}
-                      </span>
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-black ${
-                          finalizado
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-red-100 text-red-600"
-                        }`}
-                      >
-                        {finalizado ? "Finalizado" : "Pendiente"}
-                      </span>
-                    </div>
+                    {abierta && (
+                      <div className="space-y-3 border-t border-slate-200 p-4">
+                        {jornada.partidos.map((match) => {
+                          const finalizado =
+                            match.home_score !== null &&
+                            match.away_score !== null;
+
+                          return (
+                            <div
+                              key={match.id}
+                              className="rounded-2xl bg-white p-4 shadow"
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="flex-1">
+                                  <p className="text-base font-black leading-tight">
+                                    {match.home_team?.name}
+                                  </p>
+                                  <p className="text-xs font-black uppercase text-slate-400">
+                                    vs
+                                  </p>
+                                  <p className="text-base font-black leading-tight">
+                                    {match.away_team?.name}
+                                  </p>
+                                </div>
+
+                                <div className="min-w-20 rounded-2xl bg-slate-950 px-3 py-2 text-center text-white shadow">
+                                  {finalizado ? (
+                                    <p className="text-2xl font-black">
+                                      {match.home_score} - {match.away_score}
+                                    </p>
+                                  ) : (
+                                    <p className="text-lg font-black text-red-400">
+                                      {match.match_time}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="mt-3 flex items-center justify-between text-sm font-semibold text-slate-500">
+                                <span>
+                                  {match.match_time} · {match.field}
+                                </span>
+                                <span
+                                  className={`rounded-full px-3 py-1 text-xs font-black ${
+                                    finalizado
+                                      ? "bg-emerald-100 text-emerald-700"
+                                      : "bg-red-100 text-red-600"
+                                  }`}
+                                >
+                                  {finalizado ? "Finalizado" : "Pendiente"}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
               })

@@ -50,14 +50,11 @@ export default function InicioPage() {
         className="fixed inset-0 h-screen w-screen object-cover opacity-35 blur-sm"
       />
 
-      <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-20">
+      <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-24">
         <div className="rounded-3xl bg-black/60 p-6 text-white shadow-2xl backdrop-blur">
           <h1 className="text-3xl font-black">
             Torneo Fútbol 7 Astrabudua
           </h1>
-          <p className="mt-2 text-emerald-100">
-            Resultados, calendario, clasificación y MVP.
-          </p>
         </div>
 
         <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
@@ -80,9 +77,9 @@ export default function InicioPage() {
 
               <a
                 href="/partidos"
-                className="mt-5 block w-full rounded-xl bg-red-600 py-3 text-center font-bold text-white"
+                className="mt-5 block w-full rounded-xl bg-red-600 py-3 text-center font-bold text-white shadow-lg"
               >
-                Ver calendario
+                Ver resultados
               </a>
             </>
           ) : (
@@ -93,30 +90,38 @@ export default function InicioPage() {
         </div>
 
         <div className="mt-6 grid grid-cols-2 gap-3">
-          <a href="/partidos" className="rounded-2xl bg-white/95 p-4 font-bold shadow">
-            Partidos
-          </a>
-          <a href="/clasificacion" className="rounded-2xl bg-white/95 p-4 font-bold shadow">
+          <a
+            href="/clasificacion"
+            className="rounded-2xl bg-white/95 p-4 text-lg font-black shadow"
+          >
             Clasificación
           </a>
-          <a href="/mvp" className="rounded-2xl bg-white/95 p-4 font-bold shadow">
+
+          <a
+            href="/equipos"
+            className="rounded-2xl bg-white/95 p-4 text-lg font-black shadow"
+          >
+            Equipos
+          </a>
+
+          <a
+            href="/mvp"
+            className="rounded-2xl bg-white/95 p-4 text-lg font-black shadow"
+          >
             MVP
           </a>
-          <a href="/equipos" className="rounded-2xl bg-white/95 p-4 font-bold shadow">
-            Equipos
+
+          <a
+            href="/normativa"
+            className="rounded-2xl bg-white/95 p-4 text-lg font-black shadow"
+          >
+            Normativa
           </a>
         </div>
 
         <a
-          href="/normativa"
-          className="mt-5 block w-full rounded-2xl bg-black/80 p-4 text-center font-black text-white shadow"
-        >
-          Ver normativa
-        </a>
-
-        <a
           href="/admin"
-          className="mt-3 block w-full rounded-2xl bg-red-600 p-4 text-center font-black text-white shadow"
+          className="mt-5 block w-full rounded-2xl bg-black/85 p-4 text-center text-lg font-black text-white shadow"
         >
           Panel admin
         </a>

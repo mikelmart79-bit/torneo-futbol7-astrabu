@@ -21,6 +21,7 @@ type FinalMatch = {
 export default function FaseFinalPage() {
   const [matches, setMatches] = useState<FinalMatch[]>([]);
   const [loading, setLoading] = useState(true);
+  const [faseAbierta, setFaseAbierta] = useState("Cuartos");
 
   useEffect(() => {
     async function cargarCruces() {
@@ -39,7 +40,7 @@ export default function FaseFinalPage() {
     cargarCruces();
   }, []);
 
-  const fases = ["Cuartos", "Semifinales", "Final", "Tercer puesto"];
+  const fases = ["Cuartos", "Semifinales", "Tercer puesto", "Final"];
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-black text-slate-900">
@@ -49,15 +50,14 @@ export default function FaseFinalPage() {
         className="fixed inset-0 h-screen w-screen object-cover opacity-35 blur-sm"
       />
 
-      <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-20">
-        <div className="rounded-3xl bg-black/60 p-6 text-white shadow-2xl backdrop-blur">
-          <p className="text-sm uppercase tracking-widest text-emerald-200">
-            Torneo verano 2026
+      <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-24">
+        <div className="rounded-3xl bg-black/60 px-4 py-5 text-white shadow-2xl backdrop-blur">
+          <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
+            Torneo Fútbol 7 Astrabudua
           </p>
-          <h1 className="mt-2 text-3xl font-black">Fase final</h1>
-          <p className="mt-2 text-emerald-100">
-            Cruces configurables desde el panel admin.
-          </p>
+          <h1 className="mt-2 text-center text-3xl font-black">
+            Eliminatorias
+          </h1>
         </div>
 
         {loading ? (
@@ -65,85 +65,98 @@ export default function FaseFinalPage() {
             Cargando fase final...
           </div>
         ) : (
-          <div className="mt-6 space-y-5">
+          <div className="mt-6 space-y-4">
             {fases.map((fase) => {
               const cruces = matches.filter((match) => match.phase === fase);
-
-              if (cruces.length === 0) return null;
+              const abierta = faseAbierta === fase;
 
               return (
                 <div
                   key={fase}
-                  className={`rounded-3xl p-5 shadow-2xl backdrop-blur ${
-                    fase === "Final"
-                      ? "bg-red-600 text-white"
-                      : "bg-white/95 text-slate-900"
-                  }`}
+                  className="overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur"
                 >
-                  <h2 className="text-xl font-black">{fase}</h2>
+                  <button
+                    onClick={() => setFaseAbierta(abierta ? "" : fase)}
+                    className={`flex w-full items-center justify-between px-5 py-4 text-left ${
+                      fase === "Final"
+                        ? "bg-red-600 text-white"
+                        : "bg-slate-950 text-white"
+                    }`}
+                  >
+                    <div>
+                      <p className="text-xl font-black">{fase}</p>
+                      <p className="text-sm font-bold opacity-80">
+                        {cruces.length} cruces
+                      </p>
+                    </div>
 
-                  <div className="mt-4 space-y-3">
-                    {cruces.map((match) => (
-                      <div
-                        key={match.id}
-                        className={`rounded-2xl p-4 shadow-sm ${
-                          fase === "Final"
-                            ? "bg-white/15"
-                            : "bg-slate-50"
-                        }`}
-                      >
-                        <p
-                          className={`text-sm font-black ${
-                            fase === "Final"
-                              ? "text-red-100"
-                              : "text-red-600"
-                          }`}
-                        >
-                          {match.title}
+                    <span className="text-3xl font-black">
+                      {abierta ? "−" : "+"}
+                    </span>
+                  </button>
+
+                  {abierta && (
+                    <div className="space-y-3 p-4">
+                      {cruces.length === 0 ? (
+                        <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">
+                          Todavía no hay cruces configurados.
                         </p>
+                      ) : (
+                        cruces.map((match) => {
+                          const finalizado = match.status === "Finalizado";
 
-                        <div className="mt-2 grid grid-cols-[1fr_44px] items-center gap-2">
-                          <p className="text-lg font-black">
-                            {match.home_ref}
-                          </p>
-                          <p className="text-center text-2xl font-black">
-                            {match.home_score ?? "-"}
-                          </p>
+                          return (
+                            <div
+                              key={match.id}
+                              className={`rounded-2xl p-4 shadow ${
+                                fase === "Final"
+                                  ? "bg-red-50 ring-1 ring-red-100"
+                                  : "bg-slate-50"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm font-black uppercase text-red-600">
+                                  {match.title}
+                                </p>
 
-                          <p className="text-lg font-black">
-                            {match.away_ref}
-                          </p>
-                          <p className="text-center text-2xl font-black">
-                            {match.away_score ?? "-"}
-                          </p>
-                        </div>
+                                <span
+                                  className={`rounded-full px-3 py-1 text-xs font-black ${
+                                    finalizado
+                                      ? "bg-emerald-100 text-emerald-700"
+                                      : "bg-slate-200 text-slate-600"
+                                  }`}
+                                >
+                                  {match.status}
+                                </span>
+                              </div>
 
-                        <p
-                          className={`mt-3 text-sm font-semibold ${
-                            fase === "Final"
-                              ? "text-red-100"
-                              : "text-slate-500"
-                          }`}
-                        >
-                          {match.match_date ?? "Fecha pendiente"} ·{" "}
-                          {match.match_time ?? "Hora pendiente"} ·{" "}
-                          {match.field ?? "Campo pendiente"}
-                        </p>
+                              <div className="mt-4 grid grid-cols-[1fr_52px] items-center gap-3">
+                                <p className="text-lg font-black leading-tight">
+                                  {match.home_ref}
+                                </p>
+                                <p className="rounded-xl bg-slate-950 py-2 text-center text-2xl font-black text-white">
+                                  {match.home_score ?? "-"}
+                                </p>
 
-                        <span
-                          className={`mt-3 inline-block rounded-full px-3 py-1 text-xs font-black ${
-                            match.status === "Finalizado"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : fase === "Final"
-                                ? "bg-white/20 text-white"
-                                : "bg-slate-200 text-slate-600"
-                          }`}
-                        >
-                          {match.status}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                                <p className="text-lg font-black leading-tight">
+                                  {match.away_ref}
+                                </p>
+                                <p className="rounded-xl bg-slate-950 py-2 text-center text-2xl font-black text-white">
+                                  {match.away_score ?? "-"}
+                                </p>
+                              </div>
+
+                              <p className="mt-4 text-sm font-semibold text-slate-500">
+                                {match.match_date ?? "Fecha pendiente"} ·{" "}
+                                {match.match_time ?? "Hora pendiente"} ·{" "}
+                                {match.field ?? "Campo pendiente"}
+                              </p>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}

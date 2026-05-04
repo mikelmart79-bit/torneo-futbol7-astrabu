@@ -231,6 +231,7 @@ export default function MvpPage() {
       match_id: selectedMatch.id,
       player_id: player.id,
       user_id: userId,
+      team_id: player.team_id,
     });
 
     if (error) {

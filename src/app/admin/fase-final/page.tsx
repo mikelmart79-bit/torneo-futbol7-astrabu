@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import AdminGuard from "@/components/AdminGuard";
 import { supabase } from "@/lib/supabase";
 
+type SourceType = "group_position" | "winner" | "loser" | "manual";
+
 type FinalMatch = {
   id: string;
   phase: string;
@@ -14,6 +16,10 @@ type FinalMatch = {
   home_group: string | null;
   away_position: number | null;
   away_group: string | null;
+  home_source_type: SourceType | null;
+  home_source_match_title: string | null;
+  away_source_type: SourceType | null;
+  away_source_match_title: string | null;
   match_date: string | null;
   match_time: string | null;
   field: string | null;
@@ -60,12 +66,19 @@ export default function AdminFaseFinalPage() {
 
   const [phase, setPhase] = useState("Cuartos");
   const [title, setTitle] = useState("");
+
+  const [homeSourceType, setHomeSourceType] = useState<SourceType>("group_position");
   const [homeRef, setHomeRef] = useState("");
-  const [awayRef, setAwayRef] = useState("");
   const [homePosition, setHomePosition] = useState("1");
   const [homeGroup, setHomeGroup] = useState("");
+  const [homeSourceMatchTitle, setHomeSourceMatchTitle] = useState("");
+
+  const [awaySourceType, setAwaySourceType] = useState<SourceType>("group_position");
+  const [awayRef, setAwayRef] = useState("");
   const [awayPosition, setAwayPosition] = useState("2");
   const [awayGroup, setAwayGroup] = useState("");
+  const [awaySourceMatchTitle, setAwaySourceMatchTitle] = useState("");
+
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [field, setField] = useState("");
@@ -127,12 +140,19 @@ export default function AdminFaseFinalPage() {
     setSelectedId(match.id);
     setPhase(match.phase);
     setTitle(match.title);
+
+    setHomeSourceType(match.home_source_type ?? "manual");
     setHomeRef(match.home_ref ?? "");
-    setAwayRef(match.away_ref ?? "");
     setHomePosition(match.home_position?.toString() ?? "1");
     setHomeGroup(match.home_group ?? "");
+    setHomeSourceMatchTitle(match.home_source_match_title ?? "");
+
+    setAwaySourceType(match.away_source_type ?? "manual");
+    setAwayRef(match.away_ref ?? "");
     setAwayPosition(match.away_position?.toString() ?? "2");
     setAwayGroup(match.away_group ?? "");
+    setAwaySourceMatchTitle(match.away_source_match_title ?? "");
+
     setDate(match.match_date ?? "");
     setTime(match.match_time ?? "");
     setField(match.field ?? "");
@@ -147,12 +167,16 @@ export default function AdminFaseFinalPage() {
     setSelectedId("");
     setPhase("Cuartos");
     setTitle("");
+    setHomeSourceType("group_position");
     setHomeRef("");
-    setAwayRef("");
     setHomePosition("1");
     setHomeGroup(grupos[0] ?? "");
+    setHomeSourceMatchTitle("");
+    setAwaySourceType("group_position");
+    setAwayRef("");
     setAwayPosition("2");
     setAwayGroup(grupos[1] ?? grupos[0] ?? "");
+    setAwaySourceMatchTitle("");
     setDate("");
     setTime("");
     setField("");
@@ -226,46 +250,118 @@ export default function AdminFaseFinalPage() {
     });
   }
 
-  function resolverEquipo(posicionTexto: string, grupo: string) {
-    const posicion = Number(posicionTexto);
+  function labelPosicion(posicion: string | number | null, grupo: string | null) {
+    if (!posicion || !grupo) return "";
+    return `${posicion}º ${grupo}`;
+  }
 
-    if (!grupo || !posicion) return "";
+  function resolverEquipoGrupo(posicion: string | number | null, grupo: string | null) {
+    if (!posicion || !grupo) return "";
 
     const tabla = calcularClasificacion(grupo);
-    const equipo = tabla[posicion - 1];
+    const equipo = tabla[Number(posicion) - 1];
 
-    return equipo?.teamName ?? "";
+    return equipo?.teamName ?? labelPosicion(posicion, grupo);
   }
 
-  function actualizarLocal(posicion: string, grupo: string) {
-    setHomePosition(posicion);
-    setHomeGroup(grupo);
+  function resolverGanadorPerdedor(
+    sourceMatchTitle: string | null,
+    tipo: "winner" | "loser",
+    lista: FinalMatch[]
+  ) {
+    if (!sourceMatchTitle) return "";
 
-    const equipo = resolverEquipo(posicion, grupo);
-    setHomeRef(equipo || `${posicion}º ${grupo}`);
+    const source = lista.find((match) => match.title === sourceMatchTitle);
+
+    if (!source) return `${tipo === "winner" ? "Ganador" : "Perdedor"} ${sourceMatchTitle}`;
+
+    if (source.home_score === null || source.away_score === null) {
+      return `${tipo === "winner" ? "Ganador" : "Perdedor"} ${sourceMatchTitle}`;
+    }
+
+    if (source.home_score === source.away_score) {
+      return `${tipo === "winner" ? "Ganador" : "Perdedor"} ${sourceMatchTitle}`;
+    }
+
+    const ganaLocal = source.home_score > source.away_score;
+
+    if (tipo === "winner") {
+      return ganaLocal ? source.home_ref : source.away_ref;
+    }
+
+    return ganaLocal ? source.away_ref : source.home_ref;
   }
 
-  function actualizarVisitante(posicion: string, grupo: string) {
-    setAwayPosition(posicion);
-    setAwayGroup(grupo);
+  function resolverReferenciaLado(
+    tipo: SourceType | null,
+    posicion: number | null,
+    grupo: string | null,
+    sourceMatchTitle: string | null,
+    manualRef: string,
+    lista: FinalMatch[]
+  ) {
+    if (tipo === "group_position") {
+      return resolverEquipoGrupo(posicion, grupo);
+    }
 
-    const equipo = resolverEquipo(posicion, grupo);
-    setAwayRef(equipo || `${posicion}º ${grupo}`);
+    if (tipo === "winner") {
+      return resolverGanadorPerdedor(sourceMatchTitle, "winner", lista);
+    }
+
+    if (tipo === "loser") {
+      return resolverGanadorPerdedor(sourceMatchTitle, "loser", lista);
+    }
+
+    return manualRef;
+  }
+
+  function referenciaPreviaLado(
+    tipo: SourceType,
+    posicion: string,
+    grupo: string,
+    sourceMatchTitle: string,
+    manualRef: string
+  ) {
+    if (tipo === "group_position") return labelPosicion(posicion, grupo);
+    if (tipo === "winner") return sourceMatchTitle ? `Ganador ${sourceMatchTitle}` : "";
+    if (tipo === "loser") return sourceMatchTitle ? `Perdedor ${sourceMatchTitle}` : "";
+    return manualRef;
   }
 
   async function guardarCruce() {
-    const localCalculado = resolverEquipo(homePosition, homeGroup);
-    const visitanteCalculado = resolverEquipo(awayPosition, awayGroup);
-
     const payload = {
       phase,
       title,
-      home_ref: localCalculado || homeRef,
-      away_ref: visitanteCalculado || awayRef,
-      home_position: homePosition ? Number(homePosition) : null,
-      home_group: homeGroup || null,
-      away_position: awayPosition ? Number(awayPosition) : null,
-      away_group: awayGroup || null,
+      home_ref: referenciaPreviaLado(
+        homeSourceType,
+        homePosition,
+        homeGroup,
+        homeSourceMatchTitle,
+        homeRef
+      ),
+      away_ref: referenciaPreviaLado(
+        awaySourceType,
+        awayPosition,
+        awayGroup,
+        awaySourceMatchTitle,
+        awayRef
+      ),
+      home_position:
+        homeSourceType === "group_position" ? Number(homePosition) : null,
+      home_group: homeSourceType === "group_position" ? homeGroup || null : null,
+      away_position:
+        awaySourceType === "group_position" ? Number(awayPosition) : null,
+      away_group: awaySourceType === "group_position" ? awayGroup || null : null,
+      home_source_type: homeSourceType,
+      home_source_match_title:
+        homeSourceType === "winner" || homeSourceType === "loser"
+          ? homeSourceMatchTitle || null
+          : null,
+      away_source_type: awaySourceType,
+      away_source_match_title:
+        awaySourceType === "winner" || awaySourceType === "loser"
+          ? awaySourceMatchTitle || null
+          : null,
       match_date: date || null,
       match_time: time || null,
       field: field || null,
@@ -288,6 +384,56 @@ export default function AdminFaseFinalPage() {
     await cargarCruces();
   }
 
+  async function actualizarEquiposDesdeFuentes() {
+    const { data, error } = await supabase
+      .from("final_matches")
+      .select("*")
+      .order("sort_order", { ascending: true });
+
+    if (error) {
+      setMensaje("No se han podido cargar los cruces.");
+      return;
+    }
+
+    let lista = (data ?? []) as FinalMatch[];
+
+    for (let vuelta = 0; vuelta < 5; vuelta++) {
+      lista = lista.map((match) => ({
+        ...match,
+        home_ref: resolverReferenciaLado(
+          match.home_source_type,
+          match.home_position,
+          match.home_group,
+          match.home_source_match_title,
+          match.home_ref,
+          lista
+        ),
+        away_ref: resolverReferenciaLado(
+          match.away_source_type,
+          match.away_position,
+          match.away_group,
+          match.away_source_match_title,
+          match.away_ref,
+          lista
+        ),
+      }));
+    }
+
+    for (const match of lista) {
+      await supabase
+        .from("final_matches")
+        .update({
+          home_ref: match.home_ref,
+          away_ref: match.away_ref,
+        })
+        .eq("id", match.id);
+    }
+
+    setMatches(lista);
+    setMensaje("Equipos actualizados desde clasificación y resultados.");
+    await cargarCruces();
+  }
+
   async function eliminarCruce() {
     if (!selectedId) return;
 
@@ -306,6 +452,8 @@ export default function AdminFaseFinalPage() {
     await cargarCruces();
   }
 
+  const opcionesCrucesFuente = matches.filter((match) => match.id !== selectedId);
+
   return (
     <AdminGuard>
       <main className="relative min-h-screen overflow-hidden bg-black text-slate-900">
@@ -321,6 +469,21 @@ export default function AdminFaseFinalPage() {
               Torneo Fútbol 7 Astrabudua
             </p>
             <h1 className="mt-2 text-center text-3xl font-black">Fase final</h1>
+          </div>
+
+          <div className="mt-5 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
+            <button
+              onClick={actualizarEquiposDesdeFuentes}
+              className="w-full rounded-xl bg-red-600 py-3 font-black text-white shadow"
+            >
+              Actualizar equipos desde clasificación/resultados
+            </button>
+
+            <p className="mt-3 text-xs font-bold text-slate-500">
+              Primero puedes definir los cruces como referencias. Cuando acaben
+              los grupos o una eliminatoria, pulsa aquí y la app colocará los
+              equipos en su sitio.
+            </p>
           </div>
 
           <div className="mt-5 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
@@ -401,17 +564,26 @@ export default function AdminFaseFinalPage() {
                 Equipo local
               </p>
 
-              <div className="mt-3 grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-black uppercase text-slate-500">
-                    Posición
-                  </label>
+              <label className="mt-3 block text-xs font-black uppercase text-slate-500">
+                Origen
+              </label>
+              <select
+                value={homeSourceType}
+                onChange={(e) => setHomeSourceType(e.target.value as SourceType)}
+                className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
+              >
+                <option value="group_position">Clasificación grupo</option>
+                <option value="winner">Ganador de cruce</option>
+                <option value="loser">Perdedor de cruce</option>
+                <option value="manual">Manual</option>
+              </select>
+
+              {homeSourceType === "group_position" && (
+                <div className="mt-3 grid grid-cols-2 gap-3">
                   <select
                     value={homePosition}
-                    onChange={(e) =>
-                      actualizarLocal(e.target.value, homeGroup)
-                    }
-                    className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
+                    onChange={(e) => setHomePosition(e.target.value)}
+                    className="rounded-xl border border-slate-300 bg-white p-3 font-bold"
                   >
                     <option value="1">1º</option>
                     <option value="2">2º</option>
@@ -420,20 +592,13 @@ export default function AdminFaseFinalPage() {
                     <option value="5">5º</option>
                     <option value="6">6º</option>
                   </select>
-                </div>
 
-                <div>
-                  <label className="text-xs font-black uppercase text-slate-500">
-                    Grupo
-                  </label>
                   <select
                     value={homeGroup}
-                    onChange={(e) =>
-                      actualizarLocal(homePosition, e.target.value)
-                    }
-                    className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
+                    onChange={(e) => setHomeGroup(e.target.value)}
+                    className="rounded-xl border border-slate-300 bg-white p-3 font-bold"
                   >
-                    <option value="">Elegir grupo</option>
+                    <option value="">Grupo</option>
                     {grupos.map((grupo) => (
                       <option key={grupo} value={grupo}>
                         {grupo}
@@ -441,14 +606,31 @@ export default function AdminFaseFinalPage() {
                     ))}
                   </select>
                 </div>
-              </div>
+              )}
 
-              <input
-                value={homeRef}
-                onChange={(e) => setHomeRef(e.target.value)}
-                placeholder="Se calculará automáticamente"
-                className="mt-3 w-full rounded-xl border border-slate-300 p-3 font-bold"
-              />
+              {(homeSourceType === "winner" || homeSourceType === "loser") && (
+                <select
+                  value={homeSourceMatchTitle}
+                  onChange={(e) => setHomeSourceMatchTitle(e.target.value)}
+                  className="mt-3 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
+                >
+                  <option value="">Elegir cruce</option>
+                  {opcionesCrucesFuente.map((match) => (
+                    <option key={match.id} value={match.title}>
+                      {match.title}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              {homeSourceType === "manual" && (
+                <input
+                  value={homeRef}
+                  onChange={(e) => setHomeRef(e.target.value)}
+                  placeholder="Equipo local"
+                  className="mt-3 w-full rounded-xl border border-slate-300 p-3 font-bold"
+                />
+              )}
             </div>
 
             <div className="mt-4 rounded-2xl bg-slate-100 p-4">
@@ -456,17 +638,26 @@ export default function AdminFaseFinalPage() {
                 Equipo visitante
               </p>
 
-              <div className="mt-3 grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-black uppercase text-slate-500">
-                    Posición
-                  </label>
+              <label className="mt-3 block text-xs font-black uppercase text-slate-500">
+                Origen
+              </label>
+              <select
+                value={awaySourceType}
+                onChange={(e) => setAwaySourceType(e.target.value as SourceType)}
+                className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
+              >
+                <option value="group_position">Clasificación grupo</option>
+                <option value="winner">Ganador de cruce</option>
+                <option value="loser">Perdedor de cruce</option>
+                <option value="manual">Manual</option>
+              </select>
+
+              {awaySourceType === "group_position" && (
+                <div className="mt-3 grid grid-cols-2 gap-3">
                   <select
                     value={awayPosition}
-                    onChange={(e) =>
-                      actualizarVisitante(e.target.value, awayGroup)
-                    }
-                    className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
+                    onChange={(e) => setAwayPosition(e.target.value)}
+                    className="rounded-xl border border-slate-300 bg-white p-3 font-bold"
                   >
                     <option value="1">1º</option>
                     <option value="2">2º</option>
@@ -475,20 +666,13 @@ export default function AdminFaseFinalPage() {
                     <option value="5">5º</option>
                     <option value="6">6º</option>
                   </select>
-                </div>
 
-                <div>
-                  <label className="text-xs font-black uppercase text-slate-500">
-                    Grupo
-                  </label>
                   <select
                     value={awayGroup}
-                    onChange={(e) =>
-                      actualizarVisitante(awayPosition, e.target.value)
-                    }
-                    className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
+                    onChange={(e) => setAwayGroup(e.target.value)}
+                    className="rounded-xl border border-slate-300 bg-white p-3 font-bold"
                   >
-                    <option value="">Elegir grupo</option>
+                    <option value="">Grupo</option>
                     {grupos.map((grupo) => (
                       <option key={grupo} value={grupo}>
                         {grupo}
@@ -496,95 +680,84 @@ export default function AdminFaseFinalPage() {
                     ))}
                   </select>
                 </div>
-              </div>
+              )}
 
-              <input
-                value={awayRef}
-                onChange={(e) => setAwayRef(e.target.value)}
-                placeholder="Se calculará automáticamente"
-                className="mt-3 w-full rounded-xl border border-slate-300 p-3 font-bold"
-              />
+              {(awaySourceType === "winner" || awaySourceType === "loser") && (
+                <select
+                  value={awaySourceMatchTitle}
+                  onChange={(e) => setAwaySourceMatchTitle(e.target.value)}
+                  className="mt-3 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
+                >
+                  <option value="">Elegir cruce</option>
+                  {opcionesCrucesFuente.map((match) => (
+                    <option key={match.id} value={match.title}>
+                      {match.title}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              {awaySourceType === "manual" && (
+                <input
+                  value={awayRef}
+                  onChange={(e) => setAwayRef(e.target.value)}
+                  placeholder="Equipo visitante"
+                  className="mt-3 w-full rounded-xl border border-slate-300 p-3 font-bold"
+                />
+              )}
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-black uppercase text-slate-500">
-                  Fecha
-                </label>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="mt-2 w-full rounded-xl border border-slate-300 p-3 font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-black uppercase text-slate-500">
-                  Hora
-                </label>
-                <input
-                  type="time"
-                  value={time}
-                  onChange={(e) => setTime(e.target.value)}
-                  className="mt-2 w-full rounded-xl border border-slate-300 p-3 font-bold"
-                />
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <label className="text-xs font-black uppercase text-slate-500">
-                Campo
-              </label>
               <input
-                value={field}
-                onChange={(e) => setField(e.target.value)}
-                placeholder="Campo 1"
-                className="mt-2 w-full rounded-xl border border-slate-300 p-3 font-bold"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="rounded-xl border border-slate-300 p-3 font-bold"
+              />
+
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                className="rounded-xl border border-slate-300 p-3 font-bold"
               />
             </div>
 
+            <input
+              value={field}
+              onChange={(e) => setField(e.target.value)}
+              placeholder="Campo"
+              className="mt-4 w-full rounded-xl border border-slate-300 p-3 font-bold"
+            />
+
             <div className="mt-4 grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-black uppercase text-slate-500">
-                  Goles local
-                </label>
-                <input
-                  type="number"
-                  value={homeScore}
-                  onChange={(e) => setHomeScore(e.target.value)}
-                  className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
-                />
-              </div>
+              <input
+                type="number"
+                value={homeScore}
+                onChange={(e) => setHomeScore(e.target.value)}
+                placeholder="Goles local"
+                className="rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
+              />
 
-              <div>
-                <label className="text-xs font-black uppercase text-slate-500">
-                  Goles visitante
-                </label>
-                <input
-                  type="number"
-                  value={awayScore}
-                  onChange={(e) => setAwayScore(e.target.value)}
-                  className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
-                />
-              </div>
+              <input
+                type="number"
+                value={awayScore}
+                onChange={(e) => setAwayScore(e.target.value)}
+                placeholder="Goles visitante"
+                className="rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
+              />
             </div>
 
-            <div className="mt-4">
-              <label className="text-xs font-black uppercase text-slate-500">
-                Estado
-              </label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
-              >
-                <option>Pendiente</option>
-                <option>En juego</option>
-                <option>Finalizado</option>
-                <option>Cerrado</option>
-              </select>
-            </div>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="mt-4 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
+            >
+              <option>Pendiente</option>
+              <option>En juego</option>
+              <option>Finalizado</option>
+              <option>Cerrado</option>
+            </select>
 
             <button
               onClick={guardarCruce}

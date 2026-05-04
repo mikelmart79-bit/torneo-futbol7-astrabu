@@ -35,6 +35,19 @@ type Row = {
   pts: number;
 };
 
+type RawMatch = Omit<Match, "home_team" | "away_team"> & {
+  home_team: { id: string; name: string }[] | { id: string; name: string } | null;
+  away_team: { id: string; name: string }[] | { id: string; name: string } | null;
+};
+
+function normalizarEquipo(
+  equipo: RawMatch["home_team"]
+): { id: string; name: string } | null {
+  if (!equipo) return null;
+  if (Array.isArray(equipo)) return equipo[0] ?? null;
+  return equipo;
+}
+
 export default function FaseGruposPage() {
   const [grupoActivo, setGrupoActivo] = useState("Grupo A");
   const [teams, setTeams] = useState<Team[]>([]);
@@ -65,8 +78,16 @@ export default function FaseGruposPage() {
         .order("match_date", { ascending: true })
         .order("match_time", { ascending: true });
 
+      const partidosNormalizados: Match[] = ((matchesData as unknown as RawMatch[]) || []).map(
+        (match) => ({
+          ...match,
+          home_team: normalizarEquipo(match.home_team),
+          away_team: normalizarEquipo(match.away_team),
+        })
+      );
+
       setTeams((teamsData as Team[]) || []);
-      setMatches((matchesData as Match[]) || []);
+      setMatches(partidosNormalizados);
     }
 
     cargarDatos();
@@ -74,11 +95,7 @@ export default function FaseGruposPage() {
 
   const grupos = useMemo(() => {
     const encontrados = Array.from(
-      new Set(
-        teams
-          .map((team) => team.group_name)
-          .filter(Boolean) as string[]
-      )
+      new Set(teams.map((team) => team.group_name).filter(Boolean) as string[])
     );
 
     return encontrados.length > 0
@@ -87,10 +104,7 @@ export default function FaseGruposPage() {
   }, [teams]);
 
   const teamsGrupo = teams.filter((team) => team.group_name === grupoActivo);
-
-  const matchesGrupo = matches.filter(
-    (match) => match.group_name === grupoActivo
-  );
+  const matchesGrupo = matches.filter((match) => match.group_name === grupoActivo);
 
   const clasificacion = useMemo(() => {
     const tabla: Row[] = teamsGrupo.map((team) => ({
@@ -123,10 +137,8 @@ export default function FaseGruposPage() {
 
       local.pj += 1;
       visitante.pj += 1;
-
       local.gf += match.home_score;
       local.gc += match.away_score;
-
       visitante.gf += match.away_score;
       visitante.gc += match.home_score;
 
@@ -239,9 +251,7 @@ export default function FaseGruposPage() {
                       >
                         {index + 1}
                       </span>
-                      <span className="font-black leading-tight">
-                        {row.team}
-                      </span>
+                      <span className="font-black leading-tight">{row.team}</span>
                     </div>
 
                     <span className="text-center font-bold">{row.pj}</span>

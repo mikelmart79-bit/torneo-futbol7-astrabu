@@ -1,0 +1,17 @@
+.env.local
+.gitignore
+.next
+AGENTS.md
+CLAUDE.md
+eslint.config.mjs
+lista.txt
+next-env.d.ts
+next.config.ts
+node_modules
+package-lock.json
+package.json
+postcss.config.mjs
+public
+README.md
+src
+tsconfig.json

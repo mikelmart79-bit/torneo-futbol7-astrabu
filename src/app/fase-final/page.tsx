@@ -21,7 +21,7 @@ type FinalMatch = {
 export default function FaseFinalPage() {
   const [matches, setMatches] = useState<FinalMatch[]>([]);
   const [loading, setLoading] = useState(true);
-  const [faseAbierta, setFaseAbierta] = useState("Cuartos");
+  const [faseAbierta, setFaseAbierta] = useState("");
 
   useEffect(() => {
     async function cargarCruces() {
@@ -85,10 +85,7 @@ export default function FaseFinalPage() {
                   >
                     <div>
                       <p className="text-xl font-black">{fase}</p>
-                      <p className="text-sm font-bold opacity-80">
-                        {cruces.length} cruces
-                      </p>
-                    </div>
+                      </div>
 
                     <span className="text-3xl font-black">
                       {abierta ? "−" : "+"}

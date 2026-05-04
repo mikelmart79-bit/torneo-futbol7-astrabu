@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 type Match = {
@@ -32,6 +32,7 @@ function normalizarEquipo(
 
 export default function AdminPartidosPage() {
   const [matches, setMatches] = useState<Match[]>([]);
+  const [grupoActivo, setGrupoActivo] = useState("Grupo A");
   const [partidoId, setPartidoId] = useState("");
   const [golesLocal, setGolesLocal] = useState("");
   const [golesVisitante, setGolesVisitante] = useState("");
@@ -40,7 +41,21 @@ export default function AdminPartidosPage() {
   const [mensaje, setMensaje] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const partido = matches.find((match) => match.id === partidoId);
+  const partidosGrupo = matches.filter(
+    (match) => match.group_name === grupoActivo
+  );
+
+  const partido = partidosGrupo.find((match) => match.id === partidoId);
+
+  const grupos = useMemo(() => {
+    const encontrados = Array.from(
+      new Set(matches.map((match) => match.group_name).filter(Boolean))
+    );
+
+    return encontrados.length > 0
+      ? encontrados
+      : ["Grupo A", "Grupo B", "Grupo C", "Grupo D"];
+  }, [matches]);
 
   useEffect(() => {
     cargarPartidos();
@@ -62,6 +77,7 @@ export default function AdminPartidosPage() {
         home_team:teams!matches_home_team_id_fkey(name),
         away_team:teams!matches_away_team_id_fkey(name)
       `)
+      .order("group_name", { ascending: true })
       .order("match_date", { ascending: true })
       .order("match_time", { ascending: true });
 
@@ -82,8 +98,17 @@ export default function AdminPartidosPage() {
 
     setMatches(partidos);
 
-    if (partidos.length > 0 && !partidoId) {
-      seleccionarPartido(partidos[0]);
+    if (partidos.length > 0) {
+      const primerGrupo = partidos[0].group_name || "Grupo A";
+      const primerPartido = partidos.find(
+        (match) => match.group_name === primerGrupo
+      );
+
+      setGrupoActivo(primerGrupo);
+
+      if (primerPartido) {
+        seleccionarPartido(primerPartido);
+      }
     }
 
     setLoading(false);
@@ -96,6 +121,24 @@ export default function AdminPartidosPage() {
     setEstado(match.status ?? "Pendiente");
     setMvpOpen(Boolean(match.mvp_open));
     setMensaje("");
+  }
+
+  function cambiarGrupo(grupo: string) {
+    setGrupoActivo(grupo);
+
+    const primerPartidoGrupo = matches.find(
+      (match) => match.group_name === grupo
+    );
+
+    if (primerPartidoGrupo) {
+      seleccionarPartido(primerPartidoGrupo);
+    } else {
+      setPartidoId("");
+      setGolesLocal("");
+      setGolesVisitante("");
+      setEstado("Pendiente");
+      setMvpOpen(false);
+    }
   }
 
   function cambiarPartido(id: string) {
@@ -151,7 +194,7 @@ export default function AdminPartidosPage() {
             Torneo Fútbol 7 Astrabudua
           </p>
           <h1 className="mt-2 text-center text-3xl font-black">
-            Meter resultados
+            Resultados
           </h1>
         </div>
 
@@ -161,6 +204,22 @@ export default function AdminPartidosPage() {
           ) : (
             <>
               <label className="text-sm font-black uppercase text-slate-500">
+                Grupo
+              </label>
+
+              <select
+                value={grupoActivo}
+                onChange={(event) => cambiarGrupo(event.target.value)}
+                className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
+              >
+                {grupos.map((grupo) => (
+                  <option key={grupo} value={grupo}>
+                    {grupo}
+                  </option>
+                ))}
+              </select>
+
+              <label className="mt-5 block text-sm font-black uppercase text-slate-500">
                 Partido
               </label>
 
@@ -169,7 +228,7 @@ export default function AdminPartidosPage() {
                 onChange={(event) => cambiarPartido(event.target.value)}
                 className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
               >
-                {matches.map((match) => (
+                {partidosGrupo.map((match) => (
                   <option key={match.id} value={match.id}>
                     {match.home_team?.name ?? "Local"} vs{" "}
                     {match.away_team?.name ?? "Visitante"} · {match.match_date} ·{" "}
@@ -178,7 +237,7 @@ export default function AdminPartidosPage() {
                 ))}
               </select>
 
-              {partido && (
+              {partido ? (
                 <>
                   <div className="mt-5 rounded-2xl bg-slate-100 p-4">
                     <p className="text-sm font-black text-red-600">
@@ -255,6 +314,10 @@ export default function AdminPartidosPage() {
                     </div>
                   )}
                 </>
+              ) : (
+                <p className="mt-5 rounded-2xl bg-slate-100 p-4 font-bold text-slate-500">
+                  No hay partidos cargados en este grupo.
+                </p>
               )}
             </>
           )}

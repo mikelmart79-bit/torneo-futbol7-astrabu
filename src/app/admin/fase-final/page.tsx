@@ -19,6 +19,34 @@ type FinalMatch = {
   sort_order: number;
 };
 
+type Team = {
+  id: string;
+  name: string;
+  group_name: string;
+};
+
+type GroupMatch = {
+  id: string;
+  group_name: string;
+  home_team_id: string;
+  away_team_id: string;
+  home_score: number | null;
+  away_score: number | null;
+};
+
+type TableRow = {
+  teamId: string;
+  teamName: string;
+  pj: number;
+  g: number;
+  e: number;
+  p: number;
+  gf: number;
+  gc: number;
+  dg: number;
+  pts: number;
+};
+
 export default function AdminFaseFinalPage() {
   const [matches, setMatches] = useState<FinalMatch[]>([]);
   const [selectedId, setSelectedId] = useState("");
@@ -132,6 +160,247 @@ export default function AdminFaseFinalPage() {
     await cargarCruces();
   }
 
+  function calcularClasificacion(
+    grupo: string,
+    teams: Team[],
+    groupMatches: GroupMatch[]
+  ) {
+    const equiposGrupo = teams.filter((team) => team.group_name === grupo);
+
+    const tabla: TableRow[] = equiposGrupo.map((team) => ({
+      teamId: team.id,
+      teamName: team.name,
+      pj: 0,
+      g: 0,
+      e: 0,
+      p: 0,
+      gf: 0,
+      gc: 0,
+      dg: 0,
+      pts: 0,
+    }));
+
+    const partidosGrupo = groupMatches.filter(
+      (match) => match.group_name === grupo
+    );
+
+    partidosGrupo.forEach((match) => {
+      if (match.home_score === null || match.away_score === null) return;
+
+      const local = tabla.find((row) => row.teamId === match.home_team_id);
+      const visitante = tabla.find((row) => row.teamId === match.away_team_id);
+
+      if (!local || !visitante) return;
+
+      local.pj += 1;
+      visitante.pj += 1;
+
+      local.gf += match.home_score;
+      local.gc += match.away_score;
+
+      visitante.gf += match.away_score;
+      visitante.gc += match.home_score;
+
+      if (match.home_score > match.away_score) {
+        local.g += 1;
+        visitante.p += 1;
+        local.pts += 3;
+      } else if (match.home_score < match.away_score) {
+        visitante.g += 1;
+        local.p += 1;
+        visitante.pts += 3;
+      } else {
+        local.e += 1;
+        visitante.e += 1;
+        local.pts += 1;
+        visitante.pts += 1;
+      }
+
+      local.dg = local.gf - local.gc;
+      visitante.dg = visitante.gf - visitante.gc;
+    });
+
+    return tabla.sort((a, b) => {
+      if (b.pts !== a.pts) return b.pts - a.pts;
+      if (b.dg !== a.dg) return b.dg - a.dg;
+      if (b.gf !== a.gf) return b.gf - a.gf;
+      return a.teamName.localeCompare(b.teamName);
+    });
+  }
+
+  async function generarEliminatoriasAutomaticas() {
+    const confirmar = window.confirm(
+      "Esto borrará los cruces actuales de fase final y generará nuevos cruces desde la clasificación. ¿Continuar?"
+    );
+
+    if (!confirmar) return;
+
+    const { data: teamsData, error: teamsError } = await supabase
+      .from("teams")
+      .select("id, name, group_name");
+
+    if (teamsError) {
+      setMensaje("No se han podido cargar los equipos.");
+      return;
+    }
+
+    const { data: matchesData, error: matchesError } = await supabase
+      .from("matches")
+      .select("id, group_name, home_team_id, away_team_id, home_score, away_score");
+
+    if (matchesError) {
+      setMensaje("No se han podido cargar los partidos.");
+      return;
+    }
+
+    const teams = (teamsData ?? []) as Team[];
+    const groupMatches = (matchesData ?? []) as GroupMatch[];
+
+    const grupos = ["Grupo A", "Grupo B", "Grupo C", "Grupo D"];
+
+    const clasificados: Record<string, TableRow[]> = {};
+
+    for (const grupo of grupos) {
+      const tabla = calcularClasificacion(grupo, teams, groupMatches);
+      clasificados[grupo] = tabla;
+
+      if (tabla.length < 2) {
+        setMensaje(`Faltan equipos clasificados en ${grupo}.`);
+        return;
+      }
+    }
+
+    const nuevosCruces = [
+      {
+        phase: "Cuartos",
+        title: "Cuarto 1",
+        home_ref: clasificados["Grupo A"][0].teamName,
+        away_ref: clasificados["Grupo B"][1].teamName,
+        match_date: null,
+        match_time: null,
+        field: null,
+        home_score: null,
+        away_score: null,
+        status: "Pendiente",
+        sort_order: 1,
+      },
+      {
+        phase: "Cuartos",
+        title: "Cuarto 2",
+        home_ref: clasificados["Grupo B"][0].teamName,
+        away_ref: clasificados["Grupo A"][1].teamName,
+        match_date: null,
+        match_time: null,
+        field: null,
+        home_score: null,
+        away_score: null,
+        status: "Pendiente",
+        sort_order: 2,
+      },
+      {
+        phase: "Cuartos",
+        title: "Cuarto 3",
+        home_ref: clasificados["Grupo C"][0].teamName,
+        away_ref: clasificados["Grupo D"][1].teamName,
+        match_date: null,
+        match_time: null,
+        field: null,
+        home_score: null,
+        away_score: null,
+        status: "Pendiente",
+        sort_order: 3,
+      },
+      {
+        phase: "Cuartos",
+        title: "Cuarto 4",
+        home_ref: clasificados["Grupo D"][0].teamName,
+        away_ref: clasificados["Grupo C"][1].teamName,
+        match_date: null,
+        match_time: null,
+        field: null,
+        home_score: null,
+        away_score: null,
+        status: "Pendiente",
+        sort_order: 4,
+      },
+      {
+        phase: "Semifinales",
+        title: "Semifinal 1",
+        home_ref: "Ganador Cuarto 1",
+        away_ref: "Ganador Cuarto 2",
+        match_date: null,
+        match_time: null,
+        field: null,
+        home_score: null,
+        away_score: null,
+        status: "Pendiente",
+        sort_order: 5,
+      },
+      {
+        phase: "Semifinales",
+        title: "Semifinal 2",
+        home_ref: "Ganador Cuarto 3",
+        away_ref: "Ganador Cuarto 4",
+        match_date: null,
+        match_time: null,
+        field: null,
+        home_score: null,
+        away_score: null,
+        status: "Pendiente",
+        sort_order: 6,
+      },
+      {
+        phase: "Tercer puesto",
+        title: "Tercer y cuarto puesto",
+        home_ref: "Perdedor Semifinal 1",
+        away_ref: "Perdedor Semifinal 2",
+        match_date: null,
+        match_time: null,
+        field: null,
+        home_score: null,
+        away_score: null,
+        status: "Pendiente",
+        sort_order: 7,
+      },
+      {
+        phase: "Final",
+        title: "Final",
+        home_ref: "Ganador Semifinal 1",
+        away_ref: "Ganador Semifinal 2",
+        match_date: null,
+        match_time: null,
+        field: null,
+        home_score: null,
+        away_score: null,
+        status: "Pendiente",
+        sort_order: 8,
+      },
+    ];
+
+    const { error: deleteError } = await supabase
+      .from("final_matches")
+      .delete()
+      .neq("id", "00000000-0000-0000-0000-000000000000");
+
+    if (deleteError) {
+      setMensaje("No se han podido borrar los cruces anteriores.");
+      return;
+    }
+
+    const { error: insertError } = await supabase
+      .from("final_matches")
+      .insert(nuevosCruces);
+
+    if (insertError) {
+      setMensaje("No se han podido generar las eliminatorias.");
+      return;
+    }
+
+    setMensaje("Eliminatorias generadas automáticamente.");
+    setSelectedId("");
+    await cargarCruces();
+  }
+
   return (
     <AdminGuard>
       <main className="relative min-h-screen overflow-hidden bg-black text-slate-900">
@@ -152,6 +421,20 @@ export default function AdminFaseFinalPage() {
           </div>
 
           <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
+            <button
+              onClick={generarEliminatoriasAutomaticas}
+              className="w-full rounded-xl bg-red-600 py-3 font-black text-white shadow"
+            >
+              Generar eliminatorias automáticamente
+            </button>
+
+            <p className="mt-3 text-xs font-bold text-slate-500">
+              Usa la clasificación actual de los grupos. Borra los cruces
+              existentes y crea cuartos, semifinales, tercer puesto y final.
+            </p>
+          </div>
+
+          <div className="mt-5 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
             <label className="text-sm font-black uppercase text-slate-500">
               Cruce existente
             </label>

@@ -51,8 +51,8 @@ export default function InicioPage() {
       />
 
       <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-24">
-        <div className="rounded-3xl bg-black/60 p-6 text-white shadow-2xl backdrop-blur">
-          <h1 className="text-3xl font-black">
+        <div className="rounded-3xl bg-black/60 px-4 py-5 text-white shadow-2xl backdrop-blur">
+          <h1 className="text-center text-lg font-black whitespace-nowrap sm:text-xl">
             Torneo Fútbol 7 Astrabudua
           </h1>
         </div>

@@ -6,7 +6,7 @@ import { Home, CalendarDays, Layers, Star } from "lucide-react";
 
 const items = [
   {
-    href: "/",
+    href: "/inicio",
     label: "Inicio",
     icon: Home,
   },
@@ -35,11 +35,7 @@ export default function BottomNav() {
       <div className="mx-auto grid max-w-md grid-cols-4">
         {items.map((item) => {
           const Icon = item.icon;
-
-          const active =
-            item.href === "/"
-              ? pathname === "/"
-              : pathname.startsWith(item.href);
+          const active = pathname.startsWith(item.href);
 
           return (
             <Link
@@ -52,7 +48,6 @@ export default function BottomNav() {
               }`}
             >
               <Icon size={30} strokeWidth={active ? 3 : 2.3} />
-
               <span className="leading-tight">{item.label}</span>
             </Link>
           );

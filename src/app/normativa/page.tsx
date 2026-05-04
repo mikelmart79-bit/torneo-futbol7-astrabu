@@ -10,14 +10,13 @@ export default function NormativaPage() {
       />
 
       <section className="relative z-10 mx-auto flex min-h-screen max-w-md flex-col px-4 py-6">
-        <div className="rounded-3xl bg-black/55 p-6 text-white shadow-2xl backdrop-blur">
-          <p className="text-sm uppercase tracking-widest text-emerald-200">
-            Torneo verano 2026
+        <div className="rounded-3xl bg-black/55 px-4 py-5 text-white shadow-2xl backdrop-blur">
+          <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
+            Torneo Fútbol 7 Astrabudua
           </p>
-          <h1 className="mt-2 text-3xl font-bold">Normativa</h1>
-          <p className="mt-2 text-emerald-100">
-            Reglas básicas del torneo.
-          </p>
+          <h1 className="mt-2 text-center text-3xl font-black">
+            Normativa
+          </h1>
         </div>
 
         <div className="mt-5 flex-1 overflow-y-auto rounded-3xl bg-white/90 p-4 text-slate-900 shadow-2xl backdrop-blur">

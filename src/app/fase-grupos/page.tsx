@@ -51,7 +51,7 @@ function normalizarEquipo(
 export default function FaseGruposPage() {
   const [grupoActivo, setGrupoActivo] = useState("Grupo A");
   const [clasificacionAbierta, setClasificacionAbierta] = useState(false);
-  const [jornadaAbierta, setJornadaAbierta] = useState("Jornada 1");
+  const [jornadaAbierta, setJornadaAbierta] = useState("");
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -190,7 +190,7 @@ export default function FaseGruposPage() {
 
   useEffect(() => {
     setClasificacionAbierta(false);
-    setJornadaAbierta("Jornada 1");
+    setJornadaAbierta("");
   }, [grupoActivo]);
 
   return (

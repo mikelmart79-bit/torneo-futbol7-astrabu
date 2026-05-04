@@ -58,7 +58,6 @@ export default function FaseGruposPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [grupoActivo, setGrupoActivo] = useState("");
   const [clasificacionAbierta, setClasificacionAbierta] = useState(false);
-  const [jornadaAbierta, setJornadaAbierta] = useState("");
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -187,21 +186,8 @@ export default function FaseGruposPage() {
     });
   }, [teamsGrupo, matchesGrupo]);
 
-  const jornadas = useMemo(() => {
-    const fechas = Array.from(
-      new Set(matchesGrupo.map((match) => match.match_date))
-    ).sort();
-
-    return fechas.map((fecha, index) => ({
-      nombre: `Jornada ${index + 1}`,
-      fecha,
-      partidos: matchesGrupo.filter((match) => match.match_date === fecha),
-    }));
-  }, [matchesGrupo]);
-
   useEffect(() => {
     setClasificacionAbierta(false);
-    setJornadaAbierta("");
   }, [grupoActivo]);
 
   return (
@@ -256,14 +242,9 @@ export default function FaseGruposPage() {
                   <p className="text-sm font-bold">{grupoActivo}</p>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-red-600">
-                    Top 2
-                  </span>
-                  <span className="text-2xl font-black">
-                    {clasificacionAbierta ? "−" : "+"}
-                  </span>
-                </div>
+                <span className="text-2xl font-black">
+                  {clasificacionAbierta ? "−" : "+"}
+                </span>
               </button>
 
               {clasificacionAbierta && (
@@ -306,10 +287,18 @@ export default function FaseGruposPage() {
                             </span>
                           </div>
 
-                          <span className="text-center font-bold">{row.pj}</span>
-                          <span className="text-center font-bold">{row.g}</span>
-                          <span className="text-center font-bold">{row.e}</span>
-                          <span className="text-center font-bold">{row.p}</span>
+                          <span className="text-center font-bold">
+                            {row.pj}
+                          </span>
+                          <span className="text-center font-bold">
+                            {row.g}
+                          </span>
+                          <span className="text-center font-bold">
+                            {row.e}
+                          </span>
+                          <span className="text-center font-bold">
+                            {row.p}
+                          </span>
                           <span
                             className={`text-center font-black ${
                               row.dg > 0
@@ -346,97 +335,61 @@ export default function FaseGruposPage() {
               </div>
 
               <div className="space-y-3 p-4">
-                {jornadas.length === 0 ? (
+                {matchesGrupo.length === 0 ? (
                   <p className="text-sm text-slate-500">
                     No hay partidos cargados en este grupo.
                   </p>
                 ) : (
-                  jornadas.map((jornada) => {
-                    const abierta = jornadaAbierta === jornada.nombre;
+                  matchesGrupo.map((match) => {
+                    const finalizado =
+                      match.home_score !== null && match.away_score !== null;
 
                     return (
                       <div
-                        key={jornada.nombre}
-                        className="overflow-hidden rounded-2xl bg-slate-50 shadow-sm"
+                        key={match.id}
+                        className="rounded-2xl bg-white p-4 shadow"
                       >
-                        <button
-                          onClick={() =>
-                            setJornadaAbierta(abierta ? "" : jornada.nombre)
-                          }
-                          className="flex w-full items-center justify-between px-4 py-4 text-left"
-                        >
-                          <div>
-                            <p className="text-lg font-black">
-                              {jornada.nombre}
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex-1">
+                            <p className="text-base font-black leading-tight">
+                              {match.home_team?.name}
                             </p>
-                            <p className="text-sm font-semibold text-slate-500">
-                              {jornada.fecha}
+                            <p className="text-xs font-black uppercase text-slate-400">
+                              vs
+                            </p>
+                            <p className="text-base font-black leading-tight">
+                              {match.away_team?.name}
                             </p>
                           </div>
 
-                          <span className="text-2xl font-black text-red-600">
-                            {abierta ? "−" : "+"}
+                          <div className="min-w-20 rounded-2xl bg-slate-950 px-3 py-2 text-center text-white shadow">
+                            {finalizado ? (
+                              <p className="text-2xl font-black">
+                                {match.home_score} - {match.away_score}
+                              </p>
+                            ) : (
+                              <p className="text-lg font-black text-red-400">
+                                {match.match_time}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="mt-3 flex items-center justify-between text-sm font-semibold text-slate-500">
+                          <span>
+                            {match.match_date} · {match.match_time} ·{" "}
+                            {match.field}
                           </span>
-                        </button>
-
-                        {abierta && (
-                          <div className="space-y-3 border-t border-slate-200 p-4">
-                            {jornada.partidos.map((match) => {
-                              const finalizado =
-                                match.home_score !== null &&
-                                match.away_score !== null;
-
-                              return (
-                                <div
-                                  key={match.id}
-                                  className="rounded-2xl bg-white p-4 shadow"
-                                >
-                                  <div className="flex items-center justify-between gap-3">
-                                    <div className="flex-1">
-                                      <p className="text-base font-black leading-tight">
-                                        {match.home_team?.name}
-                                      </p>
-                                      <p className="text-xs font-black uppercase text-slate-400">
-                                        vs
-                                      </p>
-                                      <p className="text-base font-black leading-tight">
-                                        {match.away_team?.name}
-                                      </p>
-                                    </div>
-
-                                    <div className="min-w-20 rounded-2xl bg-slate-950 px-3 py-2 text-center text-white shadow">
-                                      {finalizado ? (
-                                        <p className="text-2xl font-black">
-                                          {match.home_score} -{" "}
-                                          {match.away_score}
-                                        </p>
-                                      ) : (
-                                        <p className="text-lg font-black text-red-400">
-                                          {match.match_time}
-                                        </p>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  <div className="mt-3 flex items-center justify-between text-sm font-semibold text-slate-500">
-                                    <span>
-                                      {match.match_time} · {match.field}
-                                    </span>
-                                    <span
-                                      className={`rounded-full px-3 py-1 text-xs font-black ${
-                                        finalizado
-                                          ? "bg-emerald-100 text-emerald-700"
-                                          : "bg-red-100 text-red-600"
-                                      }`}
-                                    >
-                                      {finalizado ? "Finalizado" : "Pendiente"}
-                                    </span>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-black ${
+                              finalizado
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-red-100 text-red-600"
+                            }`}
+                          >
+                            {finalizado ? "Finalizado" : "Pendiente"}
+                          </span>
+                        </div>
                       </div>
                     );
                   })

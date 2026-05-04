@@ -13,9 +13,22 @@ type Match = {
   away_score: number | null;
   status: string;
   mvp_open: boolean;
-  home_team: { name: string };
-  away_team: { name: string };
+  home_team: { name: string } | null;
+  away_team: { name: string } | null;
 };
+
+type RawMatch = Omit<Match, "home_team" | "away_team"> & {
+  home_team: { name: string }[] | { name: string } | null;
+  away_team: { name: string }[] | { name: string } | null;
+};
+
+function normalizarEquipo(
+  equipo: RawMatch["home_team"]
+): { name: string } | null {
+  if (!equipo) return null;
+  if (Array.isArray(equipo)) return equipo[0] ?? null;
+  return equipo;
+}
 
 export default function AdminPartidosPage() {
   const [matches, setMatches] = useState<Match[]>([]);
@@ -36,8 +49,7 @@ export default function AdminPartidosPage() {
   async function cargarPartidos() {
     const { data, error } = await supabase
       .from("matches")
-      .select(
-        `
+      .select(`
         id,
         group_name,
         match_date,
@@ -49,8 +61,7 @@ export default function AdminPartidosPage() {
         mvp_open,
         home_team:teams!matches_home_team_id_fkey(name),
         away_team:teams!matches_away_team_id_fkey(name)
-      `
-      )
+      `)
       .order("match_date", { ascending: true })
       .order("match_time", { ascending: true });
 
@@ -61,17 +72,24 @@ export default function AdminPartidosPage() {
       return;
     }
 
-    const partidos = (data ?? []) as unknown as Match[];
+    const partidos: Match[] = ((data as unknown as RawMatch[]) || []).map(
+      (match) => ({
+        ...match,
+        home_team: normalizarEquipo(match.home_team),
+        away_team: normalizarEquipo(match.away_team),
+      })
+    );
+
     setMatches(partidos);
 
     if (partidos.length > 0 && !partidoId) {
-      seleccionarPartido(partidos[0], partidos);
+      seleccionarPartido(partidos[0]);
     }
 
     setLoading(false);
   }
 
-  function seleccionarPartido(match: Match, lista = matches) {
+  function seleccionarPartido(match: Match) {
     setPartidoId(match.id);
     setGolesLocal(match.home_score?.toString() ?? "");
     setGolesVisitante(match.away_score?.toString() ?? "");
@@ -111,9 +129,9 @@ export default function AdminPartidosPage() {
     }
 
     setMensaje(
-      `Resultado guardado: ${partido.home_team?.name} ${local ?? "-"} - ${
-        visitante ?? "-"
-      } ${partido.away_team?.name}`
+      `Resultado guardado: ${partido.home_team?.name ?? "Local"} ${
+        local ?? "-"
+      } - ${visitante ?? "-"} ${partido.away_team?.name ?? "Visitante"}`
     );
 
     await cargarPartidos();
@@ -127,18 +145,15 @@ export default function AdminPartidosPage() {
         className="fixed inset-0 h-screen w-screen object-cover opacity-35 blur-sm"
       />
 
-      <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-20">
+      <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-24">
         <div className="rounded-3xl bg-black/60 px-4 py-5 text-white shadow-2xl backdrop-blur">
           <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
             Torneo Fútbol 7 Astrabudua
-	<div className="rounded-3xl bg-black/60 px-4 py-5 text-white shadow-2xl backdrop-blur">
-  	  <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
-            Torneo Fútbol 7 Astrabudua
-         </p>
-         <h1 className="mt-2 text-center text-3xl font-black">
+          </p>
+          <h1 className="mt-2 text-center text-3xl font-black">
             Meter resultados
-        </h1>
-      </div>
+          </h1>
+        </div>
 
         <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
           {loading ? (
@@ -156,8 +171,9 @@ export default function AdminPartidosPage() {
               >
                 {matches.map((match) => (
                   <option key={match.id} value={match.id}>
-                    {match.home_team?.name} vs {match.away_team?.name} ·{" "}
-                    {match.match_date} · {match.match_time}
+                    {match.home_team?.name ?? "Local"} vs{" "}
+                    {match.away_team?.name ?? "Visitante"} · {match.match_date} ·{" "}
+                    {match.match_time}
                   </option>
                 ))}
               </select>
@@ -175,7 +191,9 @@ export default function AdminPartidosPage() {
                   </div>
 
                   <div className="mt-5 grid grid-cols-[1fr_80px] items-center gap-3">
-                    <p className="font-black">{partido.home_team?.name}</p>
+                    <p className="font-black">
+                      {partido.home_team?.name ?? "Local"}
+                    </p>
                     <input
                       type="number"
                       min="0"
@@ -184,7 +202,9 @@ export default function AdminPartidosPage() {
                       className="rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
                     />
 
-                    <p className="font-black">{partido.away_team?.name}</p>
+                    <p className="font-black">
+                      {partido.away_team?.name ?? "Visitante"}
+                    </p>
                     <input
                       type="number"
                       min="0"

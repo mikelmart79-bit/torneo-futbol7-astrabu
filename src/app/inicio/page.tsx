@@ -52,7 +52,7 @@ export default function InicioPage() {
 
       <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-24">
         <div className="rounded-3xl bg-black/60 px-4 py-5 text-white shadow-2xl backdrop-blur">
-          <h1 className="text-center text-lg font-black whitespace-nowrap sm:text-xl">
+          <h1 className="whitespace-nowrap text-center text-lg font-black sm:text-xl">
             Torneo Fútbol 7 Astrabudua
           </h1>
         </div>
@@ -105,20 +105,17 @@ export default function InicioPage() {
 
         <div className="mt-6 grid grid-cols-2 gap-3">
           <a
-            href="/clasificacion"
+            href="/equipos"
             className="rounded-2xl bg-white/95 p-4 text-lg font-black shadow"
           >
-            Clasificación
+            Equipos
           </a>
 
           <a
             href="/mvp"
-            className="rounded-2xl bg-white/95 p-4 text-lg font-black shadow"
+            className="whitespace-nowrap rounded-2xl bg-white/95 p-4 text-base font-black shadow"
           >
-            7 Ideal
-            <span className="block text-sm font-bold text-red-600">
-              MVP
-            </span>
+            MVP Equipo Ideal
           </a>
 
           <a
@@ -130,7 +127,7 @@ export default function InicioPage() {
 
           <a
             href="/admin"
-            className="rounded-2xl bg-black/85 p-4 text-lg font-black text-white shadow"
+            className="rounded-2xl bg-red-600 p-4 text-lg font-black text-white shadow"
           >
             Panel admin
           </a>

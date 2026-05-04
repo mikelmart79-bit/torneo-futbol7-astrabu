@@ -95,13 +95,6 @@ export default function InicioPage() {
                   </p>
                 </div>
               </div>
-
-              <a
-                href="/partidos"
-                className="mt-5 block w-full rounded-xl bg-red-600 py-3 text-center font-bold text-white shadow-lg"
-              >
-                Ver resultados
-              </a>
             </div>
           ) : (
             <p className="p-5 text-sm text-slate-500">
@@ -119,17 +112,13 @@ export default function InicioPage() {
           </a>
 
           <a
-            href="/equipos"
-            className="rounded-2xl bg-white/95 p-4 text-lg font-black shadow"
-          >
-            Equipos
-          </a>
-
-          <a
             href="/mvp"
             className="rounded-2xl bg-white/95 p-4 text-lg font-black shadow"
           >
-            MVP
+            7 Ideal
+            <span className="block text-sm font-bold text-red-600">
+              MVP
+            </span>
           </a>
 
           <a
@@ -138,14 +127,14 @@ export default function InicioPage() {
           >
             Normativa
           </a>
-        </div>
 
-        <a
-          href="/admin"
-          className="mt-5 block w-full rounded-2xl bg-black/85 p-4 text-center text-lg font-black text-white shadow"
-        >
-          Panel admin
-        </a>
+          <a
+            href="/admin"
+            className="rounded-2xl bg-black/85 p-4 text-lg font-black text-white shadow"
+          >
+            Panel admin
+          </a>
+        </div>
       </section>
     </main>
   );

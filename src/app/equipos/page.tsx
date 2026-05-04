@@ -44,15 +44,14 @@ export default function EquiposPage() {
         className="fixed inset-0 h-screen w-screen object-cover opacity-35 blur-sm"
       />
 
-      <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-20">
-        <div className="rounded-3xl bg-black/60 p-6 text-white shadow-2xl backdrop-blur">
-          <p className="text-sm uppercase tracking-widest text-emerald-200">
-            Torneo verano 2026
+      <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-24">
+        <div className="rounded-3xl bg-black/60 px-4 py-5 text-white shadow-2xl backdrop-blur">
+          <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
+            Torneo Fútbol 7 Astrabudua
           </p>
-          <h1 className="mt-2 text-3xl font-black">Equipos</h1>
-          <p className="mt-2 text-emerald-100">
-            Equipos participantes por grupos.
-          </p>
+          <h1 className="mt-2 text-center text-3xl font-black">
+            Equipos
+          </h1>
         </div>
 
         {loading ? (
@@ -68,19 +67,20 @@ export default function EquiposPage() {
               );
 
               return (
-                <div key={grupo} className="rounded-2xl bg-white/95 shadow">
+                <div key={grupo} className="overflow-hidden rounded-2xl bg-white/95 shadow">
                   <button
                     onClick={() => setGrupoAbierto(abierto ? "" : grupo)}
-                    className="flex w-full items-center justify-between p-4 text-left"
+                    className={`flex w-full items-center justify-between p-4 text-left ${
+                      abierto ? "bg-red-600 text-white" : "bg-white/95 text-slate-900"
+                    }`}
                   >
-                    <div>
-                      <p className="text-lg font-black">{grupo}</p>
-                      <p className="text-sm text-slate-500">
-                        {equiposGrupo.length} equipos
-                      </p>
-                    </div>
+                    <p className="text-lg font-black">{grupo}</p>
 
-                    <span className="text-2xl font-black text-red-600">
+                    <span
+                      className={`text-2xl font-black ${
+                        abierto ? "text-white" : "text-red-600"
+                      }`}
+                    >
                       {abierto ? "−" : "+"}
                     </span>
                   </button>
@@ -97,12 +97,7 @@ export default function EquiposPage() {
                             {team.name.slice(0, 2).toUpperCase()}
                           </div>
 
-                          <div>
-                            <p className="font-bold">{team.name}</p>
-                            <p className="text-sm text-slate-500">
-                              {team.group_name}
-                            </p>
-                          </div>
+                          <p className="font-bold">{team.name}</p>
                         </Link>
                       ))}
                     </div>

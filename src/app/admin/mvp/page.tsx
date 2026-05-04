@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import AdminGuard from "@/components/AdminGuard";
 import { supabase } from "@/lib/supabase";
+
+type Group = {
+  id: string;
+  name: string;
+  sort_order: number;
+};
 
 type Match = {
   id: string;
@@ -49,23 +55,14 @@ function normalizarEquipo(
 }
 
 export default function AdminMvpPage() {
+  const [groups, setGroups] = useState<Group[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
-  const [grupoActivo, setGrupoActivo] = useState("Grupo A");
+  const [grupoActivo, setGrupoActivo] = useState("");
   const [selectedMatchId, setSelectedMatchId] = useState("");
   const [players, setPlayers] = useState<Player[]>([]);
   const [votes, setVotes] = useState<Vote[]>([]);
   const [mensaje, setMensaje] = useState("");
   const [loading, setLoading] = useState(true);
-
-  const grupos = useMemo(() => {
-    const encontrados = Array.from(
-      new Set(matches.map((match) => match.group_name).filter(Boolean))
-    );
-
-    return encontrados.length > 0
-      ? encontrados
-      : ["Grupo A", "Grupo B", "Grupo C", "Grupo D"];
-  }, [matches]);
 
   const matchesGrupo = matches.filter(
     (match) => match.group_name === grupoActivo
@@ -78,11 +75,19 @@ export default function AdminMvpPage() {
   const totalVotos = votes.length;
 
   useEffect(() => {
-    cargarPartidos();
+    cargarDatos();
   }, []);
 
-  async function cargarPartidos() {
+  async function cargarDatos() {
     setLoading(true);
+
+    const { data: groupsData } = await supabase
+      .from("groups")
+      .select("id, name, sort_order")
+      .order("sort_order", { ascending: true });
+
+    const grupos = (groupsData ?? []) as Group[];
+    setGroups(grupos);
 
     const { data, error } = await supabase
       .from("matches")
@@ -121,18 +126,16 @@ export default function AdminMvpPage() {
 
     setMatches(partidos);
 
-    if (partidos.length > 0) {
-      const primerGrupo = partidos[0].group_name || "Grupo A";
-      const primerPartido = partidos.find(
-        (match) => match.group_name === primerGrupo
-      );
+    const primerGrupo = grupos[0]?.name || partidos[0]?.group_name || "";
+    setGrupoActivo(primerGrupo);
 
-      setGrupoActivo(primerGrupo);
+    const primerPartido = partidos.find(
+      (match) => match.group_name === primerGrupo
+    );
 
-      if (primerPartido) {
-        setSelectedMatchId(primerPartido.id);
-        await cargarDatosPartido(primerPartido);
-      }
+    if (primerPartido) {
+      setSelectedMatchId(primerPartido.id);
+      await cargarDatosPartido(primerPartido);
     }
 
     setLoading(false);
@@ -196,7 +199,7 @@ export default function AdminMvpPage() {
     }
 
     setMensaje(abierto ? "Votación MVP abierta." : "Votación MVP cerrada.");
-    await cargarPartidos();
+    await cargarDatos();
   }
 
   async function borrarVotos() {
@@ -322,9 +325,9 @@ export default function AdminMvpPage() {
           <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
             {loading ? (
               <p className="font-bold text-slate-500">Cargando votaciones...</p>
-            ) : matches.length === 0 ? (
+            ) : groups.length === 0 ? (
               <p className="font-bold text-slate-500">
-                No hay partidos cargados.
+                Todavía no hay grupos creados.
               </p>
             ) : (
               <>
@@ -337,9 +340,9 @@ export default function AdminMvpPage() {
                   onChange={(event) => cambiarGrupo(event.target.value)}
                   className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
                 >
-                  {grupos.map((grupo) => (
-                    <option key={grupo} value={grupo}>
-                      {grupo}
+                  {groups.map((grupo) => (
+                    <option key={grupo.id} value={grupo.name}>
+                      {grupo.name}
                     </option>
                   ))}
                 </select>
@@ -376,6 +379,7 @@ export default function AdminMvpPage() {
                         {selectedMatch.match_date} ·{" "}
                         {selectedMatch.match_time} · {selectedMatch.field}
                       </p>
+
                       <p className="mt-2 text-sm font-black">
                         Estado votación:{" "}
                         <span
@@ -388,6 +392,7 @@ export default function AdminMvpPage() {
                           {selectedMatch.mvp_open ? "Abierta" : "Cerrada"}
                         </span>
                       </p>
+
                       <p className="mt-1 text-sm font-bold text-slate-500">
                         Total votos: {totalVotos}
                       </p>

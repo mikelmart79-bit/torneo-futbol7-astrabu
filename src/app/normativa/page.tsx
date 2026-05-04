@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase";
 
 type Rule = {
   id: string;
-  rule_text: string;
+  content: string;
   sort_order: number;
 };
 
@@ -16,7 +16,7 @@ export default function NormativaPage() {
     async function cargarNormativa() {
       const { data } = await supabase
         .from("rules")
-        .select("id, rule_text, sort_order")
+        .select("id, content, sort_order")
         .order("sort_order", { ascending: true });
 
       setRules((data ?? []) as Rule[]);
@@ -51,7 +51,7 @@ export default function NormativaPage() {
                   </div>
 
                   <p className="font-semibold leading-relaxed">
-                    {rule.rule_text}
+                    {rule.content}
                   </p>
                 </div>
               </div>

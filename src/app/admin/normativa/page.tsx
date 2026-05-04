@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 
 type Rule = {
   id: string;
-  rule_text: string;
+  content: string;
   sort_order: number;
 };
 
@@ -24,7 +24,7 @@ export default function AdminNormativaPage() {
   async function cargarNormativa() {
     const { data } = await supabase
       .from("rules")
-      .select("id, rule_text, sort_order")
+      .select("id, content, sort_order")
       .order("sort_order", { ascending: true });
 
     const rows = (data ?? []) as Rule[];
@@ -37,7 +37,7 @@ export default function AdminNormativaPage() {
 
   function cargarEnFormulario(rule: Rule) {
     setSelectedId(rule.id);
-    setTexto(rule.rule_text);
+    setTexto(rule.content);
     setOrden(rule.sort_order.toString());
     setMensaje("");
   }
@@ -56,7 +56,7 @@ export default function AdminNormativaPage() {
     }
 
     const payload = {
-      rule_text: texto.trim(),
+      content: texto.trim(),
       sort_order: Number(orden) || 1,
     };
 
@@ -125,7 +125,7 @@ export default function AdminNormativaPage() {
               <option value="">Nueva regla</option>
               {rules.map((rule) => (
                 <option key={rule.id} value={rule.id}>
-                  {rule.sort_order}. {rule.rule_text.slice(0, 45)}
+                  {rule.sort_order}. {rule.content.slice(0, 45)}
                 </option>
               ))}
             </select>

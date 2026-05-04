@@ -46,6 +46,13 @@ export default function AdminPage() {
             </Link>
 
             <Link
+              href="/admin/gestionar-partidos"
+              className="rounded-2xl bg-white/95 p-5 text-lg font-black shadow"
+            >
+              Gestionar partidos
+            </Link>
+
+            <Link
               href="/admin/equipos"
               className="rounded-2xl bg-white/95 p-5 text-lg font-black shadow"
             >

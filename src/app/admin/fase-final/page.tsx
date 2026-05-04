@@ -22,12 +22,12 @@ type FinalMatch = {
 type Team = {
   id: string;
   name: string;
-  group_name: string;
+  group_name: string | null;
 };
 
 type GroupMatch = {
   id: string;
-  group_name: string;
+  group_name: string | null;
   home_team_id: string;
   away_team_id: string;
   home_score: number | null;
@@ -230,14 +230,16 @@ export default function AdminFaseFinalPage() {
 
   async function generarEliminatoriasAutomaticas() {
     const confirmar = window.confirm(
-      "Esto borrará los cruces actuales de fase final y generará nuevos cruces desde la clasificación. ¿Continuar?"
+      "Esto borrará los cruces actuales de fase final y generará nuevos cruces desde los grupos existentes. ¿Continuar?"
     );
 
     if (!confirmar) return;
 
     const { data: teamsData, error: teamsError } = await supabase
       .from("teams")
-      .select("id, name, group_name");
+      .select("id, name, group_name")
+      .order("group_name", { ascending: true })
+      .order("name", { ascending: true });
 
     if (teamsError) {
       setMensaje("No se han podido cargar los equipos.");
@@ -246,17 +248,31 @@ export default function AdminFaseFinalPage() {
 
     const { data: matchesData, error: matchesError } = await supabase
       .from("matches")
-      .select("id, group_name, home_team_id, away_team_id, home_score, away_score");
+      .select(
+        "id, group_name, home_team_id, away_team_id, home_score, away_score"
+      );
 
     if (matchesError) {
       setMensaje("No se han podido cargar los partidos.");
       return;
     }
 
-    const teams = (teamsData ?? []) as Team[];
-    const groupMatches = (matchesData ?? []) as GroupMatch[];
+    const teams = ((teamsData ?? []) as Team[]).filter(
+      (team) => team.group_name && team.group_name.trim() !== ""
+    );
 
-    const grupos = ["Grupo A", "Grupo B", "Grupo C", "Grupo D"];
+    const groupMatches = ((matchesData ?? []) as GroupMatch[]).filter(
+      (match) => match.group_name && match.group_name.trim() !== ""
+    );
+
+    const grupos = Array.from(
+      new Set(teams.map((team) => team.group_name as string))
+    ).sort((a, b) => a.localeCompare(b));
+
+    if (grupos.length < 2) {
+      setMensaje("Necesitas al menos 2 grupos con equipos para generar eliminatorias.");
+      return;
+    }
 
     const clasificados: Record<string, TableRow[]> = {};
 
@@ -265,117 +281,95 @@ export default function AdminFaseFinalPage() {
       clasificados[grupo] = tabla;
 
       if (tabla.length < 2) {
-        setMensaje(`Faltan equipos clasificados en ${grupo}.`);
+        setMensaje(`Faltan al menos 2 equipos en ${grupo}.`);
         return;
       }
     }
 
-    const nuevosCruces = [
-      {
-        phase: "Cuartos",
-        title: "Cuarto 1",
-        home_ref: clasificados["Grupo A"][0].teamName,
-        away_ref: clasificados["Grupo B"][1].teamName,
-        match_date: null,
-        match_time: null,
-        field: null,
-        home_score: null,
-        away_score: null,
-        status: "Pendiente",
-        sort_order: 1,
-      },
-      {
-        phase: "Cuartos",
-        title: "Cuarto 2",
-        home_ref: clasificados["Grupo B"][0].teamName,
-        away_ref: clasificados["Grupo A"][1].teamName,
-        match_date: null,
-        match_time: null,
-        field: null,
-        home_score: null,
-        away_score: null,
-        status: "Pendiente",
-        sort_order: 2,
-      },
-      {
-        phase: "Cuartos",
-        title: "Cuarto 3",
-        home_ref: clasificados["Grupo C"][0].teamName,
-        away_ref: clasificados["Grupo D"][1].teamName,
-        match_date: null,
-        match_time: null,
-        field: null,
-        home_score: null,
-        away_score: null,
-        status: "Pendiente",
-        sort_order: 3,
-      },
-      {
-        phase: "Cuartos",
-        title: "Cuarto 4",
-        home_ref: clasificados["Grupo D"][0].teamName,
-        away_ref: clasificados["Grupo C"][1].teamName,
-        match_date: null,
-        match_time: null,
-        field: null,
-        home_score: null,
-        away_score: null,
-        status: "Pendiente",
-        sort_order: 4,
-      },
-      {
+    const crucesCuartos = [];
+
+    for (let i = 0; i < grupos.length; i += 2) {
+      const grupo1 = grupos[i];
+      const grupo2 = grupos[i + 1];
+
+      if (!grupo2) break;
+
+      crucesCuartos.push({
+        home: clasificados[grupo1][0].teamName,
+        away: clasificados[grupo2][1].teamName,
+      });
+
+      crucesCuartos.push({
+        home: clasificados[grupo2][0].teamName,
+        away: clasificados[grupo1][1].teamName,
+      });
+    }
+
+    if (crucesCuartos.length < 2) {
+      setMensaje("No hay suficientes grupos para crear cruces.");
+      return;
+    }
+
+    const nuevosCruces = crucesCuartos.map((cruce, index) => ({
+      phase: "Cuartos",
+      title: `Cuarto ${index + 1}`,
+      home_ref: cruce.home,
+      away_ref: cruce.away,
+      match_date: null,
+      match_time: null,
+      field: null,
+      home_score: null,
+      away_score: null,
+      status: "Pendiente",
+      sort_order: index + 1,
+    }));
+
+    const totalCuartos = nuevosCruces.length;
+    const totalSemis = Math.ceil(totalCuartos / 2);
+
+    for (let i = 0; i < totalSemis; i++) {
+      nuevosCruces.push({
         phase: "Semifinales",
-        title: "Semifinal 1",
-        home_ref: "Ganador Cuarto 1",
-        away_ref: "Ganador Cuarto 2",
+        title: `Semifinal ${i + 1}`,
+        home_ref: `Ganador Cuarto ${i * 2 + 1}`,
+        away_ref: `Ganador Cuarto ${i * 2 + 2}`,
         match_date: null,
         match_time: null,
         field: null,
         home_score: null,
         away_score: null,
         status: "Pendiente",
-        sort_order: 5,
-      },
-      {
-        phase: "Semifinales",
-        title: "Semifinal 2",
-        home_ref: "Ganador Cuarto 3",
-        away_ref: "Ganador Cuarto 4",
-        match_date: null,
-        match_time: null,
-        field: null,
-        home_score: null,
-        away_score: null,
-        status: "Pendiente",
-        sort_order: 6,
-      },
-      {
-        phase: "Tercer puesto",
-        title: "Tercer y cuarto puesto",
-        home_ref: "Perdedor Semifinal 1",
-        away_ref: "Perdedor Semifinal 2",
-        match_date: null,
-        match_time: null,
-        field: null,
-        home_score: null,
-        away_score: null,
-        status: "Pendiente",
-        sort_order: 7,
-      },
-      {
-        phase: "Final",
-        title: "Final",
-        home_ref: "Ganador Semifinal 1",
-        away_ref: "Ganador Semifinal 2",
-        match_date: null,
-        match_time: null,
-        field: null,
-        home_score: null,
-        away_score: null,
-        status: "Pendiente",
-        sort_order: 8,
-      },
-    ];
+        sort_order: nuevosCruces.length + 1,
+      });
+    }
+
+    nuevosCruces.push({
+      phase: "Tercer puesto",
+      title: "Tercer y cuarto puesto",
+      home_ref: "Perdedor Semifinal 1",
+      away_ref: "Perdedor Semifinal 2",
+      match_date: null,
+      match_time: null,
+      field: null,
+      home_score: null,
+      away_score: null,
+      status: "Pendiente",
+      sort_order: nuevosCruces.length + 1,
+    });
+
+    nuevosCruces.push({
+      phase: "Final",
+      title: "Final",
+      home_ref: "Ganador Semifinal 1",
+      away_ref: "Ganador Semifinal 2",
+      match_date: null,
+      match_time: null,
+      field: null,
+      home_score: null,
+      away_score: null,
+      status: "Pendiente",
+      sort_order: nuevosCruces.length + 1,
+    });
 
     const { error: deleteError } = await supabase
       .from("final_matches")
@@ -415,9 +409,7 @@ export default function AdminFaseFinalPage() {
             <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
               Torneo Fútbol 7 Astrabudua
             </p>
-            <h1 className="mt-2 text-center text-3xl font-black">
-              Fase final
-            </h1>
+            <h1 className="mt-2 text-center text-3xl font-black">Fase final</h1>
           </div>
 
           <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
@@ -425,12 +417,12 @@ export default function AdminFaseFinalPage() {
               onClick={generarEliminatoriasAutomaticas}
               className="w-full rounded-xl bg-red-600 py-3 font-black text-white shadow"
             >
-              Generar eliminatorias automáticamente
+              Generar eliminatorias
             </button>
 
             <p className="mt-3 text-xs font-bold text-slate-500">
-              Usa la clasificación actual de los grupos. Borra los cruces
-              existentes y crea cuartos, semifinales, tercer puesto y final.
+              Usa automáticamente los grupos existentes. Empareja 1º contra 2º
+              del siguiente grupo y crea cuartos, semifinales, tercer puesto y final.
             </p>
           </div>
 
@@ -502,7 +494,7 @@ export default function AdminFaseFinalPage() {
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Cuarto 1, Semifinal 1, Gran final..."
+                placeholder="Cuarto 1, Semifinal 1, Final..."
                 className="mt-2 w-full rounded-xl border border-slate-300 p-3 font-bold"
               />
             </div>

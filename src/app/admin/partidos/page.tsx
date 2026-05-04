@@ -128,15 +128,17 @@ export default function AdminPartidosPage() {
       />
 
       <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-20">
-        <div className="rounded-3xl bg-black/60 p-6 text-white shadow-2xl backdrop-blur">
-          <p className="text-sm uppercase tracking-widest text-emerald-200">
-            Panel admin
-          </p>
-          <h1 className="mt-2 text-3xl font-black">Meter resultados</h1>
-          <p className="mt-2 text-emerald-100">
-            Guarda resultados reales en Supabase.
-          </p>
-        </div>
+        <div className="rounded-3xl bg-black/60 px-4 py-5 text-white shadow-2xl backdrop-blur">
+          <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
+            Torneo Fútbol 7 Astrabudua
+	<div className="rounded-3xl bg-black/60 px-4 py-5 text-white shadow-2xl backdrop-blur">
+  	  <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
+            Torneo Fútbol 7 Astrabudua
+         </p>
+         <h1 className="mt-2 text-center text-3xl font-black">
+            Meter resultados
+        </h1>
+      </div>
 
         <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
           {loading ? (

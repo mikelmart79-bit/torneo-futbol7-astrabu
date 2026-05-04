@@ -65,7 +65,8 @@ export default function AdminNormativaPage() {
       : await supabase.from("rules").insert(payload);
 
     if (error) {
-      setMensaje("No se ha podido guardar la regla.");
+      console.error("Error guardando regla:", error);
+      setMensaje(`No se ha podido guardar la regla: ${error.message}`);
       return;
     }
 

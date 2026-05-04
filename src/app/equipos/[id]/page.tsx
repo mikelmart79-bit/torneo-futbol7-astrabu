@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -121,12 +120,6 @@ export default function EquipoDetalle() {
       />
 
       <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-24">
-        <Link
-          href="/equipos"
-          className="mb-4 inline-block rounded-full bg-white/95 px-4 py-2 text-sm font-black text-red-600 shadow"
-        >
-          ← Volver a equipos
-        </Link>
 
         <div className="rounded-3xl bg-black/60 px-4 py-5 text-white shadow-2xl backdrop-blur">
           <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">

@@ -22,17 +22,17 @@ type Player = {
 
 function ShirtIcon({ color }: { color: string }) {
   return (
-    <div className="relative h-8 w-9">
+    <div className="relative h-10 w-11">
       <div
-        className="absolute left-2 top-1 h-7 w-5 rounded-sm ring-1 ring-black/20"
+        className="absolute left-2 top-1 h-9 w-7 rounded-sm ring-1 ring-black/20"
         style={{ backgroundColor: color }}
       />
       <div
-        className="absolute left-0 top-2 h-3 w-3 -rotate-12 rounded-sm ring-1 ring-black/20"
+        className="absolute left-0 top-2 h-4 w-4 -rotate-12 rounded-sm ring-1 ring-black/20"
         style={{ backgroundColor: color }}
       />
       <div
-        className="absolute right-0 top-2 h-3 w-3 rotate-12 rounded-sm ring-1 ring-black/20"
+        className="absolute right-0 top-2 h-4 w-4 rotate-12 rounded-sm ring-1 ring-black/20"
         style={{ backgroundColor: color }}
       />
     </div>
@@ -141,13 +141,35 @@ export default function EquipoDetalle() {
         </div>
 
         <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
+          <h2 className="text-xl font-black">Equipaciones</h2>
+
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-slate-50 p-4 text-center shadow">
+              <div className="flex justify-center">
+                <ShirtIcon color={colorLocal} />
+              </div>
+              <p className="mt-2 text-sm font-black text-slate-700">
+                Local
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 p-4 text-center shadow">
+              <div className="flex justify-center">
+                <ShirtIcon color={colorVisitante} />
+              </div>
+              <p className="mt-2 text-sm font-black text-slate-700">
+                Visitante
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-black">Plantilla</h2>
-
-            <div className="flex gap-2">
-              <ShirtIcon color={colorLocal} />
-              <ShirtIcon color={colorVisitante} />
-            </div>
+            <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-black text-white">
+              {jugadores.length} jugadores
+            </span>
           </div>
 
           {jugadores.length === 0 ? (
@@ -155,54 +177,19 @@ export default function EquipoDetalle() {
               Este equipo todavía no tiene jugadores añadidos.
             </p>
           ) : (
-            <div className="mt-5 grid grid-cols-2 gap-4">
+            <div className="mt-5 space-y-3">
               {jugadores.map((player) => (
                 <div
                   key={player.id}
-                  className="relative overflow-hidden rounded-xl bg-[#f3ead8] p-2 shadow-lg ring-1 ring-black/10"
+                  className="flex items-center gap-4 rounded-2xl bg-slate-50 p-4 shadow-sm"
                 >
-                  <div className="relative rounded-lg border border-slate-400 bg-white p-2">
-                    <div className="absolute left-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-[#f3ead8] text-lg shadow ring-1 ring-black/20">
-                      ⚽
-                    </div>
-
-                    <p className="pl-10 text-right text-[10px] font-black uppercase tracking-widest text-slate-700">
-                      {equipo.name}
-                    </p>
-
-                    <div className="mt-4 flex h-32 items-center justify-center overflow-hidden rounded-sm border border-slate-300 bg-gradient-to-b from-slate-100 to-slate-300">
-                      <div className="flex h-24 w-24 items-center justify-center rounded-full bg-slate-800 text-5xl font-black text-white shadow-inner">
-                        {player.number}
-                      </div>
-                    </div>
-
-                    <div className="mt-2 border-t border-slate-300 pt-2">
-                      <div className="flex items-end justify-between gap-2">
-                        <div>
-                          <p className="text-[10px] font-bold uppercase text-slate-500">
-                            Dorsal
-                          </p>
-                          <p className="text-3xl font-black leading-none text-red-600">
-                            {player.number}
-                          </p>
-                        </div>
-
-                        <div className="text-right">
-                          <p className="mb-1 text-[10px] font-bold uppercase text-slate-500">
-                            Equipaciones
-                          </p>
-                          <div className="flex justify-end gap-2">
-                            <ShirtIcon color={colorLocal} />
-                            <ShirtIcon color={colorVisitante} />
-                          </div>
-                        </div>
-                      </div>
-
-                      <p className="mt-2 border-t border-slate-300 pt-2 text-center text-sm font-black uppercase leading-tight text-slate-900">
-                        {player.name}
-                      </p>
-                    </div>
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-600 text-xl font-black text-white">
+                    {player.number}
                   </div>
+
+                  <p className="text-lg font-black leading-tight">
+                    {player.name}
+                  </p>
                 </div>
               ))}
             </div>

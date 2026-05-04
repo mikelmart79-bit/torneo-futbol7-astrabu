@@ -11,30 +11,50 @@ type Team = {
   away_color: string | null;
 };
 
+type Group = {
+  id: string;
+  name: string;
+  sort_order: number;
+};
+
 export default function AdminEquiposPage() {
   const [teams, setTeams] = useState<Team[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
+
   const [equipoId, setEquipoId] = useState("");
   const [nombre, setNombre] = useState("");
-  const [grupo, setGrupo] = useState("Grupo A");
+  const [grupo, setGrupo] = useState("");
   const [colorLocal, setColorLocal] = useState("#047857");
   const [colorVisitante, setColorVisitante] = useState("#dc2626");
   const [mensaje, setMensaje] = useState("");
 
   useEffect(() => {
-    cargarEquipos();
+    cargarDatos();
   }, []);
 
-  async function cargarEquipos() {
-    const { data, error } = await supabase
+  async function cargarDatos() {
+    const { data: groupsData } = await supabase
+      .from("groups")
+      .select("id, name, sort_order")
+      .order("sort_order", { ascending: true });
+
+    const grupos = (groupsData ?? []) as Group[];
+    setGroups(grupos);
+
+    const grupoInicial = grupos[0]?.name ?? "";
+    setGrupo(grupoInicial);
+
+    const { data: teamsData, error } = await supabase
       .from("teams")
       .select("*")
       .order("group_name", { ascending: true })
       .order("name", { ascending: true });
 
-    if (!error && data) {
-      setTeams(data);
-      if (data.length > 0) {
-        seleccionarEquipo(data[0]);
+    if (!error && teamsData) {
+      setTeams(teamsData as Team[]);
+
+      if (teamsData.length > 0) {
+        seleccionarEquipo(teamsData[0] as Team);
       }
     }
   }
@@ -49,6 +69,11 @@ export default function AdminEquiposPage() {
   }
 
   function cambiarEquipo(id: string) {
+    if (!id) {
+      nuevoEquipo();
+      return;
+    }
+
     const team = teams.find((t) => t.id === id);
     if (team) seleccionarEquipo(team);
   }
@@ -56,60 +81,62 @@ export default function AdminEquiposPage() {
   function nuevoEquipo() {
     setEquipoId("");
     setNombre("");
-    setGrupo("Grupo A");
+    setGrupo(groups[0]?.name ?? "");
     setColorLocal("#047857");
     setColorVisitante("#dc2626");
     setMensaje("");
   }
 
   async function guardarEquipo() {
-    if (!nombre.trim()) return;
+    if (!nombre.trim()) {
+      setMensaje("Escribe el nombre del equipo.");
+      return;
+    }
+
+    if (!grupo) {
+      setMensaje("Crea o selecciona un grupo antes de guardar el equipo.");
+      return;
+    }
 
     const payload = {
-      name: nombre,
+      name: nombre.trim(),
       group_name: grupo,
       home_color: colorLocal,
       away_color: colorVisitante,
     };
 
-    let error;
-
-    if (equipoId) {
-      // EDITAR
-      ({ error } = await supabase
-        .from("teams")
-        .update(payload)
-        .eq("id", equipoId));
-    } else {
-      // CREAR
-      ({ error } = await supabase.from("teams").insert(payload));
-    }
+    const { error } = equipoId
+      ? await supabase.from("teams").update(payload).eq("id", equipoId)
+      : await supabase.from("teams").insert(payload);
 
     if (error) {
-      setMensaje("Error guardando equipo");
+      setMensaje(`Error guardando equipo: ${error.message}`);
       return;
     }
 
-    setMensaje("Equipo guardado correctamente");
-    await cargarEquipos();
+    setMensaje("Equipo guardado correctamente.");
+    await cargarDatos();
   }
 
   async function eliminarEquipo() {
     if (!equipoId) return;
 
-    const { error } = await supabase
-      .from("teams")
-      .delete()
-      .eq("id", equipoId);
+    const confirmar = window.confirm(
+      "¿Seguro que quieres eliminar este equipo?"
+    );
+
+    if (!confirmar) return;
+
+    const { error } = await supabase.from("teams").delete().eq("id", equipoId);
 
     if (error) {
-      setMensaje("Error eliminando equipo");
+      setMensaje(`Error eliminando equipo: ${error.message}`);
       return;
     }
 
-    setMensaje("Equipo eliminado");
+    setMensaje("Equipo eliminado.");
     nuevoEquipo();
-    await cargarEquipos();
+    await cargarDatos();
   }
 
   return (
@@ -120,18 +147,14 @@ export default function AdminEquiposPage() {
         className="absolute inset-0 h-full w-full object-cover opacity-35 blur-sm"
       />
 
-      <section className="relative z-10 mx-auto max-w-md px-4 py-6">
-        {/* HEADER */}
+      <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-24">
         <div className="rounded-3xl bg-black/60 px-4 py-5 text-white shadow-2xl backdrop-blur">
           <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
             Torneo Fútbol 7 Astrabudua
           </p>
-          <h1 className="mt-2 text-center text-3xl font-black">
-           Equipos
-          </h1>
+          <h1 className="mt-2 text-center text-3xl font-black">Equipos</h1>
         </div>
 
-        {/* SELECT */}
         <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
           <label className="text-sm font-black uppercase text-slate-500">
             Equipo
@@ -158,7 +181,6 @@ export default function AdminEquiposPage() {
           </button>
         </div>
 
-        {/* FORM */}
         <div className="mt-5 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
           <div>
             <label className="text-sm font-black uppercase text-slate-500">
@@ -175,15 +197,21 @@ export default function AdminEquiposPage() {
             <label className="text-sm font-black uppercase text-slate-500">
               Grupo
             </label>
+
             <select
               value={grupo}
               onChange={(e) => setGrupo(e.target.value)}
               className="mt-2 w-full rounded-xl border p-3 font-bold"
             >
-              <option>Grupo A</option>
-              <option>Grupo B</option>
-              <option>Grupo C</option>
-              <option>Grupo D</option>
+              {groups.length === 0 ? (
+                <option value="">No hay grupos creados</option>
+              ) : (
+                groups.map((group) => (
+                  <option key={group.id} value={group.name}>
+                    {group.name}
+                  </option>
+                ))
+              )}
             </select>
           </div>
 

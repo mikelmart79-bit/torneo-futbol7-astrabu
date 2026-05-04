@@ -11,7 +11,7 @@ const items = [
     icon: Home,
   },
   {
-    href: "/partidos",
+    href: "/fase-grupos",
     label: "Fase grupos",
     icon: CalendarDays,
   },

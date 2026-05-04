@@ -24,8 +24,6 @@ export default function AdminFaseFinalPage() {
   const [selectedId, setSelectedId] = useState("");
   const [mensaje, setMensaje] = useState("");
 
-  const selected = matches.find((m) => m.id === selectedId);
-
   const [phase, setPhase] = useState("Cuartos");
   const [title, setTitle] = useState("");
   const [homeRef, setHomeRef] = useState("");
@@ -143,15 +141,14 @@ export default function AdminFaseFinalPage() {
           className="fixed inset-0 h-screen w-screen object-cover opacity-35 blur-sm"
         />
 
-        <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-20">
-          <div className="rounded-3xl bg-black/60 p-6 text-white shadow-2xl backdrop-blur">
-            <p className="text-sm uppercase tracking-widest text-emerald-200">
-              Panel admin
+        <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-24">
+          <div className="rounded-3xl bg-black/60 px-4 py-5 text-white shadow-2xl backdrop-blur">
+            <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
+              Torneo Fútbol 7 Astrabudua
             </p>
-            <h1 className="mt-2 text-3xl font-black">Fase final</h1>
-            <p className="mt-2 text-emerald-100">
-              Configura cruces, horarios, campos y resultados.
-            </p>
+            <h1 className="mt-2 text-center text-3xl font-black">
+              Fase final
+            </h1>
           </div>
 
           <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
@@ -164,6 +161,7 @@ export default function AdminFaseFinalPage() {
               onChange={(e) => {
                 const match = matches.find((m) => m.id === e.target.value);
                 if (match) cargarEnFormulario(match);
+                if (!e.target.value) nuevoCruce();
               }}
               className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
             >
@@ -196,8 +194,8 @@ export default function AdminFaseFinalPage() {
                 >
                   <option>Cuartos</option>
                   <option>Semifinales</option>
-                  <option>Final</option>
                   <option>Tercer puesto</option>
+                  <option>Final</option>
                 </select>
               </div>
 

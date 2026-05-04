@@ -3,6 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
+type Group = {
+  id: string;
+  name: string;
+  sort_order: number;
+};
+
 type Match = {
   id: string;
   group_name: string;
@@ -55,9 +61,10 @@ function getUserId() {
   return userId;
 }
 
-export default function MvpPage() {
+export default function VotarMvpPage() {
+  const [groups, setGroups] = useState<Group[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
-  const [selectedGroup, setSelectedGroup] = useState("Grupo A");
+  const [selectedGroup, setSelectedGroup] = useState("");
   const [selectedMatchId, setSelectedMatchId] = useState("");
   const [players, setPlayers] = useState<Player[]>([]);
   const [votes, setVotes] = useState<Vote[]>([]);
@@ -66,16 +73,6 @@ export default function MvpPage() {
   const [loading, setLoading] = useState(true);
 
   const selectedMatch = matches.find((match) => match.id === selectedMatchId);
-
-  const grupos = useMemo(() => {
-    const encontrados = Array.from(
-      new Set(matches.map((match) => match.group_name).filter(Boolean))
-    );
-
-    return encontrados.length > 0
-      ? encontrados
-      : ["Grupo A", "Grupo B", "Grupo C", "Grupo D"];
-  }, [matches]);
 
   const matchesGrupo = matches.filter(
     (match) => match.group_name === selectedGroup
@@ -94,7 +91,21 @@ export default function MvpPage() {
     cargarDatos();
   }, []);
 
+  const gruposConPartidos = useMemo(() => {
+    return groups.filter((group) =>
+      matches.some((match) => match.group_name === group.name)
+    );
+  }, [groups, matches]);
+
   async function cargarDatos() {
+    const { data: groupsData } = await supabase
+      .from("groups")
+      .select("id, name, sort_order")
+      .order("sort_order", { ascending: true });
+
+    const grupos = (groupsData ?? []) as Group[];
+    setGroups(grupos);
+
     const { data: matchesData, error: matchesError } = await supabase
       .from("matches")
       .select(
@@ -134,7 +145,13 @@ export default function MvpPage() {
     setMatches(partidosNormalizados);
 
     if (partidosNormalizados.length > 0) {
-      const primerGrupo = partidosNormalizados[0].group_name || "Grupo A";
+      const primerGrupo =
+        grupos.find((group) =>
+          partidosNormalizados.some((match) => match.group_name === group.name)
+        )?.name ||
+        partidosNormalizados[0].group_name ||
+        "";
+
       const primerPartido = partidosNormalizados.find(
         (match) => match.group_name === primerGrupo
       );
@@ -162,8 +179,8 @@ export default function MvpPage() {
       .select("id, match_id, player_id, user_id")
       .eq("match_id", match.id);
 
-    setPlayers(playersData ?? []);
-    setVotes(votesData ?? []);
+    setPlayers((playersData ?? []) as Player[]);
+    setVotes((votesData ?? []) as Vote[]);
     setMensaje("");
   }
 
@@ -336,7 +353,7 @@ export default function MvpPage() {
           <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
             Torneo Fútbol 7 Astrabudua
           </p>
-          <h1 className="mt-2 text-center text-3xl font-black">MVP</h1>
+          <h1 className="mt-2 text-center text-3xl font-black">Votar MVP</h1>
         </div>
 
         {loading ? (
@@ -359,9 +376,9 @@ export default function MvpPage() {
                 onChange={(event) => cambiarGrupo(event.target.value)}
                 className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
               >
-                {grupos.map((grupo) => (
-                  <option key={grupo} value={grupo}>
-                    {grupo}
+                {gruposConPartidos.map((grupo) => (
+                  <option key={grupo.id} value={grupo.name}>
+                    {grupo.name}
                   </option>
                 ))}
               </select>

@@ -38,20 +38,6 @@ type RawMatch = Omit<Match, "home_team" | "away_team"> & {
   away_team: { name: string }[] | { name: string } | null;
 };
 
-type FinalMatch = {
-  id: string;
-  phase: string;
-  title: string;
-  home_ref: string;
-  away_ref: string;
-  match_date: string | null;
-  match_time: string | null;
-  field: string | null;
-  status: string | null;
-  sort_order: number;
-  mvp_open: boolean | null;
-};
-
 function normalizarEquipo(
   equipo: RawMatch["home_team"]
 ): { name: string } | null {
@@ -67,12 +53,10 @@ function formatearFechaSegura(fecha: string | null) {
 
 export default function AdminGestionarPartidosPage() {
   const [bloqueGruposAbierto, setBloqueGruposAbierto] = useState(true);
-  const [bloqueFinalAbierto, setBloqueFinalAbierto] = useState(false);
 
   const [groups, setGroups] = useState<Group[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
-  const [finalMatches, setFinalMatches] = useState<FinalMatch[]>([]);
 
   const [selectedId, setSelectedId] = useState("");
   const [grupo, setGrupo] = useState("");
@@ -85,22 +69,10 @@ export default function AdminGestionarPartidosPage() {
   const [mvpOpen, setMvpOpen] = useState(false);
   const [mensaje, setMensaje] = useState("");
 
-  const [finalSelectedId, setFinalSelectedId] = useState("");
-  const [finalPhase, setFinalPhase] = useState("Cuartos");
-  const [finalFecha, setFinalFecha] = useState("");
-  const [finalHora, setFinalHora] = useState("");
-  const [finalCampo, setFinalCampo] = useState("Campo 1");
-  const [finalEstado, setFinalEstado] = useState("Pendiente");
-  const [finalMvpOpen, setFinalMvpOpen] = useState(false);
-  const [finalMensaje, setFinalMensaje] = useState("");
-
   const [loading, setLoading] = useState(true);
 
   const teamsGrupo = teams.filter((team) => team.group_name === grupo);
   const matchesGrupo = matches.filter((match) => match.group_name === grupo);
-  const finalMatchesFase = finalMatches.filter(
-    (match) => match.phase === finalPhase
-  );
 
   useEffect(() => {
     cargarDatos();
@@ -195,21 +167,6 @@ export default function AdminGestionarPartidosPage() {
     );
 
     setMatches(partidos);
-
-    const { data: finalData, error: finalError } = await supabase
-      .from("final_matches")
-      .select(
-        "id, phase, title, home_ref, away_ref, match_date, match_time, field, status, sort_order, mvp_open"
-      )
-      .order("sort_order", { ascending: true });
-
-    if (finalError) {
-      setFinalMensaje("Error cargando eliminatorias.");
-      setLoading(false);
-      return;
-    }
-
-    setFinalMatches((finalData ?? []) as FinalMatch[]);
     setLoading(false);
   }
 
@@ -351,94 +308,8 @@ export default function AdminGestionarPartidosPage() {
     await cargarDatos();
   }
 
-  function limpiarFinalFormulario() {
-    setFinalSelectedId("");
-    setFinalFecha("");
-    setFinalHora("");
-    setFinalCampo("Campo 1");
-    setFinalEstado("Pendiente");
-    setFinalMvpOpen(false);
-    setFinalMensaje("");
-  }
-
-  function cargarFinalMatch(match: FinalMatch) {
-    setFinalSelectedId(match.id);
-    setFinalPhase(match.phase);
-    setFinalFecha(match.match_date ?? "");
-    setFinalHora(match.match_time ?? "");
-    setFinalCampo(match.field ?? "Campo 1");
-    setFinalEstado(match.status ?? "Pendiente");
-    setFinalMvpOpen(Boolean(match.mvp_open));
-    setFinalMensaje("");
-  }
-
-  function cambiarFinalMatch(id: string) {
-    if (!id) {
-      limpiarFinalFormulario();
-      return;
-    }
-
-    const match = finalMatches.find((item) => item.id === id);
-    if (match) cargarFinalMatch(match);
-  }
-
-  function cambiarFinalPhase(fase: string) {
-    setFinalPhase(fase);
-    setFinalSelectedId("");
-
-    const primerCruce = finalMatches.find((match) => match.phase === fase);
-
-    if (primerCruce) {
-      cargarFinalMatch(primerCruce);
-    } else {
-      limpiarFinalFormulario();
-    }
-  }
-
-  function validarFinal() {
-    if (!finalSelectedId) {
-      setFinalMensaje("Selecciona un cruce de eliminatorias.");
-      return false;
-    }
-
-    if (!finalFecha || !finalHora) {
-      setFinalMensaje("Indica fecha y hora del partido.");
-      return false;
-    }
-
-    return true;
-  }
-
-  async function guardarFinalMatch() {
-    if (!validarFinal()) return;
-
-    const payload = {
-      match_date: finalFecha,
-      match_time: finalHora,
-      field: finalCampo || "Campo 1",
-      status: finalEstado,
-      mvp_open: finalMvpOpen,
-    };
-
-    const { error } = await supabase
-      .from("final_matches")
-      .update(payload)
-      .eq("id", finalSelectedId);
-
-    if (error) {
-      setFinalMensaje(`No se ha podido guardar: ${error.message}`);
-      return;
-    }
-
-    setFinalMensaje("Eliminatoria actualizada correctamente.");
-    await cargarDatos();
-  }
-
   const mensajeCorrecto =
     mensaje.includes("correctamente") || mensaje.includes("eliminado");
-
-  const finalMensajeCorrecto =
-    finalMensaje.includes("correctamente") || finalMensaje.includes("actualizada");
 
   return (
     <AdminGuard>
@@ -677,193 +548,6 @@ export default function AdminGestionarPartidosPage() {
                             }`}
                           >
                             {mensaje}
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
-                <button
-                  onClick={() => setBloqueFinalAbierto(!bloqueFinalAbierto)}
-                  className="flex w-full items-center justify-between bg-slate-950 px-5 py-4 text-left text-white"
-                >
-                  <div>
-                    <p className="text-lg font-black">Eliminatorias</p>
-                    <p className="text-sm font-bold opacity-80">
-                      Horarios, campo, estado y MVP
-                    </p>
-                  </div>
-
-                  <span className="text-3xl font-black">
-                    {bloqueFinalAbierto ? "−" : "+"}
-                  </span>
-                </button>
-
-                {bloqueFinalAbierto && (
-                  <div className="space-y-5 p-5">
-                    {finalMatches.length === 0 ? (
-                      <p className="font-bold text-slate-500">
-                        Primero configura los cruces en Fase final.
-                      </p>
-                    ) : (
-                      <>
-                        <div>
-                          <label className="text-sm font-black uppercase text-slate-500">
-                            Fase
-                          </label>
-
-                          <select
-                            value={finalPhase}
-                            onChange={(event) =>
-                              cambiarFinalPhase(event.target.value)
-                            }
-                            className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
-                          >
-                            <option>Cuartos</option>
-                            <option>Semifinales</option>
-                            <option>Tercer puesto</option>
-                            <option>Final</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-black uppercase text-slate-500">
-                            Cruce
-                          </label>
-
-                          <select
-                            value={finalSelectedId}
-                            onChange={(event) =>
-                              cambiarFinalMatch(event.target.value)
-                            }
-                            className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
-                          >
-                            <option value="">Selecciona cruce</option>
-                            {finalMatchesFase.map((match) => (
-                              <option key={match.id} value={match.id}>
-                                {match.title} · {match.home_ref} vs{" "}
-                                {match.away_ref}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {finalSelectedId && (
-                          <>
-                            <div className="rounded-2xl bg-slate-100 p-4">
-                              <p className="text-sm font-black uppercase text-slate-500">
-                                Partido
-                              </p>
-                              <p className="mt-2 break-words text-lg font-black leading-tight">
-                                {
-                                  finalMatches.find(
-                                    (match) => match.id === finalSelectedId
-                                  )?.home_ref
-                                }{" "}
-                                vs{" "}
-                                {
-                                  finalMatches.find(
-                                    (match) => match.id === finalSelectedId
-                                  )?.away_ref
-                                }
-                              </p>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label className="text-sm font-black uppercase text-slate-500">
-                                  Fecha
-                                </label>
-                                <input
-                                  type="date"
-                                  value={finalFecha}
-                                  onChange={(event) =>
-                                    setFinalFecha(event.target.value)
-                                  }
-                                  className="mt-2 w-full rounded-xl border border-slate-300 p-3 font-bold"
-                                />
-                              </div>
-
-                              <div>
-                                <label className="text-sm font-black uppercase text-slate-500">
-                                  Hora
-                                </label>
-                                <input
-                                  type="time"
-                                  value={finalHora}
-                                  onChange={(event) =>
-                                    setFinalHora(event.target.value)
-                                  }
-                                  className="mt-2 w-full rounded-xl border border-slate-300 p-3 font-bold"
-                                />
-                              </div>
-                            </div>
-
-                            <div>
-                              <label className="text-sm font-black uppercase text-slate-500">
-                                Campo
-                              </label>
-                              <input
-                                value={finalCampo}
-                                onChange={(event) =>
-                                  setFinalCampo(event.target.value)
-                                }
-                                className="mt-2 w-full rounded-xl border border-slate-300 p-3 font-bold"
-                                placeholder="Campo 1"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="text-sm font-black uppercase text-slate-500">
-                                Estado
-                              </label>
-                              <select
-                                value={finalEstado}
-                                onChange={(event) =>
-                                  setFinalEstado(event.target.value)
-                                }
-                                className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
-                              >
-                                <option>Pendiente</option>
-                                <option>En juego</option>
-                                <option>Finalizado</option>
-                                <option>Cerrado</option>
-                              </select>
-                            </div>
-
-                            <label className="flex items-center justify-between rounded-2xl bg-slate-100 p-4 font-black">
-                              <span>Abrir votación MVP</span>
-                              <input
-                                type="checkbox"
-                                checked={finalMvpOpen}
-                                onChange={(event) =>
-                                  setFinalMvpOpen(event.target.checked)
-                                }
-                                className="h-6 w-6"
-                              />
-                            </label>
-
-                            <button
-                              onClick={guardarFinalMatch}
-                              className="w-full rounded-xl bg-red-600 py-3 font-black text-white shadow"
-                            >
-                              Guardar eliminatoria
-                            </button>
-                          </>
-                        )}
-
-                        {finalMensaje && (
-                          <div
-                            className={`rounded-xl p-3 text-sm font-bold ${
-                              finalMensajeCorrecto
-                                ? "bg-emerald-100 text-emerald-800"
-                                : "bg-red-100 text-red-700"
-                            }`}
-                          >
-                            {finalMensaje}
                           </div>
                         )}
                       </>

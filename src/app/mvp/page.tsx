@@ -118,7 +118,7 @@ export default function MvpPage() {
   const [userId, setUserId] = useState("");
   const [loading, setLoading] = useState(true);
   const [errorCarga, setErrorCarga] = useState("");
-  const [abiertasAbierto, setAbiertasAbierto] = useState(true);
+  const [abiertasAbierto, setAbiertasAbierto] = useState(false);
   const [idealAbierto, setIdealAbierto] = useState(false);
   const [restoAbierto, setRestoAbierto] = useState(false);
 

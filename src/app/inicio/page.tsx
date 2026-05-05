@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { formatearFecha } from "@/lib/formatDate";
 
 type Match = {
   id: string;
@@ -18,7 +19,6 @@ export default function InicioPage() {
   useEffect(() => {
     async function cargarProximo() {
       const ahora = new Date();
-
       const hoy = ahora.toISOString().split("T")[0];
       const horaActual = ahora.toTimeString().slice(0, 5);
 
@@ -85,7 +85,7 @@ export default function InicioPage() {
 
                 <div className="rounded-2xl bg-slate-900 px-4 py-3 text-center text-white shadow-lg">
                   <p className="text-xs font-black uppercase text-slate-300">
-                    {partido.match_date}
+                    {formatearFecha(partido.match_date)}
                   </p>
                   <p className="text-2xl font-black">{partido.match_time}</p>
                   <p className="text-xs font-bold text-slate-300">
@@ -119,6 +119,13 @@ export default function InicioPage() {
           </a>
 
           <a
+            href="/favoritos"
+            className="rounded-2xl bg-white/95 p-4 text-lg font-black shadow"
+          >
+            Favoritos
+          </a>
+
+          <a
             href="/mvp"
             className="rounded-2xl bg-white/95 p-4 text-lg font-black shadow"
           >
@@ -134,14 +141,14 @@ export default function InicioPage() {
           >
             Normativa
           </a>
-
-          <a
-            href="/admin"
-            className="rounded-2xl bg-red-600 p-4 text-lg font-black text-white shadow"
-          >
-            Panel admin
-          </a>
         </div>
+
+        <a
+          href="/admin"
+          className="mt-5 block w-full rounded-2xl bg-red-600 p-4 text-center text-lg font-black text-white shadow"
+        >
+          Panel admin
+        </a>
       </section>
     </main>
   );

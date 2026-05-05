@@ -139,9 +139,6 @@ export default function InicioPage() {
                   </p>
                 </div>
 
-                <p className="mt-4 text-center text-xs font-black text-slate-500">
-                  Partido {indicePartido + 1} de {partidos.length}
-                </p>
               </div>
             </div>
           ) : (

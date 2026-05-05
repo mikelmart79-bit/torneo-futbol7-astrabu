@@ -80,37 +80,35 @@ export default function InicioPage() {
           </div>
 
           {partido ? (
-            <div className="p-5">
-              <div className="mb-4 flex items-center justify-between">
-                <button
-                  onClick={anteriorPartido}
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-2xl font-black text-white shadow"
-                >
-                  ‹
-                </button>
+            <div className="relative p-5">
+              {partidos.length > 1 && (
+                <>
+                  <button
+                    onClick={anteriorPartido}
+                    className="absolute left-3 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-slate-900 text-2xl font-black text-white shadow"
+                  >
+                    ‹
+                  </button>
 
-                <p className="rounded-full bg-slate-100 px-4 py-2 text-xs font-black text-slate-600">
-                  {partidoActual + 1} / {partidos.length}
-                </p>
+                  <button
+                    onClick={siguientePartido}
+                    className="absolute right-3 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-slate-900 text-2xl font-black text-white shadow"
+                  >
+                    ›
+                  </button>
+                </>
+              )}
 
-                <button
-                  onClick={siguientePartido}
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-2xl font-black text-white shadow"
-                >
-                  ›
-                </button>
-              </div>
-
-              <div className="rounded-3xl bg-slate-50 p-5 text-center shadow-inner">
-                <p className="text-xl font-black leading-tight text-slate-950">
+              <div className="mx-8 rounded-3xl bg-slate-50 px-4 py-4 text-center shadow-inner">
+                <p className="text-lg font-black leading-tight text-slate-950">
                   {partido.home_team?.name}
                 </p>
 
-                <div className="my-4 flex items-center justify-center gap-4">
+                <div className="my-3 flex items-center justify-center gap-3">
                   <div className="h-px flex-1 bg-slate-200" />
 
-                  <div className="rounded-2xl bg-slate-900 px-6 py-3 text-white shadow-lg">
-                    <p className="text-xs font-black uppercase text-slate-300">
+                  <div className="rounded-2xl bg-slate-900 px-5 py-3 text-white shadow-lg">
+                    <p className="text-[11px] font-black uppercase text-slate-300">
                       {partido.match_date}
                     </p>
                     <p className="text-3xl font-black">{partido.match_time}</p>
@@ -122,7 +120,7 @@ export default function InicioPage() {
                   <div className="h-px flex-1 bg-slate-200" />
                 </div>
 
-                <p className="text-xl font-black leading-tight text-slate-950">
+                <p className="text-lg font-black leading-tight text-slate-950">
                   {partido.away_team?.name}
                 </p>
               </div>

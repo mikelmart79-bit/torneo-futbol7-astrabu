@@ -20,39 +20,46 @@ export default function EquiposPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [grupoAbierto, setGrupoAbierto] = useState("");
   const [teams, setTeams] = useState<Team[]>([]);
+  const [favoritos, setFavoritos] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const guardados = localStorage.getItem("equiposFavoritos");
+    if (guardados) setFavoritos(JSON.parse(guardados));
+
     async function cargarDatos() {
       const { data: groupsData } = await supabase
         .from("groups")
         .select("id, name, sort_order")
         .order("sort_order", { ascending: true });
 
-      const { data: teamsData, error: teamsError } = await supabase
+      const { data: teamsData } = await supabase
         .from("teams")
         .select("id, name, group_name")
         .order("group_name", { ascending: true })
         .order("name", { ascending: true });
 
-      if (teamsError) {
-        console.error("Error cargando equipos:", teamsError);
-      } else {
-        setTeams((teamsData ?? []) as Team[]);
-      }
+      setTeams((teamsData ?? []) as Team[]);
 
       const grupos = (groupsData ?? []) as Group[];
       setGroups(grupos);
 
-      if (grupos.length > 0) {
-        setGrupoAbierto(grupos[0].name);
-      }
+      if (grupos.length > 0) setGrupoAbierto(grupos[0].name);
 
       setLoading(false);
     }
 
     cargarDatos();
   }, []);
+
+  function toggleFavorito(teamId: string) {
+    const nuevosFavoritos = favoritos.includes(teamId)
+      ? favoritos.filter((id) => id !== teamId)
+      : [...favoritos, teamId];
+
+    setFavoritos(nuevosFavoritos);
+    localStorage.setItem("equiposFavoritos", JSON.stringify(nuevosFavoritos));
+  }
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-black text-slate-900">
@@ -92,9 +99,7 @@ export default function EquiposPage() {
                   className="overflow-hidden rounded-2xl bg-white/95 shadow"
                 >
                   <button
-                    onClick={() =>
-                      setGrupoAbierto(abierto ? "" : grupo.name)
-                    }
+                    onClick={() => setGrupoAbierto(abierto ? "" : grupo.name)}
                     className={`flex w-full items-center justify-between p-4 text-left ${
                       abierto
                         ? "bg-red-600 text-white"
@@ -102,12 +107,7 @@ export default function EquiposPage() {
                     }`}
                   >
                     <p className="text-lg font-black">{grupo.name}</p>
-
-                    <span
-                      className={`text-2xl font-black ${
-                        abierto ? "text-white" : "text-red-600"
-                      }`}
-                    >
+                    <span className="text-2xl font-black">
                       {abierto ? "−" : "+"}
                     </span>
                   </button>
@@ -119,19 +119,34 @@ export default function EquiposPage() {
                           No hay equipos en este grupo.
                         </p>
                       ) : (
-                        equiposGrupo.map((team) => (
-                          <Link
-                            href={`/equipos/${team.id}`}
-                            key={team.id}
-                            className="flex items-center gap-3 rounded-xl bg-slate-50 p-3 transition active:scale-[0.98]"
-                          >
-                            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-100 text-sm font-black text-red-600">
-                              {team.name.slice(0, 2).toUpperCase()}
-                            </div>
+                        equiposGrupo.map((team) => {
+                          const esFavorito = favoritos.includes(team.id);
 
-                            <p className="font-bold">{team.name}</p>
-                          </Link>
-                        ))
+                          return (
+                            <div
+                              key={team.id}
+                              className="flex items-center justify-between rounded-xl bg-slate-50 p-4 shadow-sm"
+                            >
+                              <Link
+                                href={`/equipos/${team.id}`}
+                                className="flex-1 text-lg font-black text-slate-900"
+                              >
+                                {team.name}
+                              </Link>
+
+                              <button
+                                onClick={() => toggleFavorito(team.id)}
+                                className={`ml-3 flex h-11 w-11 items-center justify-center rounded-full text-xl font-black shadow ${
+                                  esFavorito
+                                    ? "bg-red-600 text-white"
+                                    : "bg-white text-slate-400"
+                                }`}
+                              >
+                                ★
+                              </button>
+                            </div>
+                          );
+                        })
                       )}
                     </div>
                   )}

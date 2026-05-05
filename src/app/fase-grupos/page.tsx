@@ -58,6 +58,7 @@ export default function FaseGruposPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [grupoActivo, setGrupoActivo] = useState("");
   const [clasificacionAbierta, setClasificacionAbierta] = useState(false);
+  const [partidosAbiertos, setPartidosAbiertos] = useState(false);
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -188,6 +189,7 @@ export default function FaseGruposPage() {
 
   useEffect(() => {
     setClasificacionAbierta(false);
+    setPartidosAbiertos(false);
   }, [grupoActivo]);
 
   return (
@@ -328,73 +330,82 @@ export default function FaseGruposPage() {
             </div>
 
             <div className="mt-6 overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
-              <div className="bg-slate-950 px-5 py-3 text-white">
+              <button
+                onClick={() => setPartidosAbiertos(!partidosAbiertos)}
+                className="flex w-full items-center justify-between bg-slate-950 px-5 py-4 text-left text-white"
+              >
                 <p className="text-sm font-black uppercase tracking-widest">
                   Partidos del grupo
                 </p>
-              </div>
 
-              <div className="space-y-3 p-4">
-                {matchesGrupo.length === 0 ? (
-                  <p className="text-sm text-slate-500">
-                    No hay partidos cargados en este grupo.
-                  </p>
-                ) : (
-                  matchesGrupo.map((match) => {
-                    const finalizado =
-                      match.home_score !== null && match.away_score !== null;
+                <span className="text-2xl font-black">
+                  {partidosAbiertos ? "−" : "+"}
+                </span>
+              </button>
 
-                    return (
-                      <div
-                        key={match.id}
-                        className="rounded-2xl bg-white p-4 shadow"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex-1">
-                            <p className="text-base font-black leading-tight">
-                              {match.home_team?.name}
-                            </p>
-                            <p className="text-xs font-black uppercase text-slate-400">
-                              vs
-                            </p>
-                            <p className="text-base font-black leading-tight">
-                              {match.away_team?.name}
-                            </p>
+              {partidosAbiertos && (
+                <div className="space-y-3 p-4">
+                  {matchesGrupo.length === 0 ? (
+                    <p className="text-sm text-slate-500">
+                      No hay partidos cargados en este grupo.
+                    </p>
+                  ) : (
+                    matchesGrupo.map((match) => {
+                      const finalizado =
+                        match.home_score !== null && match.away_score !== null;
+
+                      return (
+                        <div
+                          key={match.id}
+                          className="rounded-2xl bg-white p-4 shadow"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex-1">
+                              <p className="text-base font-black leading-tight">
+                                {match.home_team?.name}
+                              </p>
+                              <p className="text-xs font-black uppercase text-slate-400">
+                                vs
+                              </p>
+                              <p className="text-base font-black leading-tight">
+                                {match.away_team?.name}
+                              </p>
+                            </div>
+
+                            <div className="min-w-20 rounded-2xl bg-slate-950 px-3 py-2 text-center text-white shadow">
+                              {finalizado ? (
+                                <p className="text-2xl font-black">
+                                  {match.home_score} - {match.away_score}
+                                </p>
+                              ) : (
+                                <p className="text-lg font-black text-red-400">
+                                  {match.match_time}
+                                </p>
+                              )}
+                            </div>
                           </div>
 
-                          <div className="min-w-20 rounded-2xl bg-slate-950 px-3 py-2 text-center text-white shadow">
-                            {finalizado ? (
-                              <p className="text-2xl font-black">
-                                {match.home_score} - {match.away_score}
-                              </p>
-                            ) : (
-                              <p className="text-lg font-black text-red-400">
-                                {match.match_time}
-                              </p>
-                            )}
+                          <div className="mt-3 flex items-center justify-between text-sm font-semibold text-slate-500">
+                            <span>
+                              {match.match_date} · {match.match_time} ·{" "}
+                              {match.field}
+                            </span>
+                            <span
+                              className={`rounded-full px-3 py-1 text-xs font-black ${
+                                finalizado
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : "bg-red-100 text-red-600"
+                              }`}
+                            >
+                              {finalizado ? "Finalizado" : "Pendiente"}
+                            </span>
                           </div>
                         </div>
-
-                        <div className="mt-3 flex items-center justify-between text-sm font-semibold text-slate-500">
-                          <span>
-                            {match.match_date} · {match.match_time} ·{" "}
-                            {match.field}
-                          </span>
-                          <span
-                            className={`rounded-full px-3 py-1 text-xs font-black ${
-                              finalizado
-                                ? "bg-emerald-100 text-emerald-700"
-                                : "bg-red-100 text-red-600"
-                            }`}
-                          >
-                            {finalizado ? "Finalizado" : "Pendiente"}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
             </div>
           </>
         )}

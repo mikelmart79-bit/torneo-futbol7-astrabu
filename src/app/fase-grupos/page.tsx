@@ -83,8 +83,8 @@ function formatearFechaSegura(fecha: string | null) {
 export default function FaseGruposPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [grupoActivo, setGrupoActivo] = useState("");
-  const [clasificacionAbierta, setClasificacionAbierta] = useState(true);
-  const [partidosAbiertos, setPartidosAbiertos] = useState(true);
+  const [clasificacionAbierta, setClasificacionAbierta] = useState(false);
+  const [partidosAbiertos, setPartidosAbiertos] = useState(false);
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -278,8 +278,8 @@ export default function FaseGruposPage() {
   }, [teamsGrupo, matchesGrupo]);
 
   useEffect(() => {
-    setClasificacionAbierta(true);
-    setPartidosAbiertos(true);
+    setClasificacionAbierta(false);
+    setPartidosAbiertos(false);
   }, [grupoActivo]);
 
   return (

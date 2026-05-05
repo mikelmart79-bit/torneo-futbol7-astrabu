@@ -23,13 +23,7 @@ type FinalMatch = {
   match_date: string | null;
   match_time: string | null;
   field: string | null;
-  home_score: number | null;
-  away_score: number | null;
-  home_penalties: number | null;
-  away_penalties: number | null;
-  status: string | null;
   sort_order: number;
-  mvp_open: boolean | null;
 };
 
 type Team = {
@@ -38,32 +32,9 @@ type Team = {
   group_name: string | null;
 };
 
-type GroupMatch = {
-  id: string;
-  group_name: string | null;
-  home_team_id: string;
-  away_team_id: string;
-  home_score: number | null;
-  away_score: number | null;
-};
-
-type TableRow = {
-  teamId: string;
-  teamName: string;
-  pj: number;
-  g: number;
-  e: number;
-  p: number;
-  gf: number;
-  gc: number;
-  dg: number;
-  pts: number;
-};
-
 export default function AdminFaseFinalPage() {
   const [matches, setMatches] = useState<FinalMatch[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
-  const [groupMatches, setGroupMatches] = useState<GroupMatch[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [mensaje, setMensaje] = useState("");
   const [loading, setLoading] = useState(true);
@@ -106,7 +77,7 @@ export default function AdminFaseFinalPage() {
 
   async function cargarDatos() {
     setLoading(true);
-    await Promise.all([cargarCruces(), cargarEquiposYPartidos()]);
+    await Promise.all([cargarCruces(), cargarEquipos()]);
     setLoading(false);
   }
 
@@ -129,26 +100,19 @@ export default function AdminFaseFinalPage() {
     }
   }
 
-  async function cargarEquiposYPartidos() {
-    const { data: teamsData, error: teamsError } = await supabase
+  async function cargarEquipos() {
+    const { data, error } = await supabase
       .from("teams")
       .select("id, name, group_name")
       .order("group_name", { ascending: true })
       .order("name", { ascending: true });
 
-    const { data: matchesData, error: matchesError } = await supabase
-      .from("matches")
-      .select(
-        "id, group_name, home_team_id, away_team_id, home_score, away_score"
-      );
-
-    if (teamsError || matchesError) {
-      setMensaje("No se han podido cargar equipos o partidos de grupo.");
+    if (error) {
+      setMensaje("No se han podido cargar los equipos.");
       return;
     }
 
-    setTeams((teamsData ?? []) as Team[]);
-    setGroupMatches((matchesData ?? []) as GroupMatch[]);
+    setTeams((data ?? []) as Team[]);
   }
 
   function cargarEnFormulario(match: FinalMatch) {
@@ -199,149 +163,9 @@ export default function AdminFaseFinalPage() {
     setMensaje("");
   }
 
-  function calcularClasificacion(grupo: string) {
-    const equiposGrupo = teams.filter((team) => team.group_name === grupo);
-
-    const tabla: TableRow[] = equiposGrupo.map((team) => ({
-      teamId: team.id,
-      teamName: team.name,
-      pj: 0,
-      g: 0,
-      e: 0,
-      p: 0,
-      gf: 0,
-      gc: 0,
-      dg: 0,
-      pts: 0,
-    }));
-
-    const partidosGrupo = groupMatches.filter(
-      (match) => match.group_name === grupo
-    );
-
-    partidosGrupo.forEach((match) => {
-      if (match.home_score === null || match.away_score === null) return;
-
-      const local = tabla.find((row) => row.teamId === match.home_team_id);
-      const visitante = tabla.find((row) => row.teamId === match.away_team_id);
-
-      if (!local || !visitante) return;
-
-      local.pj += 1;
-      visitante.pj += 1;
-
-      local.gf += match.home_score;
-      local.gc += match.away_score;
-      visitante.gf += match.away_score;
-      visitante.gc += match.home_score;
-
-      if (match.home_score > match.away_score) {
-        local.g += 1;
-        visitante.p += 1;
-        local.pts += 3;
-      } else if (match.home_score < match.away_score) {
-        visitante.g += 1;
-        local.p += 1;
-        visitante.pts += 3;
-      } else {
-        local.e += 1;
-        visitante.e += 1;
-        local.pts += 1;
-        visitante.pts += 1;
-      }
-
-      local.dg = local.gf - local.gc;
-      visitante.dg = visitante.gf - visitante.gc;
-    });
-
-    return tabla.sort((a, b) => {
-      if (b.pts !== a.pts) return b.pts - a.pts;
-      if (b.dg !== a.dg) return b.dg - a.dg;
-      if (b.gf !== a.gf) return b.gf - a.gf;
-      return a.teamName.localeCompare(b.teamName);
-    });
-  }
-
   function labelPosicion(posicion: string | number | null, grupo: string | null) {
     if (!posicion || !grupo) return "";
     return `${posicion}º ${grupo}`;
-  }
-
-  function resolverEquipoGrupo(
-    posicion: string | number | null,
-    grupo: string | null
-  ) {
-    if (!posicion || !grupo) return "";
-
-    const tabla = calcularClasificacion(grupo);
-    const equipo = tabla[Number(posicion) - 1];
-
-    return equipo?.teamName ?? labelPosicion(posicion, grupo);
-  }
-
-  function resolverGanadorPerdedor(
-    sourceMatchTitle: string | null,
-    tipo: "winner" | "loser",
-    lista: FinalMatch[]
-  ) {
-    if (!sourceMatchTitle) return "";
-
-    const source = lista.find((match) => match.title === sourceMatchTitle);
-
-    if (!source) {
-      return `${tipo === "winner" ? "Ganador" : "Perdedor"} ${sourceMatchTitle}`;
-    }
-
-    if (source.home_score === null || source.away_score === null) {
-      return `${tipo === "winner" ? "Ganador" : "Perdedor"} ${sourceMatchTitle}`;
-    }
-
-    let ganaLocal: boolean | null = null;
-
-    if (source.home_score > source.away_score) {
-      ganaLocal = true;
-    } else if (source.home_score < source.away_score) {
-      ganaLocal = false;
-    } else if (
-      source.home_penalties !== null &&
-      source.away_penalties !== null &&
-      source.home_penalties !== source.away_penalties
-    ) {
-      ganaLocal = source.home_penalties > source.away_penalties;
-    }
-
-    if (ganaLocal === null) {
-      return `${tipo === "winner" ? "Ganador" : "Perdedor"} ${sourceMatchTitle}`;
-    }
-
-    if (tipo === "winner") {
-      return ganaLocal ? source.home_ref : source.away_ref;
-    }
-
-    return ganaLocal ? source.away_ref : source.home_ref;
-  }
-
-  function resolverReferenciaLado(
-    tipo: SourceType | null,
-    posicion: number | null,
-    grupo: string | null,
-    sourceMatchTitle: string | null,
-    manualRef: string,
-    lista: FinalMatch[]
-  ) {
-    if (tipo === "group_position") {
-      return resolverEquipoGrupo(posicion, grupo);
-    }
-
-    if (tipo === "winner") {
-      return resolverGanadorPerdedor(sourceMatchTitle, "winner", lista);
-    }
-
-    if (tipo === "loser") {
-      return resolverGanadorPerdedor(sourceMatchTitle, "loser", lista);
-    }
-
-    return manualRef;
   }
 
   function referenciaPreviaLado(
@@ -407,7 +231,7 @@ export default function AdminFaseFinalPage() {
   async function guardarCruce() {
     if (!validarCruce()) return;
 
-    const payload = {
+    const payloadBase = {
       phase,
       title: title.trim(),
       home_ref: referenciaPreviaLado(
@@ -447,8 +271,19 @@ export default function AdminFaseFinalPage() {
     };
 
     const { error } = selectedId
-      ? await supabase.from("final_matches").update(payload).eq("id", selectedId)
-      : await supabase.from("final_matches").insert(payload);
+      ? await supabase
+          .from("final_matches")
+          .update(payloadBase)
+          .eq("id", selectedId)
+      : await supabase.from("final_matches").insert({
+          ...payloadBase,
+          home_score: null,
+          away_score: null,
+          home_penalties: null,
+          away_penalties: null,
+          status: "Pendiente",
+          mvp_open: false,
+        });
 
     if (error) {
       console.error(error);
@@ -457,61 +292,6 @@ export default function AdminFaseFinalPage() {
     }
 
     setMensaje("Cruce guardado correctamente.");
-    await cargarCruces();
-  }
-
-  async function actualizarEquiposDesdeFuentes() {
-    const { data, error } = await supabase
-      .from("final_matches")
-      .select("*")
-      .order("sort_order", { ascending: true });
-
-    if (error) {
-      setMensaje("No se han podido cargar los cruces.");
-      return;
-    }
-
-    let lista = (data ?? []) as FinalMatch[];
-
-    for (let vuelta = 0; vuelta < 5; vuelta++) {
-      lista = lista.map((match) => ({
-        ...match,
-        home_ref: resolverReferenciaLado(
-          match.home_source_type,
-          match.home_position,
-          match.home_group,
-          match.home_source_match_title,
-          match.home_ref,
-          lista
-        ),
-        away_ref: resolverReferenciaLado(
-          match.away_source_type,
-          match.away_position,
-          match.away_group,
-          match.away_source_match_title,
-          match.away_ref,
-          lista
-        ),
-      }));
-    }
-
-    for (const match of lista) {
-      const { error: updateError } = await supabase
-        .from("final_matches")
-        .update({
-          home_ref: match.home_ref,
-          away_ref: match.away_ref,
-        })
-        .eq("id", match.id);
-
-      if (updateError) {
-        setMensaje("No se han podido actualizar todos los cruces.");
-        return;
-      }
-    }
-
-    setMatches(lista);
-    setMensaje("Equipos actualizados desde clasificación y resultados.");
     await cargarCruces();
   }
 
@@ -561,21 +341,6 @@ export default function AdminFaseFinalPage() {
             </div>
           ) : (
             <>
-              <div className="mt-5 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
-                <button
-                  onClick={actualizarEquiposDesdeFuentes}
-                  className="w-full rounded-xl bg-red-600 py-3 font-black text-white shadow"
-                >
-                  Actualizar equipos desde clasificación/resultados
-                </button>
-
-                <p className="mt-3 text-xs font-bold text-slate-500">
-                  Primero define los cruces como referencias. Cuando acaben los
-                  grupos o una eliminatoria, pulsa aquí y la app colocará los
-                  equipos en su sitio.
-                </p>
-              </div>
-
               <div className="mt-5 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
                 <label className="text-sm font-black uppercase text-slate-500">
                   Cruce existente
@@ -846,7 +611,6 @@ export default function AdminFaseFinalPage() {
                   <div
                     className={`mt-4 rounded-xl p-3 text-sm font-bold ${
                       mensaje.includes("correctamente") ||
-                      mensaje.includes("actualizados") ||
                       mensaje.includes("eliminado")
                         ? "bg-emerald-100 text-emerald-800"
                         : "bg-red-100 text-red-700"

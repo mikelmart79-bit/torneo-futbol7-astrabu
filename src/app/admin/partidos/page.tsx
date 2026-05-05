@@ -11,6 +11,8 @@ type Group = {
   sort_order: number;
 };
 
+type SourceType = "group_position" | "winner" | "loser" | "manual";
+
 type Match = {
   id: string;
   group_name: string | null;
@@ -46,9 +48,13 @@ type FinalMatch = {
   status: string | null;
   sort_order: number;
   mvp_open: boolean | null;
-  home_source_type?: string | null;
+  home_position: number | null;
+  home_group: string | null;
+  away_position: number | null;
+  away_group: string | null;
+  home_source_type?: SourceType | null;
   home_source_match_title?: string | null;
-  away_source_type?: string | null;
+  away_source_type?: SourceType | null;
   away_source_match_title?: string | null;
 };
 
@@ -435,6 +441,189 @@ export default function AdminPartidosPage() {
     return true;
   }
 
+  async function actualizarEquiposDesdeFuentes() {
+    const { data, error } = await supabase
+      .from("final_matches")
+      .select("*")
+      .order("sort_order", { ascending: true });
+
+    if (error) {
+      setFinalMensaje("No se han podido cargar los cruces.");
+      return;
+    }
+
+    let lista = (data ?? []) as FinalMatch[];
+
+    function calcularClasificacion(grupo: string) {
+      const nombresGrupo = new Set<string>();
+
+      matches
+        .filter((match) => match.group_name === grupo)
+        .forEach((match) => {
+          if (match.home_team?.name) nombresGrupo.add(match.home_team.name);
+          if (match.away_team?.name) nombresGrupo.add(match.away_team.name);
+        });
+
+      const tabla = Array.from(nombresGrupo).map((teamName) => ({
+        teamName,
+        pj: 0,
+        g: 0,
+        e: 0,
+        p: 0,
+        gf: 0,
+        gc: 0,
+        dg: 0,
+        pts: 0,
+      }));
+
+      matches
+        .filter((match) => match.group_name === grupo)
+        .forEach((match) => {
+          if (match.home_score === null || match.away_score === null) return;
+
+          const local = tabla.find(
+            (row) => row.teamName === match.home_team?.name
+          );
+          const visitante = tabla.find(
+            (row) => row.teamName === match.away_team?.name
+          );
+
+          if (!local || !visitante) return;
+
+          local.pj += 1;
+          visitante.pj += 1;
+
+          local.gf += match.home_score;
+          local.gc += match.away_score;
+
+          visitante.gf += match.away_score;
+          visitante.gc += match.home_score;
+
+          if (match.home_score > match.away_score) {
+            local.g += 1;
+            visitante.p += 1;
+            local.pts += 3;
+          } else if (match.home_score < match.away_score) {
+            visitante.g += 1;
+            local.p += 1;
+            visitante.pts += 3;
+          } else {
+            local.e += 1;
+            visitante.e += 1;
+            local.pts += 1;
+            visitante.pts += 1;
+          }
+
+          local.dg = local.gf - local.gc;
+          visitante.dg = visitante.gf - visitante.gc;
+        });
+
+      return tabla.sort((a, b) => {
+        if (b.pts !== a.pts) return b.pts - a.pts;
+        if (b.dg !== a.dg) return b.dg - a.dg;
+        if (b.gf !== a.gf) return b.gf - a.gf;
+        return a.teamName.localeCompare(b.teamName);
+      });
+    }
+
+    function resolverEquipoGrupo(posicion: number | null, grupo: string | null) {
+      if (!posicion || !grupo) return "";
+
+      const tabla = calcularClasificacion(grupo);
+      const equipo = tabla[posicion - 1];
+
+      return equipo?.teamName ?? `${posicion}º ${grupo}`;
+    }
+
+    function resolverGanadorPerdedor(
+      matchTitle: string | null | undefined,
+      tipo: "winner" | "loser"
+    ) {
+      if (!matchTitle) return "";
+
+      const origen = lista.find((match) => match.title === matchTitle);
+
+      if (!origen) {
+        return `${tipo === "winner" ? "Ganador" : "Perdedor"} ${matchTitle}`;
+      }
+
+      if (origen.home_score === null || origen.away_score === null) {
+        return `${tipo === "winner" ? "Ganador" : "Perdedor"} ${matchTitle}`;
+      }
+
+      let ganaLocal: boolean | null = null;
+
+      if (origen.home_score > origen.away_score) {
+        ganaLocal = true;
+      } else if (origen.home_score < origen.away_score) {
+        ganaLocal = false;
+      } else if (
+        origen.home_penalties !== null &&
+        origen.away_penalties !== null &&
+        origen.home_penalties !== origen.away_penalties
+      ) {
+        ganaLocal = origen.home_penalties > origen.away_penalties;
+      }
+
+      if (ganaLocal === null) {
+        return `${tipo === "winner" ? "Ganador" : "Perdedor"} ${matchTitle}`;
+      }
+
+      if (tipo === "winner") {
+        return ganaLocal ? origen.home_ref : origen.away_ref;
+      }
+
+      return ganaLocal ? origen.away_ref : origen.home_ref;
+    }
+
+    for (let vuelta = 0; vuelta < 5; vuelta++) {
+      lista = lista.map((match) => ({
+        ...match,
+        home_ref:
+          match.home_source_type === "group_position"
+            ? resolverEquipoGrupo(match.home_position, match.home_group)
+            : match.home_source_type === "winner"
+              ? resolverGanadorPerdedor(match.home_source_match_title, "winner")
+              : match.home_source_type === "loser"
+                ? resolverGanadorPerdedor(match.home_source_match_title, "loser")
+                : match.home_ref,
+        away_ref:
+          match.away_source_type === "group_position"
+            ? resolverEquipoGrupo(match.away_position, match.away_group)
+            : match.away_source_type === "winner"
+              ? resolverGanadorPerdedor(match.away_source_match_title, "winner")
+              : match.away_source_type === "loser"
+                ? resolverGanadorPerdedor(match.away_source_match_title, "loser")
+                : match.away_ref,
+      }));
+    }
+
+    for (const match of lista) {
+      const { error: updateError } = await supabase
+        .from("final_matches")
+        .update({
+          home_ref: match.home_ref,
+          away_ref: match.away_ref,
+        })
+        .eq("id", match.id);
+
+      if (updateError) {
+        setFinalMensaje("No se han podido actualizar todos los cruces.");
+        return;
+      }
+    }
+
+    setFinalMatches(lista);
+    setFinalMensaje("Equipos actualizados desde clasificación y resultados.");
+
+    await cargarDatos({
+      partidoMantenerId: partidoId,
+      grupoMantener: grupoActivo,
+      finalMantenerId: finalSelectedId,
+      faseMantener: finalPhase,
+    });
+  }
+
   async function actualizarArrastresFinales() {
     const { data, error } = await supabase
       .from("final_matches")
@@ -570,7 +759,9 @@ export default function AdminPartidosPage() {
   }
 
   const mensajeCorrecto = mensaje.includes("guardado");
-  const finalMensajeCorrecto = finalMensaje.includes("guardada");
+  const finalMensajeCorrecto =
+    finalMensaje.includes("guardada") ||
+    finalMensaje.includes("actualizados");
 
   return (
     <AdminGuard>
@@ -796,6 +987,21 @@ export default function AdminPartidosPage() {
                       </p>
                     ) : (
                       <>
+                        <div className="rounded-2xl bg-red-50 p-4">
+                          <button
+                            onClick={actualizarEquiposDesdeFuentes}
+                            className="w-full rounded-xl bg-red-600 py-3 font-black text-white shadow"
+                          >
+                            Actualizar equipos desde clasificación/resultados
+                          </button>
+
+                          <p className="mt-3 text-xs font-bold text-red-800">
+                            Coloca automáticamente los equipos en las
+                            eliminatorias según la clasificación de grupos y los
+                            ganadores o perdedores de cruces anteriores.
+                          </p>
+                        </div>
+
                         <div>
                           <label className="text-sm font-black uppercase text-slate-500">
                             Fase

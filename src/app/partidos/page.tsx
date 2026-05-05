@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { formatearFecha } from "@/lib/formatDate";
 
 type Match = {
   id: string;
@@ -60,9 +61,7 @@ export default function PartidosPage() {
       <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-20">
         <div className="rounded-3xl bg-black/60 p-6 text-white shadow-2xl backdrop-blur">
           <h1 className="text-3xl font-black">Partidos</h1>
-          <p className="mt-2 text-emerald-100">
-            Calendario del torneo
-          </p>
+          <p className="mt-2 text-emerald-100">Calendario del torneo</p>
         </div>
 
         {loading ? (
@@ -72,26 +71,20 @@ export default function PartidosPage() {
         ) : (
           <div className="mt-6 space-y-3">
             {matches.map((match) => (
-              <div
-                key={match.id}
-                className="rounded-2xl bg-white p-4 shadow"
-              >
+              <div key={match.id} className="rounded-2xl bg-white p-4 shadow">
                 <p className="text-sm font-black text-red-600">
                   {match.group_name}
                 </p>
 
                 <div className="mt-2">
-                  <p className="text-lg font-black">
-                    {match.home_team?.name}
-                  </p>
+                  <p className="text-lg font-black">{match.home_team?.name}</p>
                   <p className="text-xs text-slate-400">VS</p>
-                  <p className="text-lg font-black">
-                    {match.away_team?.name}
-                  </p>
+                  <p className="text-lg font-black">{match.away_team?.name}</p>
                 </div>
 
                 <div className="mt-2 text-sm text-slate-500">
-                  {match.match_date} · {match.match_time} · {match.field}
+                  {formatearFecha(match.match_date)} · {match.match_time} ·{" "}
+                  {match.field}
                 </div>
 
                 <div className="mt-2 text-xs font-bold text-slate-400">

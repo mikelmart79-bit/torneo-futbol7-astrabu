@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { formatearFecha } from "@/lib/formatDate";
 
 type FinalMatch = {
   id: string;
@@ -208,7 +209,7 @@ export default function FaseFinalPage() {
                               )}
 
                               <p className="mt-4 text-sm font-semibold text-slate-500">
-                                {match.match_date ?? "Fecha pendiente"} ·{" "}
+                                {formatearFecha(match.match_date)} ·{" "}
                                 {match.match_time ?? "Hora pendiente"} ·{" "}
                                 {match.field ?? "Campo pendiente"}
                               </p>

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { formatearFecha } from "@/lib/formatDate";
 
 type Group = {
   id: string;
@@ -426,8 +427,8 @@ export default function FaseGruposPage() {
 
                           <div className="mt-3 flex items-center justify-between text-sm font-semibold text-slate-500">
                             <span>
-                              {match.match_date} · {match.match_time} ·{" "}
-                              {match.field}
+                              {formatearFecha(match.match_date)} ·{" "}
+                              {match.match_time} · {match.field}
                             </span>
                             <span
                               className={`rounded-full px-3 py-1 text-xs font-black ${

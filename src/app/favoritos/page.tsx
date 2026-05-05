@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { formatearFecha } from "@/lib/formatDate";
 
 type Team = {
   id: string;
@@ -229,7 +230,7 @@ export default function FavoritosPage() {
                                 </div>
 
                                 <p className="mt-3 text-sm font-bold text-slate-500">
-                                  {match.match_date}
+                                  {formatearFecha(match.match_date)}
                                 </p>
                               </div>
                             ))
@@ -279,7 +280,7 @@ export default function FavoritosPage() {
                                 </div>
 
                                 <p className="mt-3 text-sm font-bold text-slate-500">
-                                  {match.match_date}
+                                  {formatearFecha(match.match_date)}
                                 </p>
                               </div>
                             ))

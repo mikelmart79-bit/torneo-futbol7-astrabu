@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { formatearFecha } from "@/lib/formatDate";
 
 type Match = {
   id: string;
@@ -109,7 +110,7 @@ export default function InicioPage() {
 
                   <div className="rounded-2xl bg-slate-900 px-5 py-3 text-white shadow-lg">
                     <p className="text-[11px] font-black uppercase text-slate-300">
-                      {partido.match_date}
+                      {formatearFecha(partido.match_date)}
                     </p>
                     <p className="text-3xl font-black">{partido.match_time}</p>
                     <p className="text-xs font-bold text-slate-300">

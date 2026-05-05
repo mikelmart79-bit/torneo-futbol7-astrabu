@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { formatearFecha } from "@/lib/formatDate";
 
 type Group = {
   id: string;
@@ -346,11 +347,11 @@ export default function VotarMvpPage() {
     if (error) {
       if (error.code === "23505") {
         setMensaje("Ya has votado a este equipo en este partido.");
-    } else {
+      } else {
         setMensaje("Error al registrar el voto.");
+      }
+      return;
     }
-    return;
-  }
 
     setMensaje("Voto registrado correctamente.");
     await cargarJugadoresYVotos(selectedMatch);
@@ -496,7 +497,7 @@ export default function VotarMvpPage() {
                   <option key={match.id} value={match.id}>
                     {match.tipo === "final" ? `${match.phase} · ` : ""}
                     {match.home_team?.name} vs {match.away_team?.name} ·{" "}
-                    {match.match_date ?? "Sin fecha"}
+                    {formatearFecha(match.match_date)}
                   </option>
                 ))}
               </select>
@@ -513,7 +514,7 @@ export default function VotarMvpPage() {
                     {selectedMatch.away_team?.name}
                   </h2>
                   <p className="mt-1 text-sm text-slate-500">
-                    {selectedMatch.match_date ?? "Fecha pendiente"} ·{" "}
+                    {formatearFecha(selectedMatch.match_date)} ·{" "}
                     {selectedMatch.match_time ?? "Hora pendiente"} ·{" "}
                     {selectedMatch.field ?? "Campo pendiente"}
                   </p>

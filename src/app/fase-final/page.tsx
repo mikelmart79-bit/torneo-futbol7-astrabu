@@ -18,6 +18,7 @@ type FinalMatch = {
   away_penalties: number | null;
   status: string;
   sort_order: number;
+  mvp_open: boolean | null;
 };
 
 export default function FaseFinalPage() {
@@ -153,6 +154,15 @@ export default function FaseFinalPage() {
                                   Penaltis: {match.home_penalties} -{" "}
                                   {match.away_penalties}
                                 </div>
+                              )}
+
+                              {match.mvp_open && (
+                                <a
+                                  href="/votar-mvp"
+                                  className="mt-3 block rounded-xl bg-red-600 px-3 py-3 text-center text-sm font-black text-white shadow"
+                                >
+                                  Votar MVP de este partido
+                                </a>
                               )}
 
                               <p className="mt-4 text-sm font-semibold text-slate-500">

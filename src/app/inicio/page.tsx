@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { formatearFecha } from "@/lib/formatDate";
 
 type Match = {
   id: string;
@@ -14,12 +13,14 @@ type Match = {
 };
 
 export default function InicioPage() {
-  const [partidos, setPartidos] = useState<Match[]>([]);
-  const [partidoActual, setPartidoActual] = useState(0);
+  const [partido, setPartido] = useState<Match | null>(null);
 
   useEffect(() => {
-    async function cargarProximos() {
-      const hoy = new Date().toISOString().split("T")[0];
+    async function cargarProximo() {
+      const ahora = new Date();
+
+      const hoy = ahora.toISOString().split("T")[0];
+      const horaActual = ahora.toTimeString().slice(0, 5);
 
       const { data, error } = await supabase
         .from("matches")
@@ -31,32 +32,22 @@ export default function InicioPage() {
           home_team:teams!matches_home_team_id_fkey(name),
           away_team:teams!matches_away_team_id_fkey(name)
         `)
-        .gte("match_date", hoy)
+        .or(
+          `match_date.gt.${hoy},and(match_date.eq.${hoy},match_time.gte.${horaActual})`
+        )
         .order("match_date", { ascending: true })
         .order("match_time", { ascending: true })
-        .limit(8);
+        .limit(1);
 
-      if (!error && data) {
-        setPartidos(data as any);
+      if (!error && data && data.length > 0) {
+        setPartido(data[0] as any);
+      } else {
+        setPartido(null);
       }
     }
 
-    cargarProximos();
+    cargarProximo();
   }, []);
-
-  function anteriorPartido() {
-    setPartidoActual((actual) =>
-      actual === 0 ? partidos.length - 1 : actual - 1
-    );
-  }
-
-  function siguientePartido() {
-    setPartidoActual((actual) =>
-      actual === partidos.length - 1 ? 0 : actual + 1
-    );
-  }
-
-  const partido = partidos[partidoActual];
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-black text-slate-900">
@@ -68,7 +59,7 @@ export default function InicioPage() {
 
       <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-24">
         <div className="rounded-3xl bg-black/60 px-4 py-5 text-white shadow-2xl backdrop-blur">
-          <h1 className="whitespace-nowrap text-center text-lg font-black sm:text-xl">
+          <h1 className="text-center text-lg font-black whitespace-nowrap sm:text-xl">
             Torneo Fútbol 7 Astrabudua
           </h1>
         </div>
@@ -76,58 +67,44 @@ export default function InicioPage() {
         <div className="mt-6 overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
           <div className="bg-red-600 px-5 py-3 text-center">
             <p className="text-sm font-black uppercase tracking-widest text-white">
-              Próximos partidos
+              Próximo partido
             </p>
           </div>
 
           {partido ? (
-            <div className="relative p-5">
-              {partidos.length > 1 && (
-                <>
-                  <button
-                    onClick={anteriorPartido}
-                    className="absolute left-3 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-slate-900 text-2xl font-black text-white shadow"
-                  >
-                    ‹
-                  </button>
-
-                  <button
-                    onClick={siguientePartido}
-                    className="absolute right-3 top-1/2 z-20 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-slate-900 text-2xl font-black text-white shadow"
-                  >
-                    ›
-                  </button>
-                </>
-              )}
-
-              <div className="mx-8 rounded-3xl bg-slate-50 px-4 py-4 text-center shadow-inner">
-                <p className="text-lg font-black leading-tight text-slate-950">
-                  {partido.home_team?.name}
-                </p>
-
-                <div className="my-3 flex items-center justify-center gap-3">
-                  <div className="h-px flex-1 bg-slate-200" />
-
-                  <div className="rounded-2xl bg-slate-900 px-5 py-3 text-white shadow-lg">
-                    <p className="text-[11px] font-black uppercase text-slate-300">
-                      {formatearFecha(partido.match_date)}
-                    </p>
-                    <p className="text-3xl font-black">{partido.match_time}</p>
-                    <p className="text-xs font-bold text-slate-300">
-                      {partido.field}
-                    </p>
+            <div className="p-5">
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                <div className="text-left">
+                  <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-red-600 text-lg font-black text-white shadow">
+                    {partido.home_team?.name?.slice(0, 2).toUpperCase()}
                   </div>
-
-                  <div className="h-px flex-1 bg-slate-200" />
+                  <p className="text-center text-base font-black leading-tight">
+                    {partido.home_team?.name}
+                  </p>
                 </div>
 
-                <p className="text-lg font-black leading-tight text-slate-950">
-                  {partido.away_team?.name}
-                </p>
+                <div className="rounded-2xl bg-slate-900 px-4 py-3 text-center text-white shadow-lg">
+                  <p className="text-xs font-black uppercase text-slate-300">
+                    {partido.match_date}
+                  </p>
+                  <p className="text-2xl font-black">{partido.match_time}</p>
+                  <p className="text-xs font-bold text-slate-300">
+                    {partido.field}
+                  </p>
+                </div>
+
+                <div className="text-right">
+                  <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-slate-900 text-lg font-black text-white shadow">
+                    {partido.away_team?.name?.slice(0, 2).toUpperCase()}
+                  </div>
+                  <p className="text-center text-base font-black leading-tight">
+                    {partido.away_team?.name}
+                  </p>
+                </div>
               </div>
             </div>
           ) : (
-            <p className="p-5 text-sm text-slate-500">
+            <p className="p-5 text-center text-sm font-bold text-slate-500">
               No hay partidos próximos
             </p>
           )}
@@ -143,9 +120,12 @@ export default function InicioPage() {
 
           <a
             href="/mvp"
-            className="whitespace-nowrap rounded-2xl bg-white/95 p-4 text-base font-black shadow"
+            className="rounded-2xl bg-white/95 p-4 text-lg font-black shadow"
           >
-            MVP Equipo Ideal
+            7 Ideal
+            <span className="block text-sm font-bold text-red-600">
+              MVP
+            </span>
           </a>
 
           <a
@@ -156,19 +136,12 @@ export default function InicioPage() {
           </a>
 
           <a
-            href="/favoritos"
-            className="rounded-2xl bg-white/95 p-4 text-lg font-black shadow"
+            href="/admin"
+            className="rounded-2xl bg-red-600 p-4 text-lg font-black text-white shadow"
           >
-            Favoritos
+            Panel admin
           </a>
         </div>
-
-        <a
-          href="/admin"
-          className="mt-4 block w-full rounded-2xl bg-slate-950 p-4 text-center text-lg font-black text-white shadow"
-        >
-          Panel admin
-        </a>
       </section>
     </main>
   );

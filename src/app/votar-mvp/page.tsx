@@ -177,9 +177,9 @@ export default function VotarMvpPage() {
 
     const partidosGrupo: Match[] = (
       (matchesData as unknown as RawMatch[]) || []
-    ).map((match): Match | null => {
+    ).map((match) => ({
       ...match,
-      tipo: "grupo",
+      tipo: "grupo" as const,
       group_name: match.group_name,
       home_team: normalizarEquipo(match.home_team),
       away_team: normalizarEquipo(match.away_team),

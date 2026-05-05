@@ -4,6 +4,87 @@ import Link from "next/link";
 import AdminGuard from "@/components/AdminGuard";
 import { supabase } from "@/lib/supabase";
 
+type AdminLink = {
+  href: string;
+  title: string;
+  description: string;
+  variant?: "primary" | "normal";
+};
+
+const principales: AdminLink[] = [
+  {
+    href: "/admin/partidos",
+    title: "Resultados",
+    description: "Meter resultados y actualizar estados.",
+    variant: "primary",
+  },
+  {
+    href: "/admin/gestionar-partidos",
+    title: "Gestionar partidos",
+    description: "Crear, editar o eliminar partidos.",
+  },
+  {
+    href: "/admin/fase-final",
+    title: "Configurar eliminatorias",
+    description: "Cruces, final, tercer puesto y MVP.",
+  },
+];
+
+const datos: AdminLink[] = [
+  {
+    href: "/admin/grupos",
+    title: "Gestionar grupos",
+    description: "Crear y ordenar grupos.",
+  },
+  {
+    href: "/admin/equipos",
+    title: "Gestionar equipos",
+    description: "Añadir, editar o eliminar equipos.",
+  },
+  {
+    href: "/admin/jugadores",
+    title: "Gestionar jugadores",
+    description: "Plantillas y dorsales.",
+  },
+];
+
+const extras: AdminLink[] = [
+  {
+    href: "/admin/mvp",
+    title: "Votaciones MVP",
+    description: "Abrir, cerrar y revisar votaciones.",
+  },
+  {
+    href: "/admin/normativa",
+    title: "Editar normativa",
+    description: "Crear y modificar reglas del torneo.",
+  },
+];
+
+function AdminCard({ item }: { item: AdminLink }) {
+  const principal = item.variant === "primary";
+
+  return (
+    <Link
+      href={item.href}
+      className={`block rounded-2xl p-5 shadow ${
+        principal
+          ? "bg-red-600 text-white"
+          : "bg-white/95 text-slate-900"
+      }`}
+    >
+      <p className="text-lg font-black leading-tight">{item.title}</p>
+      <p
+        className={`mt-1 text-sm font-bold ${
+          principal ? "text-red-100" : "text-slate-500"
+        }`}
+      >
+        {item.description}
+      </p>
+    </Link>
+  );
+}
+
 export default function AdminPage() {
   async function borrarDatosTorneo() {
     const confirmar1 = window.confirm(
@@ -47,40 +128,47 @@ export default function AdminPage() {
             <h1 className="mt-2 text-center text-3xl font-black">
               Panel admin
             </h1>
+            <p className="mt-2 text-center text-sm font-bold text-emerald-100">
+              Gestión del torneo
+            </p>
           </div>
 
-          <div className="mt-6 grid grid-cols-1 gap-3">
-            <Link href="/admin/partidos" className="rounded-2xl bg-white/95 p-5 text-lg font-black shadow">
-              Resultados
-            </Link>
+          <div className="mt-6 space-y-5">
+            <div className="rounded-3xl bg-white/95 p-4 shadow-2xl backdrop-blur">
+              <p className="mb-3 text-sm font-black uppercase tracking-widest text-red-600">
+                Operativa del torneo
+              </p>
 
-            <Link href="/admin/fase-final" className="rounded-2xl bg-white/95 p-5 text-lg font-black shadow">
-              Configurar eliminatorias
-            </Link>
+              <div className="space-y-3">
+                {principales.map((item) => (
+                  <AdminCard key={item.href} item={item} />
+                ))}
+              </div>
+            </div>
 
-            <Link href="/admin/grupos" className="rounded-2xl bg-white/95 p-5 text-lg font-black shadow">
-              Gestionar grupos
-            </Link>
+            <div className="rounded-3xl bg-white/95 p-4 shadow-2xl backdrop-blur">
+              <p className="mb-3 text-sm font-black uppercase tracking-widest text-slate-500">
+                Datos base
+              </p>
 
-            <Link href="/admin/gestionar-partidos" className="rounded-2xl bg-white/95 p-5 text-lg font-black shadow">
-              Gestionar partidos
-            </Link>
+              <div className="space-y-3">
+                {datos.map((item) => (
+                  <AdminCard key={item.href} item={item} />
+                ))}
+              </div>
+            </div>
 
-            <Link href="/admin/equipos" className="rounded-2xl bg-white/95 p-5 text-lg font-black shadow">
-              Gestionar equipos
-            </Link>
+            <div className="rounded-3xl bg-white/95 p-4 shadow-2xl backdrop-blur">
+              <p className="mb-3 text-sm font-black uppercase tracking-widest text-slate-500">
+                Contenido y MVP
+              </p>
 
-            <Link href="/admin/jugadores" className="rounded-2xl bg-white/95 p-5 text-lg font-black shadow">
-              Gestionar jugadores
-            </Link>
-
-            <Link href="/admin/mvp" className="rounded-2xl bg-white/95 p-5 text-lg font-black shadow">
-              Votaciones MVP
-            </Link>
-
-            <Link href="/admin/normativa" className="rounded-2xl bg-white/95 p-5 text-lg font-black shadow">
-              Editar normativa
-            </Link>
+              <div className="space-y-3">
+                {extras.map((item) => (
+                  <AdminCard key={item.href} item={item} />
+                ))}
+              </div>
+            </div>
           </div>
 
           <div className="mt-8 rounded-3xl border-2 border-red-600 bg-red-50 p-5 shadow-2xl">
@@ -90,6 +178,11 @@ export default function AdminPage() {
 
             <p className="mt-2 text-sm font-bold text-red-900">
               Borra todos los datos del torneo para empezar pruebas desde cero.
+            </p>
+
+            <p className="mt-2 text-xs font-bold text-red-700">
+              Se eliminarán grupos, equipos, jugadores, partidos,
+              eliminatorias y votos MVP.
             </p>
 
             <button

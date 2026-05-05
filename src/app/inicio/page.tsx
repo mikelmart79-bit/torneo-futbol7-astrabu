@@ -40,13 +40,14 @@ export default function InicioPage() {
         )
         .order("match_date", { ascending: true })
         .order("match_time", { ascending: true })
-        .limit(10);
+        .limit(20);
 
       if (!error && data) {
         setPartidos(data as any);
         setIndicePartido(0);
       } else {
         setPartidos([]);
+        setIndicePartido(0);
       }
     }
 
@@ -54,12 +55,16 @@ export default function InicioPage() {
   }, []);
 
   function anteriorPartido() {
+    if (partidos.length <= 1) return;
+
     setIndicePartido((actual) =>
       actual === 0 ? partidos.length - 1 : actual - 1
     );
   }
 
   function siguientePartido() {
+    if (partidos.length <= 1) return;
+
     setIndicePartido((actual) =>
       actual === partidos.length - 1 ? 0 : actual + 1
     );
@@ -89,54 +94,54 @@ export default function InicioPage() {
 
           {partido ? (
             <div className="p-5">
-              <div className="rounded-3xl bg-slate-50 p-4 text-center shadow-inner">
-                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                  <div className="min-w-0">
-                    <p className="break-words text-base font-black leading-tight text-slate-950">
+              <div className="rounded-3xl bg-slate-50 p-4 shadow-inner">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={anteriorPartido}
+                    disabled={partidos.length <= 1}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-950 text-2xl font-black text-white shadow disabled:bg-slate-300 disabled:text-white"
+                  >
+                    ‹
+                  </button>
+
+                  <div className="min-w-0 flex-1 text-center">
+                    <p className="truncate text-xl font-black leading-tight text-slate-950">
                       {partido.home_team?.name}
                     </p>
-                  </div>
 
-                  <div className="rounded-2xl bg-slate-950 px-4 py-3 text-center text-white shadow-lg">
-                    <p className="text-xs font-black uppercase text-slate-300">
-                      {formatearFecha(partido.match_date)}
+                    <p className="my-2 text-xs font-black uppercase tracking-widest text-red-600">
+                      vs
                     </p>
-                    <p className="text-3xl font-black leading-none">
-                      {partido.match_time}
-                    </p>
-                    <p className="mt-1 text-xs font-bold text-slate-300">
-                      {partido.field}
-                    </p>
-                  </div>
 
-                  <div className="min-w-0">
-                    <p className="break-words text-base font-black leading-tight text-slate-950">
+                    <p className="truncate text-xl font-black leading-tight text-slate-950">
                       {partido.away_team?.name}
                     </p>
                   </div>
+
+                  <button
+                    onClick={siguientePartido}
+                    disabled={partidos.length <= 1}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-950 text-2xl font-black text-white shadow disabled:bg-slate-300 disabled:text-white"
+                  >
+                    ›
+                  </button>
                 </div>
 
-                {partidos.length > 1 && (
-                  <div className="mt-5 flex items-center justify-center gap-5">
-                    <button
-                      onClick={anteriorPartido}
-                      className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-950 text-2xl font-black text-white shadow"
-                    >
-                      ‹
-                    </button>
+                <div className="mx-auto mt-5 max-w-[220px] rounded-2xl bg-slate-950 px-4 py-3 text-center text-white shadow-lg">
+                  <p className="text-xs font-black uppercase text-slate-300">
+                    {formatearFecha(partido.match_date)}
+                  </p>
+                  <p className="text-3xl font-black leading-none">
+                    {partido.match_time}
+                  </p>
+                  <p className="mt-1 text-xs font-bold text-slate-300">
+                    {partido.field}
+                  </p>
+                </div>
 
-                    <p className="text-sm font-black text-slate-500">
-                      {indicePartido + 1} / {partidos.length}
-                    </p>
-
-                    <button
-                      onClick={siguientePartido}
-                      className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-950 text-2xl font-black text-white shadow"
-                    >
-                      ›
-                    </button>
-                  </div>
-                )}
+                <p className="mt-4 text-center text-xs font-black text-slate-500">
+                  Partido {indicePartido + 1} de {partidos.length}
+                </p>
               </div>
             </div>
           ) : (

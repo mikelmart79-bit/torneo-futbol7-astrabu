@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 type Team = {
   id: string;
   name: string;
-  group_name: string;
+  group_name: string | null;
 };
 
 type Player = {
@@ -38,6 +38,7 @@ export default function AdminJugadoresPage() {
 
   async function cargarDatos() {
     setLoading(true);
+    setMensaje("");
 
     const { data: teamsData, error: teamsError } = await supabase
       .from("teams")
@@ -54,14 +55,17 @@ export default function AdminJugadoresPage() {
     const equipos = (teamsData ?? []) as Team[];
     setTeams(equipos);
 
-    const primerEquipo = equipos[0];
-
-    if (primerEquipo && !teamId) {
-      setTeamId(primerEquipo.id);
-      await cargarJugadores(primerEquipo.id);
-    } else if (teamId) {
-      await cargarJugadores(teamId);
+    if (equipos.length === 0) {
+      setTeamId("");
+      setPlayers([]);
+      setLoading(false);
+      return;
     }
+
+    const equipoSeleccionado = teamId || equipos[0].id;
+    setTeamId(equipoSeleccionado);
+
+    await cargarJugadores(equipoSeleccionado);
 
     setLoading(false);
   }
@@ -71,7 +75,8 @@ export default function AdminJugadoresPage() {
       .from("players")
       .select("id, team_id, name, number")
       .eq("team_id", idEquipo)
-      .order("number", { ascending: true });
+      .order("number", { ascending: true })
+      .order("name", { ascending: true });
 
     if (error) {
       setMensaje("Error cargando jugadores.");
@@ -87,7 +92,12 @@ export default function AdminJugadoresPage() {
     setNombre("");
     setDorsal("");
     setMensaje("");
-    await cargarJugadores(id);
+
+    if (id) {
+      await cargarJugadores(id);
+    } else {
+      setPlayers([]);
+    }
   }
 
   function seleccionarJugador(player: Player) {
@@ -104,27 +114,70 @@ export default function AdminJugadoresPage() {
     setMensaje("");
   }
 
+  function existeDorsalDuplicado(numero: number) {
+    return jugadoresEquipo.some((player) => {
+      if (player.id === playerId) return false;
+      return player.number === numero;
+    });
+  }
+
+  function existeNombreDuplicado(nombreJugador: string) {
+    const limpio = nombreJugador.trim().toLowerCase();
+
+    return jugadoresEquipo.some((player) => {
+      if (player.id === playerId) return false;
+      return player.name.trim().toLowerCase() === limpio;
+    });
+  }
+
+  async function jugadorTieneVotos(idJugador: string) {
+    const { data, error } = await supabase
+      .from("mvp_votes")
+      .select("id")
+      .eq("player_id", idJugador)
+      .limit(1);
+
+    if (error) {
+      setMensaje("No se ha podido comprobar si el jugador tiene votos.");
+      return true;
+    }
+
+    return (data ?? []).length > 0;
+  }
+
   async function guardarJugador() {
     if (!teamId) {
       setMensaje("Selecciona un equipo.");
       return;
     }
 
-    if (!nombre.trim()) {
+    const nombreLimpio = nombre.trim();
+
+    if (!nombreLimpio) {
       setMensaje("Escribe el nombre del jugador.");
       return;
     }
 
     const numero = Number.parseInt(dorsal, 10);
 
-    if (Number.isNaN(numero)) {
+    if (Number.isNaN(numero) || numero < 0) {
       setMensaje("Escribe un dorsal válido.");
+      return;
+    }
+
+    if (existeNombreDuplicado(nombreLimpio)) {
+      setMensaje("Ya existe un jugador con ese nombre en este equipo.");
+      return;
+    }
+
+    if (existeDorsalDuplicado(numero)) {
+      setMensaje("Ya existe un jugador con ese dorsal en este equipo.");
       return;
     }
 
     const payload = {
       team_id: teamId,
-      name: nombre.trim(),
+      name: nombreLimpio,
       number: numero,
     };
 
@@ -133,7 +186,7 @@ export default function AdminJugadoresPage() {
       : await supabase.from("players").insert(payload);
 
     if (error) {
-      setMensaje("No se ha podido guardar el jugador.");
+      setMensaje(`No se ha podido guardar el jugador: ${error.message}`);
       return;
     }
 
@@ -145,10 +198,32 @@ export default function AdminJugadoresPage() {
   async function eliminarJugador() {
     if (!playerId) return;
 
+    const jugadorActual = jugadoresEquipo.find((player) => player.id === playerId);
+
+    if (!jugadorActual) {
+      setMensaje("No se ha encontrado el jugador seleccionado.");
+      return;
+    }
+
+    const tieneVotos = await jugadorTieneVotos(playerId);
+
+    if (tieneVotos) {
+      setMensaje(
+        "No se puede eliminar este jugador porque ya tiene votos MVP asociados."
+      );
+      return;
+    }
+
+    const confirmar = window.confirm(
+      `¿Seguro que quieres eliminar a "${jugadorActual.name}"?`
+    );
+
+    if (!confirmar) return;
+
     const { error } = await supabase.from("players").delete().eq("id", playerId);
 
     if (error) {
-      setMensaje("No se ha podido eliminar el jugador.");
+      setMensaje(`No se ha podido eliminar el jugador: ${error.message}`);
       return;
     }
 
@@ -156,6 +231,9 @@ export default function AdminJugadoresPage() {
     nuevoJugador();
     await cargarJugadores(teamId);
   }
+
+  const mensajeCorrecto =
+    mensaje.includes("correctamente") || mensaje.includes("eliminado");
 
   return (
     <AdminGuard>
@@ -174,11 +252,18 @@ export default function AdminJugadoresPage() {
             <h1 className="mt-2 text-center text-3xl font-black">
               Jugadores
             </h1>
+            <p className="mt-2 text-center text-sm font-bold text-emerald-100">
+              Gestión de plantillas
+            </p>
           </div>
 
           <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
             {loading ? (
               <p className="font-bold text-slate-500">Cargando datos...</p>
+            ) : teams.length === 0 ? (
+              <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">
+                Todavía no hay equipos creados. Crea primero los equipos.
+              </p>
             ) : (
               <>
                 <label className="text-sm font-black uppercase text-slate-500">
@@ -192,14 +277,21 @@ export default function AdminJugadoresPage() {
                 >
                   {teams.map((team) => (
                     <option key={team.id} value={team.id}>
-                      {team.name} · {team.group_name}
+                      {team.name} · {team.group_name ?? "Sin grupo"}
                     </option>
                   ))}
                 </select>
 
                 <div className="mt-5 rounded-2xl bg-slate-50 p-4">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-black">Plantilla</h2>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-lg font-black">Plantilla</h2>
+                      <p className="text-xs font-bold text-slate-500">
+                        {jugadoresEquipo.length} jugador
+                        {jugadoresEquipo.length === 1 ? "" : "es"}
+                      </p>
+                    </div>
+
                     <button
                       onClick={nuevoJugador}
                       className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black text-white"
@@ -225,7 +317,7 @@ export default function AdminJugadoresPage() {
                           }`}
                         >
                           <div
-                            className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-black ${
+                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-black ${
                               playerId === player.id
                                 ? "bg-white text-red-600"
                                 : "bg-emerald-100 text-red-600"
@@ -234,7 +326,9 @@ export default function AdminJugadoresPage() {
                             {player.number}
                           </div>
 
-                          <p className="font-black">{player.name}</p>
+                          <p className="break-words font-black leading-tight">
+                            {player.name}
+                          </p>
                         </button>
                       ))}
                     </div>
@@ -277,7 +371,8 @@ export default function AdminJugadoresPage() {
 
             <button
               onClick={guardarJugador}
-              className="mt-6 w-full rounded-xl bg-red-600 py-3 font-black text-white shadow"
+              disabled={teams.length === 0}
+              className="mt-6 w-full rounded-xl bg-red-600 py-3 font-black text-white shadow disabled:bg-slate-300"
             >
               Guardar jugador
             </button>
@@ -292,7 +387,13 @@ export default function AdminJugadoresPage() {
             )}
 
             {mensaje && (
-              <div className="mt-4 rounded-xl bg-emerald-100 p-3 text-sm font-bold text-emerald-800">
+              <div
+                className={`mt-4 rounded-xl p-3 text-sm font-bold ${
+                  mensajeCorrecto
+                    ? "bg-emerald-100 text-emerald-800"
+                    : "bg-red-100 text-red-700"
+                }`}
+              >
                 {mensaje}
               </div>
             )}

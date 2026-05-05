@@ -34,6 +34,12 @@ type RawMatch = Omit<Match, "home_team" | "away_team"> & {
   away_team: { id: string; name: string }[] | { id: string; name: string } | null;
 };
 
+type Vote = {
+  id: string;
+  match_id: string;
+  user_id: string;
+};
+
 type Row = {
   teamId: string;
   team: string;
@@ -55,6 +61,17 @@ function normalizarEquipo(
   return equipo;
 }
 
+function getUserId() {
+  let userId = localStorage.getItem("torneo_user_id");
+
+  if (!userId) {
+    userId = crypto.randomUUID();
+    localStorage.setItem("torneo_user_id", userId);
+  }
+
+  return userId;
+}
+
 export default function FaseGruposPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [grupoActivo, setGrupoActivo] = useState("");
@@ -63,8 +80,13 @@ export default function FaseGruposPage() {
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
+  const [votes, setVotes] = useState<Vote[]>([]);
+  const [userId, setUserId] = useState("");
 
   useEffect(() => {
+    const usuario = getUserId();
+    setUserId(usuario);
+
     async function cargarDatos() {
       const { data: groupsData } = await supabase
         .from("groups")
@@ -102,6 +124,11 @@ export default function FaseGruposPage() {
         .order("match_date", { ascending: true })
         .order("match_time", { ascending: true });
 
+      const { data: votesData } = await supabase
+        .from("mvp_votes")
+        .select("id, match_id, user_id")
+        .eq("user_id", usuario);
+
       const partidosNormalizados: Match[] = (
         (matchesData as unknown as RawMatch[]) || []
       ).map((match) => ({
@@ -112,6 +139,7 @@ export default function FaseGruposPage() {
 
       setTeams((teamsData as Team[]) || []);
       setMatches(partidosNormalizados);
+      setVotes((votesData ?? []) as Vote[]);
     }
 
     cargarDatos();
@@ -124,6 +152,12 @@ export default function FaseGruposPage() {
   const matchesGrupo = matches.filter(
     (match) => match.group_name === grupoActivo
   );
+
+  function votosUsuarioEnPartido(matchId: string) {
+    return votes.filter(
+      (vote) => vote.match_id === matchId && vote.user_id === userId
+    ).length;
+  }
 
   const clasificacion = useMemo(() => {
     const tabla: Row[] = teamsGrupo.map((team) => ({
@@ -356,6 +390,9 @@ export default function FaseGruposPage() {
                       const finalizado =
                         match.home_score !== null && match.away_score !== null;
 
+                      const votosEmitidos = votosUsuarioEnPartido(match.id);
+                      const votoCompleto = votosEmitidos >= 2;
+
                       return (
                         <div
                           key={match.id}
@@ -403,7 +440,13 @@ export default function FaseGruposPage() {
                             </span>
                           </div>
 
-                          {match.mvp_open && (
+                          {match.mvp_open && votoCompleto && (
+                            <div className="mt-3 rounded-xl bg-emerald-100 px-3 py-3 text-center text-sm font-black text-emerald-800">
+                              ✅ Voto emitido
+                            </div>
+                          )}
+
+                          {match.mvp_open && !votoCompleto && (
                             <a
                               href={`/votar-mvp?match=${match.id}`}
                               className="mt-3 block rounded-xl bg-red-600 px-3 py-3 text-center text-sm font-black text-white shadow"

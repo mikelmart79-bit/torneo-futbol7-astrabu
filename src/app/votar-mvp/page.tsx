@@ -344,11 +344,13 @@ export default function VotarMvpPage() {
     });
 
     if (error) {
-      setMensaje(
-        "No se ha podido registrar el voto. Puede que ya hayas votado en este partido."
-      );
-      return;
+      if (error.code === "23505") {
+        setMensaje("Ya has votado a este equipo en este partido.");
+    } else {
+        setMensaje("Error al registrar el voto.");
     }
+    return;
+  }
 
     setMensaje("Voto registrado correctamente.");
     await cargarJugadoresYVotos(selectedMatch);

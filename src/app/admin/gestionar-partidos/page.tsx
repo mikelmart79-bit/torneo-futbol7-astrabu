@@ -51,6 +51,10 @@ type FinalMatch = {
   status: string;
   sort_order: number;
   mvp_open: boolean | null;
+  home_source_type?: string | null;
+  home_source_match_title?: string | null;
+  away_source_type?: string | null;
+  away_source_match_title?: string | null;
 };
 
 function normalizarEquipo(
@@ -343,6 +347,79 @@ export default function AdminGestionarPartidosPage() {
     if (match) cargarFinalMatch(match);
   }
 
+  async function actualizarArrastresFinales() {
+    const { data, error } = await supabase
+      .from("final_matches")
+      .select("*")
+      .order("sort_order", { ascending: true });
+
+    if (error) {
+      setFinalMensaje(
+        "Guardado, pero no se han podido actualizar los cruces siguientes."
+      );
+      return;
+    }
+
+    let lista = (data ?? []) as FinalMatch[];
+
+    function resolver(
+      matchTitle: string | null | undefined,
+      tipo: "winner" | "loser"
+    ) {
+      if (!matchTitle) return "";
+
+      const origen = lista.find((match) => match.title === matchTitle);
+
+      if (!origen) {
+        return `${tipo === "winner" ? "Ganador" : "Perdedor"} ${matchTitle}`;
+      }
+
+      if (origen.home_score === null || origen.away_score === null) {
+        return `${tipo === "winner" ? "Ganador" : "Perdedor"} ${matchTitle}`;
+      }
+
+      if (origen.home_score === origen.away_score) {
+        return `${tipo === "winner" ? "Ganador" : "Perdedor"} ${matchTitle}`;
+      }
+
+      const ganaLocal = origen.home_score > origen.away_score;
+
+      if (tipo === "winner") {
+        return ganaLocal ? origen.home_ref : origen.away_ref;
+      }
+
+      return ganaLocal ? origen.away_ref : origen.home_ref;
+    }
+
+    for (let vuelta = 0; vuelta < 5; vuelta++) {
+      lista = lista.map((match) => ({
+        ...match,
+        home_ref:
+          match.home_source_type === "winner"
+            ? resolver(match.home_source_match_title, "winner")
+            : match.home_source_type === "loser"
+            ? resolver(match.home_source_match_title, "loser")
+            : match.home_ref,
+        away_ref:
+          match.away_source_type === "winner"
+            ? resolver(match.away_source_match_title, "winner")
+            : match.away_source_type === "loser"
+            ? resolver(match.away_source_match_title, "loser")
+            : match.away_ref,
+      }));
+    }
+
+    for (const match of lista) {
+      await supabase
+        .from("final_matches")
+        .update({
+          home_ref: match.home_ref,
+          away_ref: match.away_ref,
+        })
+        .eq("id", match.id);
+    }
+  }
+
   async function guardarFinalMatch() {
     if (!finalSelectedId) {
       setFinalMensaje("Selecciona un cruce de eliminatorias.");
@@ -374,7 +451,9 @@ export default function AdminGestionarPartidosPage() {
       return;
     }
 
-    setFinalMensaje("Eliminatoria guardada correctamente.");
+    await actualizarArrastresFinales();
+
+    setFinalMensaje("Eliminatoria guardada y cruces actualizados.");
     await cargarDatos();
   }
 

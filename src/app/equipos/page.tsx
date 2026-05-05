@@ -44,7 +44,7 @@ export default function EquiposPage() {
       const grupos = (groupsData ?? []) as Group[];
       setGroups(grupos);
 
-      if (grupos.length > 0) setGrupoAbierto(grupos[0].name);
+      if (grupos.length > 0) setGrupoAbierto("");
 
       setLoading(false);
     }

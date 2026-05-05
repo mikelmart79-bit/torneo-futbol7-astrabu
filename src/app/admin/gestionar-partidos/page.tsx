@@ -47,17 +47,9 @@ type FinalMatch = {
   match_date: string | null;
   match_time: string | null;
   field: string | null;
-  home_score: number | null;
-  away_score: number | null;
-  home_penalties: number | null;
-  away_penalties: number | null;
   status: string | null;
   sort_order: number;
   mvp_open: boolean | null;
-  home_source_type?: string | null;
-  home_source_match_title?: string | null;
-  away_source_type?: string | null;
-  away_source_match_title?: string | null;
 };
 
 function normalizarEquipo(
@@ -99,10 +91,6 @@ export default function AdminGestionarPartidosPage() {
   const [finalHora, setFinalHora] = useState("");
   const [finalCampo, setFinalCampo] = useState("Campo 1");
   const [finalEstado, setFinalEstado] = useState("Pendiente");
-  const [finalHomeScore, setFinalHomeScore] = useState("");
-  const [finalAwayScore, setFinalAwayScore] = useState("");
-  const [finalHomePenalties, setFinalHomePenalties] = useState("");
-  const [finalAwayPenalties, setFinalAwayPenalties] = useState("");
   const [finalMvpOpen, setFinalMvpOpen] = useState(false);
   const [finalMensaje, setFinalMensaje] = useState("");
 
@@ -157,11 +145,17 @@ export default function AdminGestionarPartidosPage() {
       (team) => team.group_name === grupoActivo
     );
 
-    if (!homeTeamId || !equiposGrupoInicial.some((team) => team.id === homeTeamId)) {
+    if (
+      !homeTeamId ||
+      !equiposGrupoInicial.some((team) => team.id === homeTeamId)
+    ) {
       setHomeTeamId(equiposGrupoInicial[0]?.id ?? "");
     }
 
-    if (!awayTeamId || !equiposGrupoInicial.some((team) => team.id === awayTeamId)) {
+    if (
+      !awayTeamId ||
+      !equiposGrupoInicial.some((team) => team.id === awayTeamId)
+    ) {
       setAwayTeamId(equiposGrupoInicial[1]?.id ?? "");
     }
 
@@ -204,7 +198,9 @@ export default function AdminGestionarPartidosPage() {
 
     const { data: finalData, error: finalError } = await supabase
       .from("final_matches")
-      .select("*")
+      .select(
+        "id, phase, title, home_ref, away_ref, match_date, match_time, field, status, sort_order, mvp_open"
+      )
       .order("sort_order", { ascending: true });
 
     if (finalError) {
@@ -361,10 +357,6 @@ export default function AdminGestionarPartidosPage() {
     setFinalHora("");
     setFinalCampo("Campo 1");
     setFinalEstado("Pendiente");
-    setFinalHomeScore("");
-    setFinalAwayScore("");
-    setFinalHomePenalties("");
-    setFinalAwayPenalties("");
     setFinalMvpOpen(false);
     setFinalMensaje("");
   }
@@ -376,10 +368,6 @@ export default function AdminGestionarPartidosPage() {
     setFinalHora(match.match_time ?? "");
     setFinalCampo(match.field ?? "Campo 1");
     setFinalEstado(match.status ?? "Pendiente");
-    setFinalHomeScore(match.home_score?.toString() ?? "");
-    setFinalAwayScore(match.away_score?.toString() ?? "");
-    setFinalHomePenalties(match.home_penalties?.toString() ?? "");
-    setFinalAwayPenalties(match.away_penalties?.toString() ?? "");
     setFinalMvpOpen(Boolean(match.mvp_open));
     setFinalMensaje("");
   }
@@ -394,95 +382,16 @@ export default function AdminGestionarPartidosPage() {
     if (match) cargarFinalMatch(match);
   }
 
-  async function actualizarArrastresFinales() {
-    const { data, error } = await supabase
-      .from("final_matches")
-      .select("*")
-      .order("sort_order", { ascending: true });
+  function cambiarFinalPhase(fase: string) {
+    setFinalPhase(fase);
+    setFinalSelectedId("");
 
-    if (error) {
-      setFinalMensaje(
-        "Guardado, pero no se han podido actualizar los cruces siguientes."
-      );
-      return;
-    }
+    const primerCruce = finalMatches.find((match) => match.phase === fase);
 
-    let lista = (data ?? []) as FinalMatch[];
-
-    function resolver(
-      matchTitle: string | null | undefined,
-      tipo: "winner" | "loser"
-    ) {
-      if (!matchTitle) return "";
-
-      const origen = lista.find((match) => match.title === matchTitle);
-
-      if (!origen) {
-        return `${tipo === "winner" ? "Ganador" : "Perdedor"} ${matchTitle}`;
-      }
-
-      if (origen.home_score === null || origen.away_score === null) {
-        return `${tipo === "winner" ? "Ganador" : "Perdedor"} ${matchTitle}`;
-      }
-
-      let ganaLocal: boolean | null = null;
-
-      if (origen.home_score > origen.away_score) {
-        ganaLocal = true;
-      } else if (origen.home_score < origen.away_score) {
-        ganaLocal = false;
-      } else if (
-        origen.home_penalties !== null &&
-        origen.away_penalties !== null &&
-        origen.home_penalties !== origen.away_penalties
-      ) {
-        ganaLocal = origen.home_penalties > origen.away_penalties;
-      }
-
-      if (ganaLocal === null) {
-        return `${tipo === "winner" ? "Ganador" : "Perdedor"} ${matchTitle}`;
-      }
-
-      if (tipo === "winner") {
-        return ganaLocal ? origen.home_ref : origen.away_ref;
-      }
-
-      return ganaLocal ? origen.away_ref : origen.home_ref;
-    }
-
-    for (let vuelta = 0; vuelta < 5; vuelta++) {
-      lista = lista.map((match) => ({
-        ...match,
-        home_ref:
-          match.home_source_type === "winner"
-            ? resolver(match.home_source_match_title, "winner")
-            : match.home_source_type === "loser"
-              ? resolver(match.home_source_match_title, "loser")
-              : match.home_ref,
-        away_ref:
-          match.away_source_type === "winner"
-            ? resolver(match.away_source_match_title, "winner")
-            : match.away_source_type === "loser"
-              ? resolver(match.away_source_match_title, "loser")
-              : match.away_ref,
-      }));
-    }
-
-    for (const match of lista) {
-      const { error: updateError } = await supabase
-        .from("final_matches")
-        .update({
-          home_ref: match.home_ref,
-          away_ref: match.away_ref,
-        })
-        .eq("id", match.id);
-
-      if (updateError) {
-        setFinalMensaje(
-          "Guardado, pero no se han podido actualizar todos los cruces siguientes."
-        );
-        return;
-      }
+    if (primerCruce) {
+      cargarFinalMatch(primerCruce);
+    } else {
+      limpiarFinalFormulario();
     }
   }
 
@@ -497,76 +406,17 @@ export default function AdminGestionarPartidosPage() {
       return false;
     }
 
-    const homeScore = finalHomeScore === "" ? null : Number(finalHomeScore);
-    const awayScore = finalAwayScore === "" ? null : Number(finalAwayScore);
-    const homePenalties =
-      finalHomePenalties === "" ? null : Number(finalHomePenalties);
-    const awayPenalties =
-      finalAwayPenalties === "" ? null : Number(finalAwayPenalties);
-
-    if (
-      (homeScore === null || awayScore === null) &&
-      (homePenalties !== null || awayPenalties !== null)
-    ) {
-      setFinalMensaje("Solo puedes indicar penaltis cuando hay resultado.");
-      return false;
-    }
-
-    if (
-      homeScore !== null &&
-      awayScore !== null &&
-      homeScore !== awayScore &&
-      (homePenalties !== null || awayPenalties !== null)
-    ) {
-      setFinalMensaje("Solo debe haber penaltis si el partido acaba empatado.");
-      return false;
-    }
-
-    if (
-      homeScore !== null &&
-      awayScore !== null &&
-      homeScore === awayScore &&
-      ((homePenalties === null && awayPenalties !== null) ||
-        (homePenalties !== null && awayPenalties === null))
-    ) {
-      setFinalMensaje("Si hay penaltis, indica los penaltis de los dos equipos.");
-      return false;
-    }
-
-    if (
-      homeScore !== null &&
-      awayScore !== null &&
-      homeScore === awayScore &&
-      homePenalties !== null &&
-      awayPenalties !== null &&
-      homePenalties === awayPenalties
-    ) {
-      setFinalMensaje("Los penaltis no pueden quedar empatados.");
-      return false;
-    }
-
     return true;
   }
 
   async function guardarFinalMatch() {
     if (!validarFinal()) return;
 
-    const homeScore = finalHomeScore === "" ? null : Number(finalHomeScore);
-    const awayScore = finalAwayScore === "" ? null : Number(finalAwayScore);
-    const homePenalties =
-      finalHomePenalties === "" ? null : Number(finalHomePenalties);
-    const awayPenalties =
-      finalAwayPenalties === "" ? null : Number(finalAwayPenalties);
-
     const payload = {
       match_date: finalFecha,
       match_time: finalHora,
       field: finalCampo || "Campo 1",
       status: finalEstado,
-      home_score: homeScore,
-      away_score: awayScore,
-      home_penalties: homePenalties,
-      away_penalties: awayPenalties,
       mvp_open: finalMvpOpen,
     };
 
@@ -580,9 +430,7 @@ export default function AdminGestionarPartidosPage() {
       return;
     }
 
-    await actualizarArrastresFinales();
-
-    setFinalMensaje("Eliminatoria guardada y cruces actualizados.");
+    setFinalMensaje("Eliminatoria actualizada correctamente.");
     await cargarDatos();
   }
 
@@ -590,7 +438,7 @@ export default function AdminGestionarPartidosPage() {
     mensaje.includes("correctamente") || mensaje.includes("eliminado");
 
   const finalMensajeCorrecto =
-    finalMensaje.includes("guardada") || finalMensaje.includes("actualizados");
+    finalMensaje.includes("correctamente") || finalMensaje.includes("actualizada");
 
   return (
     <AdminGuard>
@@ -845,7 +693,7 @@ export default function AdminGestionarPartidosPage() {
                   <div>
                     <p className="text-lg font-black">Eliminatorias</p>
                     <p className="text-sm font-bold opacity-80">
-                      Resultados, horarios y MVP de fase final
+                      Horarios, campo, estado y MVP
                     </p>
                   </div>
 
@@ -869,10 +717,9 @@ export default function AdminGestionarPartidosPage() {
 
                           <select
                             value={finalPhase}
-                            onChange={(event) => {
-                              setFinalPhase(event.target.value);
-                              limpiarFinalFormulario();
-                            }}
+                            onChange={(event) =>
+                              cambiarFinalPhase(event.target.value)
+                            }
                             className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
                           >
                             <option>Cuartos</option>
@@ -967,66 +814,6 @@ export default function AdminGestionarPartidosPage() {
                                 className="mt-2 w-full rounded-xl border border-slate-300 p-3 font-bold"
                                 placeholder="Campo 1"
                               />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label className="text-sm font-black uppercase text-slate-500">
-                                  Goles local
-                                </label>
-                                <input
-                                  type="number"
-                                  value={finalHomeScore}
-                                  onChange={(event) =>
-                                    setFinalHomeScore(event.target.value)
-                                  }
-                                  className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
-                                />
-                              </div>
-
-                              <div>
-                                <label className="text-sm font-black uppercase text-slate-500">
-                                  Goles visitante
-                                </label>
-                                <input
-                                  type="number"
-                                  value={finalAwayScore}
-                                  onChange={(event) =>
-                                    setFinalAwayScore(event.target.value)
-                                  }
-                                  className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
-                                />
-                              </div>
-                            </div>
-
-                            <div className="rounded-2xl bg-slate-100 p-4">
-                              <p className="text-sm font-black uppercase text-slate-500">
-                                Penaltis si hay empate
-                              </p>
-
-                              <div className="mt-3 grid grid-cols-2 gap-3">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={finalHomePenalties}
-                                  onChange={(event) =>
-                                    setFinalHomePenalties(event.target.value)
-                                  }
-                                  placeholder="Pen. local"
-                                  className="rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
-                                />
-
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={finalAwayPenalties}
-                                  onChange={(event) =>
-                                    setFinalAwayPenalties(event.target.value)
-                                  }
-                                  placeholder="Pen. visitante"
-                                  className="rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
-                                />
-                              </div>
                             </div>
 
                             <div>

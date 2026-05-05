@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, CalendarDays, Layers, Star } from "lucide-react";
+import { Home, CalendarDays, Trophy, Star } from "lucide-react";
 
 const items = [
   {
@@ -12,17 +12,17 @@ const items = [
   },
   {
     href: "/fase-grupos",
-    label: "Fase grupos",
+    label: "Grupos",
     icon: CalendarDays,
   },
   {
     href: "/fase-final",
     label: "Eliminatorias",
-    icon: Layers,
+    icon: Trophy,
   },
   {
-    href: "/mvp",
-    label: "MVP",
+    href: "/favoritos",
+    label: "Favoritos",
     icon: Star,
   },
 ];

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import AdminGuard from "@/components/AdminGuard";
 import { supabase } from "@/lib/supabase";
+import { formatearFecha } from "@/lib/formatDate";
 
 type Group = {
   id: string;
@@ -13,21 +14,21 @@ type Group = {
 type Team = {
   id: string;
   name: string;
-  group_name: string;
+  group_name: string | null;
 };
 
 type Match = {
   id: string;
-  group_name: string;
-  match_date: string;
-  match_time: string;
-  field: string;
+  group_name: string | null;
+  match_date: string | null;
+  match_time: string | null;
+  field: string | null;
   home_team_id: string;
   away_team_id: string;
   home_score: number | null;
   away_score: number | null;
-  status: string;
-  mvp_open: boolean;
+  status: string | null;
+  mvp_open: boolean | null;
   home_team: { name: string } | null;
   away_team: { name: string } | null;
 };
@@ -50,7 +51,7 @@ type FinalMatch = {
   away_score: number | null;
   home_penalties: number | null;
   away_penalties: number | null;
-  status: string;
+  status: string | null;
   sort_order: number;
   mvp_open: boolean | null;
   home_source_type?: string | null;
@@ -67,8 +68,13 @@ function normalizarEquipo(
   return equipo;
 }
 
+function formatearFechaSegura(fecha: string | null) {
+  if (!fecha) return "Fecha pendiente";
+  return formatearFecha(fecha);
+}
+
 export default function AdminGestionarPartidosPage() {
-  const [bloqueGruposAbierto, setBloqueGruposAbierto] = useState(false);
+  const [bloqueGruposAbierto, setBloqueGruposAbierto] = useState(true);
   const [bloqueFinalAbierto, setBloqueFinalAbierto] = useState(false);
 
   const [groups, setGroups] = useState<Group[]>([]);
@@ -115,32 +121,49 @@ export default function AdminGestionarPartidosPage() {
   async function cargarDatos() {
     setLoading(true);
 
-    const { data: groupsData } = await supabase
+    const { data: groupsData, error: groupsError } = await supabase
       .from("groups")
       .select("id, name, sort_order")
       .order("sort_order", { ascending: true });
 
+    if (groupsError) {
+      setMensaje("Error cargando grupos.");
+      setLoading(false);
+      return;
+    }
+
     const grupos = (groupsData ?? []) as Group[];
     setGroups(grupos);
 
-    const grupoInicial = grupos[0]?.name ?? "";
-    setGrupo(grupoInicial);
+    const grupoActivo = grupo || grupos[0]?.name || "";
+    setGrupo(grupoActivo);
 
-    const { data: teamsData } = await supabase
+    const { data: teamsData, error: teamsError } = await supabase
       .from("teams")
       .select("id, name, group_name")
       .order("group_name", { ascending: true })
       .order("name", { ascending: true });
 
+    if (teamsError) {
+      setMensaje("Error cargando equipos.");
+      setLoading(false);
+      return;
+    }
+
     const equipos = (teamsData ?? []) as Team[];
     setTeams(equipos);
 
-    const primerosEquipos = equipos.filter(
-      (team) => team.group_name === grupoInicial
+    const equiposGrupoInicial = equipos.filter(
+      (team) => team.group_name === grupoActivo
     );
 
-    setHomeTeamId(primerosEquipos[0]?.id ?? "");
-    setAwayTeamId(primerosEquipos[1]?.id ?? "");
+    if (!homeTeamId || !equiposGrupoInicial.some((team) => team.id === homeTeamId)) {
+      setHomeTeamId(equiposGrupoInicial[0]?.id ?? "");
+    }
+
+    if (!awayTeamId || !equiposGrupoInicial.some((team) => team.id === awayTeamId)) {
+      setAwayTeamId(equiposGrupoInicial[1]?.id ?? "");
+    }
 
     const { data: matchesData, error: matchesError } = await supabase
       .from("matches")
@@ -226,12 +249,12 @@ export default function AdminGestionarPartidosPage() {
 
   function cargarPartido(match: Match) {
     setSelectedId(match.id);
-    setGrupo(match.group_name);
+    setGrupo(match.group_name ?? "");
     setHomeTeamId(match.home_team_id);
     setAwayTeamId(match.away_team_id);
     setFecha(match.match_date ?? "");
     setHora(match.match_time ?? "");
-    setCampo(match.field ?? "");
+    setCampo(match.field ?? "Campo 1");
     setEstado(match.status ?? "Pendiente");
     setMvpOpen(Boolean(match.mvp_open));
     setMensaje("");
@@ -247,26 +270,40 @@ export default function AdminGestionarPartidosPage() {
     if (match) cargarPartido(match);
   }
 
-  async function guardarPartido() {
+  function validarPartidoGrupo() {
     if (!grupo) {
       setMensaje("Selecciona un grupo.");
-      return;
+      return false;
     }
 
     if (!homeTeamId || !awayTeamId) {
       setMensaje("Selecciona los dos equipos.");
-      return;
+      return false;
     }
 
     if (homeTeamId === awayTeamId) {
       setMensaje("El equipo local y visitante no pueden ser el mismo.");
-      return;
+      return false;
+    }
+
+    const local = teams.find((team) => team.id === homeTeamId);
+    const visitante = teams.find((team) => team.id === awayTeamId);
+
+    if (local?.group_name !== grupo || visitante?.group_name !== grupo) {
+      setMensaje("Los dos equipos deben pertenecer al grupo seleccionado.");
+      return false;
     }
 
     if (!fecha || !hora) {
       setMensaje("Indica fecha y hora del partido.");
-      return;
+      return false;
     }
+
+    return true;
+  }
+
+  async function guardarPartido() {
+    if (!validarPartidoGrupo()) return;
 
     const payload = {
       group_name: grupo,
@@ -296,10 +333,12 @@ export default function AdminGestionarPartidosPage() {
     if (!selectedId) return;
 
     const confirmar = window.confirm(
-      "¿Seguro que quieres eliminar este partido?"
+      "¿Seguro que quieres eliminar este partido? También se borrarán sus votos MVP si los hubiera."
     );
 
     if (!confirmar) return;
+
+    await supabase.from("mvp_votes").delete().eq("match_id", selectedId);
 
     const { error } = await supabase
       .from("matches")
@@ -418,37 +457,44 @@ export default function AdminGestionarPartidosPage() {
           match.home_source_type === "winner"
             ? resolver(match.home_source_match_title, "winner")
             : match.home_source_type === "loser"
-            ? resolver(match.home_source_match_title, "loser")
-            : match.home_ref,
+              ? resolver(match.home_source_match_title, "loser")
+              : match.home_ref,
         away_ref:
           match.away_source_type === "winner"
             ? resolver(match.away_source_match_title, "winner")
             : match.away_source_type === "loser"
-            ? resolver(match.away_source_match_title, "loser")
-            : match.away_ref,
+              ? resolver(match.away_source_match_title, "loser")
+              : match.away_ref,
       }));
     }
 
     for (const match of lista) {
-      await supabase
+      const { error: updateError } = await supabase
         .from("final_matches")
         .update({
           home_ref: match.home_ref,
           away_ref: match.away_ref,
         })
         .eq("id", match.id);
+
+      if (updateError) {
+        setFinalMensaje(
+          "Guardado, pero no se han podido actualizar todos los cruces siguientes."
+        );
+        return;
+      }
     }
   }
 
-  async function guardarFinalMatch() {
+  function validarFinal() {
     if (!finalSelectedId) {
       setFinalMensaje("Selecciona un cruce de eliminatorias.");
-      return;
+      return false;
     }
 
     if (!finalFecha || !finalHora) {
       setFinalMensaje("Indica fecha y hora del partido.");
-      return;
+      return false;
     }
 
     const homeScore = finalHomeScore === "" ? null : Number(finalHomeScore);
@@ -459,6 +505,24 @@ export default function AdminGestionarPartidosPage() {
       finalAwayPenalties === "" ? null : Number(finalAwayPenalties);
 
     if (
+      (homeScore === null || awayScore === null) &&
+      (homePenalties !== null || awayPenalties !== null)
+    ) {
+      setFinalMensaje("Solo puedes indicar penaltis cuando hay resultado.");
+      return false;
+    }
+
+    if (
+      homeScore !== null &&
+      awayScore !== null &&
+      homeScore !== awayScore &&
+      (homePenalties !== null || awayPenalties !== null)
+    ) {
+      setFinalMensaje("Solo debe haber penaltis si el partido acaba empatado.");
+      return false;
+    }
+
+    if (
       homeScore !== null &&
       awayScore !== null &&
       homeScore === awayScore &&
@@ -466,7 +530,7 @@ export default function AdminGestionarPartidosPage() {
         (homePenalties !== null && awayPenalties === null))
     ) {
       setFinalMensaje("Si hay penaltis, indica los penaltis de los dos equipos.");
-      return;
+      return false;
     }
 
     if (
@@ -478,8 +542,21 @@ export default function AdminGestionarPartidosPage() {
       homePenalties === awayPenalties
     ) {
       setFinalMensaje("Los penaltis no pueden quedar empatados.");
-      return;
+      return false;
     }
+
+    return true;
+  }
+
+  async function guardarFinalMatch() {
+    if (!validarFinal()) return;
+
+    const homeScore = finalHomeScore === "" ? null : Number(finalHomeScore);
+    const awayScore = finalAwayScore === "" ? null : Number(finalAwayScore);
+    const homePenalties =
+      finalHomePenalties === "" ? null : Number(finalHomePenalties);
+    const awayPenalties =
+      finalAwayPenalties === "" ? null : Number(finalAwayPenalties);
 
     const payload = {
       match_date: finalFecha,
@@ -509,6 +586,12 @@ export default function AdminGestionarPartidosPage() {
     await cargarDatos();
   }
 
+  const mensajeCorrecto =
+    mensaje.includes("correctamente") || mensaje.includes("eliminado");
+
+  const finalMensajeCorrecto =
+    finalMensaje.includes("guardada") || finalMensaje.includes("actualizados");
+
   return (
     <AdminGuard>
       <main className="relative min-h-screen overflow-hidden bg-black text-slate-900">
@@ -526,6 +609,9 @@ export default function AdminGestionarPartidosPage() {
             <h1 className="mt-2 text-center text-3xl font-black">
               Gestionar partidos
             </h1>
+            <p className="mt-2 text-center text-sm font-bold text-emerald-100">
+              Calendario, estados y votaciones
+            </p>
           </div>
 
           {loading ? (
@@ -596,7 +682,8 @@ export default function AdminGestionarPartidosPage() {
                               <option key={match.id} value={match.id}>
                                 {match.home_team?.name ?? "Local"} vs{" "}
                                 {match.away_team?.name ?? "Visitante"} ·{" "}
-                                {match.match_date} · {match.match_time}
+                                {formatearFechaSegura(match.match_date)} ·{" "}
+                                {match.match_time ?? "Hora"}
                               </option>
                             ))}
                           </select>
@@ -734,7 +821,13 @@ export default function AdminGestionarPartidosPage() {
                         )}
 
                         {mensaje && (
-                          <div className="rounded-xl bg-emerald-100 p-3 text-sm font-bold text-emerald-800">
+                          <div
+                            className={`rounded-xl p-3 text-sm font-bold ${
+                              mensajeCorrecto
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-red-100 text-red-700"
+                            }`}
+                          >
                             {mensaje}
                           </div>
                         )}
@@ -778,7 +871,6 @@ export default function AdminGestionarPartidosPage() {
                             value={finalPhase}
                             onChange={(event) => {
                               setFinalPhase(event.target.value);
-                              setFinalSelectedId("");
                               limpiarFinalFormulario();
                             }}
                             className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
@@ -818,7 +910,7 @@ export default function AdminGestionarPartidosPage() {
                               <p className="text-sm font-black uppercase text-slate-500">
                                 Partido
                               </p>
-                              <p className="mt-2 text-lg font-black">
+                              <p className="mt-2 break-words text-lg font-black leading-tight">
                                 {
                                   finalMatches.find(
                                     (match) => match.id === finalSelectedId
@@ -977,7 +1069,13 @@ export default function AdminGestionarPartidosPage() {
                         )}
 
                         {finalMensaje && (
-                          <div className="rounded-xl bg-emerald-100 p-3 text-sm font-bold text-emerald-800">
+                          <div
+                            className={`rounded-xl p-3 text-sm font-bold ${
+                              finalMensajeCorrecto
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-red-100 text-red-700"
+                            }`}
+                          >
                             {finalMensaje}
                           </div>
                         )}

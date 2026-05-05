@@ -82,7 +82,7 @@ export default function FavoritosPage() {
 
       const primerFavorito = equipos.find((team) => ids.includes(team.id));
       if (primerFavorito) {
-        setEquipoAbierto(primerFavorito.id);
+        setEquipoAbierto("";
       }
     }
 

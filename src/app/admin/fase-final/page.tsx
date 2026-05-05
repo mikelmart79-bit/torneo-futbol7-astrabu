@@ -27,7 +27,7 @@ type FinalMatch = {
   away_score: number | null;
   home_penalties: number | null;
   away_penalties: number | null;
-  status: string;
+  status: string | null;
   sort_order: number;
   mvp_open: boolean | null;
 };
@@ -88,13 +88,7 @@ export default function AdminFaseFinalPage() {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [field, setField] = useState("");
-  const [homeScore, setHomeScore] = useState("");
-  const [awayScore, setAwayScore] = useState("");
-  const [homePenalties, setHomePenalties] = useState("");
-  const [awayPenalties, setAwayPenalties] = useState("");
-  const [status, setStatus] = useState("Pendiente");
   const [sortOrder, setSortOrder] = useState("1");
-  const [mvpOpen, setMvpOpen] = useState(false);
 
   useEffect(() => {
     cargarDatos();
@@ -177,13 +171,7 @@ export default function AdminFaseFinalPage() {
     setDate(match.match_date ?? "");
     setTime(match.match_time ?? "");
     setField(match.field ?? "");
-    setHomeScore(match.home_score?.toString() ?? "");
-    setAwayScore(match.away_score?.toString() ?? "");
-    setHomePenalties(match.home_penalties?.toString() ?? "");
-    setAwayPenalties(match.away_penalties?.toString() ?? "");
-    setStatus(match.status);
     setSortOrder(match.sort_order.toString());
-    setMvpOpen(Boolean(match.mvp_open));
     setMensaje("");
   }
 
@@ -207,13 +195,7 @@ export default function AdminFaseFinalPage() {
     setDate("");
     setTime("");
     setField("");
-    setHomeScore("");
-    setAwayScore("");
-    setHomePenalties("");
-    setAwayPenalties("");
-    setStatus("Pendiente");
     setSortOrder((matches.length + 1).toString());
-    setMvpOpen(false);
     setMensaje("");
   }
 
@@ -461,13 +443,7 @@ export default function AdminFaseFinalPage() {
       match_date: date || null,
       match_time: time || null,
       field: field || null,
-      home_score: homeScore === "" ? null : Number(homeScore),
-      away_score: awayScore === "" ? null : Number(awayScore),
-      home_penalties: homePenalties === "" ? null : Number(homePenalties),
-      away_penalties: awayPenalties === "" ? null : Number(awayPenalties),
-      status,
       sort_order: Number(sortOrder) || 1,
-      mvp_open: mvpOpen,
     };
 
     const { error } = selectedId
@@ -849,65 +825,6 @@ export default function AdminFaseFinalPage() {
                   placeholder="Campo"
                   className="mt-4 w-full rounded-xl border border-slate-300 p-3 font-bold"
                 />
-
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <input
-                    type="number"
-                    value={homeScore}
-                    onChange={(e) => setHomeScore(e.target.value)}
-                    placeholder="Goles local"
-                    className="rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
-                  />
-
-                  <input
-                    type="number"
-                    value={awayScore}
-                    onChange={(e) => setAwayScore(e.target.value)}
-                    placeholder="Goles visitante"
-                    className="rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
-                  />
-                </div>
-
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <input
-                    type="number"
-                    value={homePenalties}
-                    onChange={(e) => setHomePenalties(e.target.value)}
-                    placeholder="Penaltis local"
-                    className="rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
-                  />
-
-                  <input
-                    type="number"
-                    value={awayPenalties}
-                    onChange={(e) => setAwayPenalties(e.target.value)}
-                    placeholder="Penaltis visitante"
-                    className="rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
-                  />
-                </div>
-
-                <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                  className="mt-4 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
-                >
-                  <option>Pendiente</option>
-                  <option>En juego</option>
-                  <option>Finalizado</option>
-                  <option>Cerrado</option>
-                </select>
-
-                <label className="mt-4 flex items-center justify-between rounded-xl bg-slate-100 p-4">
-                  <span className="text-sm font-black text-slate-700">
-                    Votación MVP abierta
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={mvpOpen}
-                    onChange={(e) => setMvpOpen(e.target.checked)}
-                    className="h-5 w-5"
-                  />
-                </label>
 
                 <button
                   onClick={guardarCruce}

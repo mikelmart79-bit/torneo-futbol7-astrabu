@@ -83,56 +83,60 @@ export default function InicioPage() {
         <div className="mt-6 overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
           <div className="bg-red-600 px-5 py-3 text-center">
             <p className="text-sm font-black uppercase tracking-widest text-white">
-              Próximo partido
+              Próximos partidos
             </p>
           </div>
 
           {partido ? (
             <div className="p-5">
-              <div className="grid grid-cols-[40px_1fr_40px] items-center gap-3">
-                <button
-                  onClick={anteriorPartido}
-                  disabled={partidos.length <= 1}
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-xl font-black text-white disabled:opacity-30"
-                >
-                  ‹
-                </button>
-
-                <div className="text-center">
-                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                    <p className="text-base font-black leading-tight">
+              <div className="rounded-3xl bg-slate-50 p-4 text-center shadow-inner">
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                  <div className="min-w-0">
+                    <p className="break-words text-base font-black leading-tight text-slate-950">
                       {partido.home_team?.name}
-                    </p>
-
-                    <div className="rounded-2xl bg-slate-900 px-4 py-3 text-center text-white shadow-lg">
-                      <p className="text-xs font-black uppercase text-slate-300">
-                        {formatearFecha(partido.match_date)}
-                      </p>
-                      <p className="text-2xl font-black">{partido.match_time}</p>
-                      <p className="text-xs font-bold text-slate-300">
-                        {partido.field}
-                      </p>
-                    </div>
-
-                    <p className="text-base font-black leading-tight">
-                      {partido.away_team?.name}
                     </p>
                   </div>
 
-                  {partidos.length > 1 && (
-                    <p className="mt-4 text-xs font-bold text-slate-500">
-                      {indicePartido + 1} de {partidos.length}
+                  <div className="rounded-2xl bg-slate-950 px-4 py-3 text-center text-white shadow-lg">
+                    <p className="text-xs font-black uppercase text-slate-300">
+                      {formatearFecha(partido.match_date)}
                     </p>
-                  )}
+                    <p className="text-3xl font-black leading-none">
+                      {partido.match_time}
+                    </p>
+                    <p className="mt-1 text-xs font-bold text-slate-300">
+                      {partido.field}
+                    </p>
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="break-words text-base font-black leading-tight text-slate-950">
+                      {partido.away_team?.name}
+                    </p>
+                  </div>
                 </div>
 
-                <button
-                  onClick={siguientePartido}
-                  disabled={partidos.length <= 1}
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-xl font-black text-white disabled:opacity-30"
-                >
-                  ›
-                </button>
+                {partidos.length > 1 && (
+                  <div className="mt-5 flex items-center justify-center gap-5">
+                    <button
+                      onClick={anteriorPartido}
+                      className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-950 text-2xl font-black text-white shadow"
+                    >
+                      ‹
+                    </button>
+
+                    <p className="text-sm font-black text-slate-500">
+                      {indicePartido + 1} / {partidos.length}
+                    </p>
+
+                    <button
+                      onClick={siguientePartido}
+                      className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-950 text-2xl font-black text-white shadow"
+                    >
+                      ›
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ) : (

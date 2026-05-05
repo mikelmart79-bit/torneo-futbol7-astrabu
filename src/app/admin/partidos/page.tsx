@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AdminGuard from "@/components/AdminGuard";
 import { supabase } from "@/lib/supabase";
+import { formatearFecha } from "@/lib/formatDate";
 
 type Group = {
   id: string;
@@ -11,14 +13,14 @@ type Group = {
 
 type Match = {
   id: string;
-  group_name: string;
-  match_date: string;
-  match_time: string;
-  field: string;
+  group_name: string | null;
+  match_date: string | null;
+  match_time: string | null;
+  field: string | null;
   home_score: number | null;
   away_score: number | null;
-  status: string;
-  mvp_open: boolean;
+  status: string | null;
+  mvp_open: boolean | null;
   home_team: { name: string } | null;
   away_team: { name: string } | null;
 };
@@ -34,6 +36,11 @@ function normalizarEquipo(
   if (!equipo) return null;
   if (Array.isArray(equipo)) return equipo[0] ?? null;
   return equipo;
+}
+
+function formatearFechaSegura(fecha: string | null) {
+  if (!fecha) return "Fecha pendiente";
+  return formatearFecha(fecha);
 }
 
 export default function AdminPartidosPage() {
@@ -58,11 +65,19 @@ export default function AdminPartidosPage() {
     cargarDatos();
   }, []);
 
-  async function cargarDatos() {
-    const { data: groupsData } = await supabase
+  async function cargarDatos(partidoMantenerId?: string, grupoMantener?: string) {
+    setLoading(true);
+
+    const { data: groupsData, error: groupsError } = await supabase
       .from("groups")
       .select("id, name, sort_order")
       .order("sort_order", { ascending: true });
+
+    if (groupsError) {
+      setMensaje("Error cargando grupos.");
+      setLoading(false);
+      return;
+    }
 
     const grupos = (groupsData ?? []) as Group[];
     setGroups(grupos);
@@ -103,17 +118,23 @@ export default function AdminPartidosPage() {
 
     setMatches(partidos);
 
-    const primerGrupo =
-      grupos[0]?.name || partidos[0]?.group_name || "";
+    const grupoInicial =
+      grupoMantener || grupoActivo || grupos[0]?.name || partidos[0]?.group_name || "";
 
-    setGrupoActivo(primerGrupo);
+    setGrupoActivo(grupoInicial);
 
-    const primerPartido = partidos.find(
-      (match) => match.group_name === primerGrupo
-    );
+    const partidoMantener = partidoMantenerId
+      ? partidos.find((match) => match.id === partidoMantenerId)
+      : null;
+
+    const primerPartido = partidoMantener
+      ?? partidos.find((match) => match.group_name === grupoInicial)
+      ?? null;
 
     if (primerPartido) {
       seleccionarPartido(primerPartido);
+    } else {
+      limpiarPartido();
     }
 
     setLoading(false);
@@ -156,8 +177,35 @@ export default function AdminPartidosPage() {
     seleccionarPartido(nuevoPartido);
   }
 
+  function validarResultado() {
+    if (!partido) {
+      setMensaje("Selecciona un partido.");
+      return false;
+    }
+
+    const localVacio = golesLocal.trim() === "";
+    const visitanteVacio = golesVisitante.trim() === "";
+
+    if (localVacio !== visitanteVacio) {
+      setMensaje("Indica los goles de los dos equipos o deja ambos vacíos.");
+      return false;
+    }
+
+    if (!localVacio && Number.parseInt(golesLocal, 10) < 0) {
+      setMensaje("Los goles del equipo local no pueden ser negativos.");
+      return false;
+    }
+
+    if (!visitanteVacio && Number.parseInt(golesVisitante, 10) < 0) {
+      setMensaje("Los goles del equipo visitante no pueden ser negativos.");
+      return false;
+    }
+
+    return true;
+  }
+
   async function guardarResultado() {
-    if (!partido) return;
+    if (!validarResultado() || !partido) return;
 
     const local =
       golesLocal.trim() === "" ? null : Number.parseInt(golesLocal, 10);
@@ -186,156 +234,179 @@ export default function AdminPartidosPage() {
       } - ${visitante ?? "-"} ${partido.away_team?.name ?? "Visitante"}`
     );
 
-    await cargarDatos();
+    await cargarDatos(partido.id, grupoActivo);
   }
 
+  const mensajeCorrecto = mensaje.includes("guardado");
+
   return (
-    <main className="relative min-h-screen overflow-hidden bg-black text-slate-900">
-      <img
-        src="/torneo-verano.png"
-        alt="Fondo torneo"
-        className="fixed inset-0 h-screen w-screen object-cover opacity-35 blur-sm"
-      />
+    <AdminGuard>
+      <main className="relative min-h-screen overflow-hidden bg-black text-slate-900">
+        <img
+          src="/torneo-verano.png"
+          alt="Fondo torneo"
+          className="fixed inset-0 h-screen w-screen object-cover opacity-35 blur-sm"
+        />
 
-      <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-24">
-        <div className="rounded-3xl bg-black/60 px-4 py-5 text-white shadow-2xl backdrop-blur">
-          <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
-            Torneo Fútbol 7 Astrabudua
-          </p>
-          <h1 className="mt-2 text-center text-3xl font-black">
-            Resultados
-          </h1>
-        </div>
-
-        <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
-          {loading ? (
-            <p className="font-bold">Cargando partidos...</p>
-          ) : groups.length === 0 ? (
-            <p className="rounded-2xl bg-slate-100 p-4 font-bold text-slate-500">
-              Todavía no hay grupos creados.
+        <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-24">
+          <div className="rounded-3xl bg-black/60 px-4 py-5 text-white shadow-2xl backdrop-blur">
+            <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
+              Torneo Fútbol 7 Astrabudua
             </p>
-          ) : (
-            <>
-              <label className="text-sm font-black uppercase text-slate-500">
-                Grupo
-              </label>
+            <h1 className="mt-2 text-center text-3xl font-black">
+              Resultados
+            </h1>
+            <p className="mt-2 text-center text-sm font-bold text-emerald-100">
+              Marcadores de fase de grupos
+            </p>
+          </div>
 
-              <select
-                value={grupoActivo}
-                onChange={(event) => cambiarGrupo(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
-              >
-                {groups.map((grupo) => (
-                  <option key={grupo.id} value={grupo.name}>
-                    {grupo.name}
-                  </option>
-                ))}
-              </select>
+          <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
+            {loading ? (
+              <p className="font-bold">Cargando partidos...</p>
+            ) : groups.length === 0 ? (
+              <p className="rounded-2xl bg-slate-100 p-4 font-bold text-slate-500">
+                Todavía no hay grupos creados.
+              </p>
+            ) : (
+              <>
+                <label className="text-sm font-black uppercase text-slate-500">
+                  Grupo
+                </label>
 
-              <label className="mt-5 block text-sm font-black uppercase text-slate-500">
-                Partido
-              </label>
+                <select
+                  value={grupoActivo}
+                  onChange={(event) => cambiarGrupo(event.target.value)}
+                  className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
+                >
+                  {groups.map((grupo) => (
+                    <option key={grupo.id} value={grupo.name}>
+                      {grupo.name}
+                    </option>
+                  ))}
+                </select>
 
-              <select
-                value={partidoId}
-                onChange={(event) => cambiarPartido(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
-              >
-                {partidosGrupo.map((match) => (
-                  <option key={match.id} value={match.id}>
-                    {match.home_team?.name ?? "Local"} vs{" "}
-                    {match.away_team?.name ?? "Visitante"} · {match.match_date} ·{" "}
-                    {match.match_time}
-                  </option>
-                ))}
-              </select>
+                <label className="mt-5 block text-sm font-black uppercase text-slate-500">
+                  Partido
+                </label>
 
-              {partido ? (
-                <>
-                  <div className="mt-5 rounded-2xl bg-slate-100 p-4">
-                    <p className="text-sm font-black text-red-600">
-                      {partido.group_name}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {partido.match_date} · {partido.match_time} ·{" "}
-                      {partido.field}
-                    </p>
-                  </div>
-
-                  <div className="mt-5 grid grid-cols-[1fr_80px] items-center gap-3">
-                    <p className="font-black">
-                      {partido.home_team?.name ?? "Local"}
-                    </p>
-                    <input
-                      type="number"
-                      min="0"
-                      value={golesLocal}
-                      onChange={(event) => setGolesLocal(event.target.value)}
-                      className="rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
-                    />
-
-                    <p className="font-black">
-                      {partido.away_team?.name ?? "Visitante"}
-                    </p>
-                    <input
-                      type="number"
-                      min="0"
-                      value={golesVisitante}
-                      onChange={(event) =>
-                        setGolesVisitante(event.target.value)
-                      }
-                      className="rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
-                    />
-                  </div>
-
-                  <div className="mt-5">
-                    <label className="text-sm font-black uppercase text-slate-500">
-                      Estado
-                    </label>
-                    <select
-                      value={estado}
-                      onChange={(event) => setEstado(event.target.value)}
-                      className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
-                    >
-                      <option>Pendiente</option>
-                      <option>En juego</option>
-                      <option>Finalizado</option>
-                      <option>Cerrado</option>
-                    </select>
-                  </div>
-
-                  <label className="mt-5 flex items-center justify-between rounded-2xl bg-slate-100 p-4 font-black">
-                    <span>Abrir votación MVP</span>
-                    <input
-                      type="checkbox"
-                      checked={mvpOpen}
-                      onChange={(event) => setMvpOpen(event.target.checked)}
-                      className="h-6 w-6"
-                    />
-                  </label>
-
-                  <button
-                    onClick={guardarResultado}
-                    className="mt-6 w-full rounded-xl bg-red-600 py-3 font-black text-white shadow"
-                  >
-                    Guardar resultado
-                  </button>
-
-                  {mensaje && (
-                    <div className="mt-4 rounded-xl bg-emerald-100 p-3 text-sm font-bold text-emerald-800">
-                      {mensaje}
-                    </div>
+                <select
+                  value={partidoId}
+                  onChange={(event) => cambiarPartido(event.target.value)}
+                  className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
+                >
+                  {partidosGrupo.length === 0 ? (
+                    <option value="">No hay partidos en este grupo</option>
+                  ) : (
+                    partidosGrupo.map((match) => (
+                      <option key={match.id} value={match.id}>
+                        {match.home_team?.name ?? "Local"} vs{" "}
+                        {match.away_team?.name ?? "Visitante"} ·{" "}
+                        {formatearFechaSegura(match.match_date)} ·{" "}
+                        {match.match_time ?? "Hora pendiente"}
+                      </option>
+                    ))
                   )}
-                </>
-              ) : (
-                <p className="mt-5 rounded-2xl bg-slate-100 p-4 font-bold text-slate-500">
-                  No hay partidos cargados en este grupo.
-                </p>
-              )}
-            </>
-          )}
-        </div>
-      </section>
-    </main>
+                </select>
+
+                {partido ? (
+                  <>
+                    <div className="mt-5 rounded-2xl bg-slate-100 p-4">
+                      <p className="text-sm font-black text-red-600">
+                        {partido.group_name}
+                      </p>
+                      <p className="mt-1 text-sm font-bold text-slate-500">
+                        {formatearFechaSegura(partido.match_date)} ·{" "}
+                        {partido.match_time ?? "Hora pendiente"} ·{" "}
+                        {partido.field ?? "Campo pendiente"}
+                      </p>
+                    </div>
+
+                    <div className="mt-5 space-y-3">
+                      <div className="grid grid-cols-[1fr_82px] items-center gap-3 rounded-2xl bg-slate-50 p-3">
+                        <p className="break-words font-black leading-tight">
+                          {partido.home_team?.name ?? "Local"}
+                        </p>
+                        <input
+                          type="number"
+                          min="0"
+                          value={golesLocal}
+                          onChange={(event) => setGolesLocal(event.target.value)}
+                          className="rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-[1fr_82px] items-center gap-3 rounded-2xl bg-slate-50 p-3">
+                        <p className="break-words font-black leading-tight">
+                          {partido.away_team?.name ?? "Visitante"}
+                        </p>
+                        <input
+                          type="number"
+                          min="0"
+                          value={golesVisitante}
+                          onChange={(event) =>
+                            setGolesVisitante(event.target.value)
+                          }
+                          className="rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-5">
+                      <label className="text-sm font-black uppercase text-slate-500">
+                        Estado
+                      </label>
+                      <select
+                        value={estado}
+                        onChange={(event) => setEstado(event.target.value)}
+                        className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
+                      >
+                        <option>Pendiente</option>
+                        <option>En juego</option>
+                        <option>Finalizado</option>
+                        <option>Cerrado</option>
+                      </select>
+                    </div>
+
+                    <label className="mt-5 flex items-center justify-between rounded-2xl bg-slate-100 p-4 font-black">
+                      <span>Abrir votación MVP</span>
+                      <input
+                        type="checkbox"
+                        checked={mvpOpen}
+                        onChange={(event) => setMvpOpen(event.target.checked)}
+                        className="h-6 w-6"
+                      />
+                    </label>
+
+                    <button
+                      onClick={guardarResultado}
+                      className="mt-6 w-full rounded-xl bg-red-600 py-3 font-black text-white shadow"
+                    >
+                      Guardar resultado
+                    </button>
+
+                    {mensaje && (
+                      <div
+                        className={`mt-4 rounded-xl p-3 text-sm font-bold ${
+                          mensajeCorrecto
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-red-100 text-red-700"
+                        }`}
+                      >
+                        {mensaje}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="mt-5 rounded-2xl bg-slate-100 p-4 font-bold text-slate-500">
+                    No hay partidos cargados en este grupo.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        </section>
+      </main>
+    </AdminGuard>
   );
 }

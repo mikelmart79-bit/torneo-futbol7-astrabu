@@ -200,7 +200,7 @@ export default function VotarMvpPage() {
     }
 
     const eliminatorias: Match[] = ((finalData ?? []) as FinalMatch[])
-      .map((match) => {
+      .map((match): Match | null => {
         const local = buscarEquipoPorNombre(match.home_ref, equipos);
         const visitante = buscarEquipoPorNombre(match.away_ref, equipos);
 

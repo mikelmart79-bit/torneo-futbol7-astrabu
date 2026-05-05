@@ -2,8 +2,34 @@
 
 import Link from "next/link";
 import AdminGuard from "@/components/AdminGuard";
+import { supabase } from "@/lib/supabase";
 
 export default function AdminPage() {
+  async function borrarDatosTorneo() {
+    const confirmar1 = window.confirm(
+      "⚠️ Esto borrará TODOS los datos del torneo:\n\n- grupos\n- equipos\n- jugadores\n- partidos\n- eliminatorias\n- votos MVP\n\n¿Quieres continuar?"
+    );
+
+    if (!confirmar1) return;
+
+    const confirmar2 = window.confirm(
+      "🚨 Última confirmación.\n\nEsta acción no se puede deshacer.\n\n¿Borrar todos los datos?"
+    );
+
+    if (!confirmar2) return;
+
+    const { error } = await supabase.rpc("reset_torneo");
+
+    if (error) {
+      alert("No se han podido borrar los datos.");
+      console.error(error);
+      return;
+    }
+
+    alert("Datos del torneo borrados correctamente.");
+    window.location.reload();
+  }
+
   return (
     <AdminGuard>
       <main className="relative min-h-screen overflow-hidden bg-black text-slate-900">
@@ -24,61 +50,54 @@ export default function AdminPage() {
           </div>
 
           <div className="mt-6 grid grid-cols-1 gap-3">
-            <Link
-              href="/admin/partidos"
-              className="rounded-2xl bg-white/95 p-5 text-lg font-black shadow"
-            >
+            <Link href="/admin/partidos" className="rounded-2xl bg-white/95 p-5 text-lg font-black shadow">
               Resultados
             </Link>
 
-            <Link
-              href="/admin/fase-final"
-              className="rounded-2xl bg-white/95 p-5 text-lg font-black shadow"
-            >
+            <Link href="/admin/fase-final" className="rounded-2xl bg-white/95 p-5 text-lg font-black shadow">
               Configurar eliminatorias
             </Link>
 
-            <Link
-              href="/admin/grupos"
-              className="rounded-2xl bg-white/95 p-5 text-lg font-black shadow"
-            >
+            <Link href="/admin/grupos" className="rounded-2xl bg-white/95 p-5 text-lg font-black shadow">
               Gestionar grupos
             </Link>
 
-            <Link
-              href="/admin/gestionar-partidos"
-              className="rounded-2xl bg-white/95 p-5 text-lg font-black shadow"
-            >
+            <Link href="/admin/gestionar-partidos" className="rounded-2xl bg-white/95 p-5 text-lg font-black shadow">
               Gestionar partidos
             </Link>
 
-            <Link
-              href="/admin/equipos"
-              className="rounded-2xl bg-white/95 p-5 text-lg font-black shadow"
-            >
+            <Link href="/admin/equipos" className="rounded-2xl bg-white/95 p-5 text-lg font-black shadow">
               Gestionar equipos
             </Link>
 
-            <Link
-              href="/admin/jugadores"
-              className="rounded-2xl bg-white/95 p-5 text-lg font-black shadow"
-            >
+            <Link href="/admin/jugadores" className="rounded-2xl bg-white/95 p-5 text-lg font-black shadow">
               Gestionar jugadores
             </Link>
 
-            <Link
-              href="/admin/mvp"
-              className="rounded-2xl bg-white/95 p-5 text-lg font-black shadow"
-            >
+            <Link href="/admin/mvp" className="rounded-2xl bg-white/95 p-5 text-lg font-black shadow">
               Votaciones MVP
             </Link>
 
-            <Link
-              href="/admin/normativa"
-              className="rounded-2xl bg-white/95 p-5 text-lg font-black shadow"
-            >
+            <Link href="/admin/normativa" className="rounded-2xl bg-white/95 p-5 text-lg font-black shadow">
               Editar normativa
             </Link>
+          </div>
+
+          <div className="mt-8 rounded-3xl border-2 border-red-600 bg-red-50 p-5 shadow-2xl">
+            <p className="text-sm font-black uppercase tracking-widest text-red-700">
+              Zona peligrosa
+            </p>
+
+            <p className="mt-2 text-sm font-bold text-red-900">
+              Borra todos los datos del torneo para empezar pruebas desde cero.
+            </p>
+
+            <button
+              onClick={borrarDatosTorneo}
+              className="mt-4 w-full rounded-xl bg-red-600 py-3 font-black text-white shadow"
+            >
+              Borrar datos del torneo
+            </button>
           </div>
         </section>
       </main>

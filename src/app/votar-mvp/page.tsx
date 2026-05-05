@@ -177,7 +177,7 @@ export default function VotarMvpPage() {
 
     const partidosGrupo: Match[] = (
       (matchesData as unknown as RawMatch[]) || []
-    ).map((match) => ({
+    ).map((match): Match | null => {
       ...match,
       tipo: "grupo",
       group_name: match.group_name,
@@ -223,7 +223,7 @@ export default function VotarMvpPage() {
           away_team: { name: visitante.name },
         };
       })
-      .filter((match): match is Match => Boolean(match));
+      .filter((match): match is Match => match !== null);
 
     const todosPartidos = [...partidosGrupo, ...eliminatorias];
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { formatearFecha } from "@/lib/formatDate";
@@ -18,9 +19,9 @@ type Team = {
 
 type Match = {
   id: string;
-  match_date: string;
-  match_time: string;
-  field: string;
+  match_date: string | null;
+  match_time: string | null;
+  field: string | null;
   group_name: string | null;
   home_score: number | null;
   away_score: number | null;
@@ -39,6 +40,7 @@ type Vote = {
   id: string;
   match_id: string;
   user_id: string;
+  team_id: string | null;
 };
 
 type Row = {
@@ -73,41 +75,45 @@ function getUserId() {
   return userId;
 }
 
+function formatearFechaSegura(fecha: string | null) {
+  if (!fecha) return "Fecha pendiente";
+  return formatearFecha(fecha);
+}
+
 export default function FaseGruposPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [grupoActivo, setGrupoActivo] = useState("");
-  const [clasificacionAbierta, setClasificacionAbierta] = useState(false);
-  const [partidosAbiertos, setPartidosAbiertos] = useState(false);
+  const [clasificacionAbierta, setClasificacionAbierta] = useState(true);
+  const [partidosAbiertos, setPartidosAbiertos] = useState(true);
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [votes, setVotes] = useState<Vote[]>([]);
   const [userId, setUserId] = useState("");
 
+  const [loading, setLoading] = useState(true);
+  const [errorCarga, setErrorCarga] = useState("");
+
   useEffect(() => {
     const usuario = getUserId();
     setUserId(usuario);
 
     async function cargarDatos() {
-      const { data: groupsData } = await supabase
+      setLoading(true);
+      setErrorCarga("");
+
+      const { data: groupsData, error: groupsError } = await supabase
         .from("groups")
         .select("id, name, sort_order")
         .order("sort_order", { ascending: true });
 
-      const grupos = (groupsData ?? []) as Group[];
-      setGroups(grupos);
-
-      if (grupos.length > 0) {
-        setGrupoActivo(grupos[0].name);
-      }
-
-      const { data: teamsData } = await supabase
+      const { data: teamsData, error: teamsError } = await supabase
         .from("teams")
         .select("id, name, group_name")
         .order("group_name", { ascending: true })
         .order("name", { ascending: true });
 
-      const { data: matchesData } = await supabase
+      const { data: matchesData, error: matchesError } = await supabase
         .from("matches")
         .select(`
           id,
@@ -125,10 +131,19 @@ export default function FaseGruposPage() {
         .order("match_date", { ascending: true })
         .order("match_time", { ascending: true });
 
-      const { data: votesData } = await supabase
+      const { data: votesData, error: votesError } = await supabase
         .from("mvp_votes")
-        .select("id, match_id, user_id")
+        .select("id, match_id, user_id, team_id")
         .eq("user_id", usuario);
+
+      if (groupsError || teamsError || matchesError || votesError) {
+        setErrorCarga("No se ha podido cargar la fase de grupos.");
+        setLoading(false);
+        return;
+      }
+
+      const grupos = (groupsData ?? []) as Group[];
+      const equipos = (teamsData ?? []) as Team[];
 
       const partidosNormalizados: Match[] = (
         (matchesData as unknown as RawMatch[]) || []
@@ -138,15 +153,38 @@ export default function FaseGruposPage() {
         away_team: normalizarEquipo(match.away_team),
       }));
 
-      setTeams((teamsData as Team[]) || []);
+      setGroups(grupos);
+      setTeams(equipos);
       setMatches(partidosNormalizados);
       setVotes((votesData ?? []) as Vote[]);
+
+      const primerGrupo =
+        grupos[0]?.name ||
+        equipos.find((team) => team.group_name)?.group_name ||
+        partidosNormalizados.find((match) => match.group_name)?.group_name ||
+        "";
+
+      setGrupoActivo(primerGrupo);
+      setLoading(false);
     }
 
     cargarDatos();
   }, []);
 
-  const grupos = useMemo(() => groups.map((group) => group.name), [groups]);
+  const grupos = useMemo(() => {
+    const desdeTabla = groups.map((group) => group.name);
+
+    const desdeEquiposYPartidos = Array.from(
+      new Set(
+        [
+          ...teams.map((team) => team.group_name),
+          ...matches.map((match) => match.group_name),
+        ].filter((group): group is string => Boolean(group))
+      )
+    ).filter((group) => !desdeTabla.includes(group));
+
+    return [...desdeTabla, ...desdeEquiposYPartidos];
+  }, [groups, teams, matches]);
 
   const teamsGrupo = teams.filter((team) => team.group_name === grupoActivo);
 
@@ -157,7 +195,21 @@ export default function FaseGruposPage() {
   function votosUsuarioEnPartido(matchId: string) {
     return votes.filter(
       (vote) => vote.match_id === matchId && vote.user_id === userId
-    ).length;
+    );
+  }
+
+  function votoCompleto(match: Match) {
+    const votosPartido = votosUsuarioEnPartido(match.id);
+
+    const votoLocal = votosPartido.some(
+      (vote) => vote.team_id === match.home_team?.id
+    );
+
+    const votoVisitante = votosPartido.some(
+      (vote) => vote.team_id === match.away_team?.id
+    );
+
+    return votoLocal && votoVisitante;
   }
 
   const clasificacion = useMemo(() => {
@@ -220,13 +272,14 @@ export default function FaseGruposPage() {
     return tabla.sort((a, b) => {
       if (b.pts !== a.pts) return b.pts - a.pts;
       if (b.dg !== a.dg) return b.dg - a.dg;
-      return b.gf - a.gf;
+      if (b.gf !== a.gf) return b.gf - a.gf;
+      return a.team.localeCompare(b.team);
     });
   }, [teamsGrupo, matchesGrupo]);
 
   useEffect(() => {
-    setClasificacionAbierta(false);
-    setPartidosAbiertos(false);
+    setClasificacionAbierta(true);
+    setPartidosAbiertos(true);
   }, [grupoActivo]);
 
   return (
@@ -247,7 +300,15 @@ export default function FaseGruposPage() {
           </h1>
         </div>
 
-        {grupos.length === 0 ? (
+        {loading ? (
+          <div className="mt-6 rounded-2xl bg-white/95 p-5 font-bold shadow">
+            Cargando fase de grupos...
+          </div>
+        ) : errorCarga ? (
+          <div className="mt-6 rounded-2xl bg-red-100 p-5 font-bold text-red-700 shadow">
+            {errorCarga}
+          </div>
+        ) : grupos.length === 0 ? (
           <div className="mt-6 rounded-2xl bg-white/95 p-5 font-bold shadow">
             Todavía no hay grupos creados.
           </div>
@@ -288,78 +349,82 @@ export default function FaseGruposPage() {
 
               {clasificacionAbierta && (
                 <div className="p-3">
-                  <div className="grid grid-cols-[1fr_28px_28px_28px_28px_42px_40px] border-b border-slate-200 pb-2 text-[11px] font-black text-slate-500">
+                  <div className="grid grid-cols-[1fr_38px_42px_46px] gap-2 border-b border-slate-200 px-2 pb-2 text-xs font-black uppercase text-slate-500">
                     <span>Equipo</span>
                     <span className="text-center">PJ</span>
-                    <span className="text-center">G</span>
-                    <span className="text-center">E</span>
-                    <span className="text-center">P</span>
-                    <span className="text-center">+/-</span>
+                    <span className="text-center">DG</span>
                     <span className="text-center">PTS</span>
                   </div>
 
                   <div className="divide-y divide-slate-100">
-                    {clasificacion.map((row, index) => {
-                      const clasificado = index < 2;
-
-                      return (
-                        <div
-                          key={row.teamId}
-                          className={`grid grid-cols-[1fr_28px_28px_28px_28px_42px_40px] items-center rounded-xl py-3 text-xs ${
-                            clasificado
-                              ? "my-1 bg-emerald-50 ring-1 ring-emerald-200"
-                              : ""
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${
-                                clasificado
-                                  ? "bg-emerald-600 text-white"
-                                  : "bg-slate-100 text-slate-500"
-                              }`}
-                            >
-                              {index + 1}
-                            </span>
-                            <span className="font-black leading-tight">
-                              {row.team}
-                            </span>
-                          </div>
-
-                          <span className="text-center font-bold">
-                            {row.pj}
-                          </span>
-                          <span className="text-center font-bold">
-                            {row.g}
-                          </span>
-                          <span className="text-center font-bold">
-                            {row.e}
-                          </span>
-                          <span className="text-center font-bold">
-                            {row.p}
-                          </span>
-                          <span
-                            className={`text-center font-black ${
-                              row.dg > 0
-                                ? "text-emerald-700"
-                                : row.dg < 0
-                                ? "text-red-600"
-                                : "text-slate-600"
-                            }`}
-                          >
-                            {row.dg > 0 ? `+${row.dg}` : row.dg}
-                          </span>
-                          <span className="text-center font-black text-red-600">
-                            {row.pts}
-                          </span>
-                        </div>
-                      );
-                    })}
-
-                    {clasificacion.length === 0 && (
+                    {clasificacion.length === 0 ? (
                       <p className="p-4 text-sm font-bold text-slate-500">
                         No hay equipos en este grupo.
                       </p>
+                    ) : (
+                      clasificacion.map((row, index) => {
+                        const clasificado = index < 2;
+
+                        return (
+                          <div
+                            key={row.teamId}
+                            className={`grid grid-cols-[1fr_38px_42px_46px] items-center gap-2 rounded-2xl px-2 py-3 ${
+                              clasificado
+                                ? "my-1 bg-emerald-50 ring-1 ring-emerald-200"
+                                : ""
+                            }`}
+                          >
+                            <div className="flex min-w-0 items-start gap-2">
+                              <span
+                                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${
+                                  clasificado
+                                    ? "bg-emerald-600 text-white"
+                                    : "bg-slate-100 text-slate-500"
+                                }`}
+                              >
+                                {index + 1}
+                              </span>
+
+                              <div className="min-w-0">
+                                <p
+                                  className={`break-words text-sm leading-tight ${
+                                    clasificado
+                                      ? "font-black text-emerald-900"
+                                      : "font-black text-slate-900"
+                                  }`}
+                                >
+                                  {row.team}
+                                </p>
+
+                                <p className="mt-1 text-[11px] font-bold text-slate-500">
+                                  G {row.g} · E {row.e} · P {row.p} · GF{" "}
+                                  {row.gf} · GC {row.gc}
+                                </p>
+                              </div>
+                            </div>
+
+                            <span className="text-center text-sm font-black">
+                              {row.pj}
+                            </span>
+
+                            <span
+                              className={`text-center text-sm font-black ${
+                                row.dg > 0
+                                  ? "text-emerald-700"
+                                  : row.dg < 0
+                                    ? "text-red-600"
+                                    : "text-slate-600"
+                              }`}
+                            >
+                              {row.dg > 0 ? `+${row.dg}` : row.dg}
+                            </span>
+
+                            <span className="text-center text-lg font-black text-red-600">
+                              {row.pts}
+                            </span>
+                          </div>
+                        );
+                      })
                     )}
                   </div>
                 </div>
@@ -371,9 +436,15 @@ export default function FaseGruposPage() {
                 onClick={() => setPartidosAbiertos(!partidosAbiertos)}
                 className="flex w-full items-center justify-between bg-slate-950 px-5 py-4 text-left text-white"
               >
-                <p className="text-sm font-black uppercase tracking-widest">
-                  Partidos del grupo
-                </p>
+                <div>
+                  <p className="text-sm font-black uppercase tracking-widest">
+                    Partidos del grupo
+                  </p>
+                  <p className="text-xs font-bold text-slate-300">
+                    {matchesGrupo.length} partido
+                    {matchesGrupo.length === 1 ? "" : "s"}
+                  </p>
+                </div>
 
                 <span className="text-2xl font-black">
                   {partidosAbiertos ? "−" : "+"}
@@ -383,7 +454,7 @@ export default function FaseGruposPage() {
               {partidosAbiertos && (
                 <div className="space-y-3 p-4">
                   {matchesGrupo.length === 0 ? (
-                    <p className="text-sm text-slate-500">
+                    <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">
                       No hay partidos cargados en este grupo.
                     </p>
                   ) : (
@@ -391,45 +462,50 @@ export default function FaseGruposPage() {
                       const finalizado =
                         match.home_score !== null && match.away_score !== null;
 
-                      const votosEmitidos = votosUsuarioEnPartido(match.id);
-                      const votoCompleto = votosEmitidos >= 2;
+                      const votoEmitido = votoCompleto(match);
 
                       return (
                         <div
                           key={match.id}
-                          className="rounded-2xl bg-white p-4 shadow"
+                          className="rounded-2xl bg-slate-50 p-4 shadow-sm"
                         >
                           <div className="flex items-center justify-between gap-3">
-                            <div className="flex-1">
-                              <p className="text-base font-black leading-tight">
+                            <div className="min-w-0 flex-1">
+                              <p className="break-words text-base font-black leading-tight">
                                 {match.home_team?.name}
                               </p>
                               <p className="text-xs font-black uppercase text-slate-400">
                                 vs
                               </p>
-                              <p className="text-base font-black leading-tight">
+                              <p className="break-words text-base font-black leading-tight">
                                 {match.away_team?.name}
                               </p>
                             </div>
 
-                            <div className="min-w-20 rounded-2xl bg-slate-950 px-3 py-2 text-center text-white shadow">
+                            <div className="shrink-0 rounded-2xl bg-slate-950 px-3 py-2 text-center text-white shadow">
                               {finalizado ? (
                                 <p className="text-2xl font-black">
                                   {match.home_score} - {match.away_score}
                                 </p>
                               ) : (
                                 <p className="text-lg font-black text-red-400">
-                                  {match.match_time}
+                                  {match.match_time ?? "--:--"}
                                 </p>
                               )}
+
+                              <p className="text-xs font-bold text-slate-300">
+                                {match.field ?? "Campo"}
+                              </p>
                             </div>
                           </div>
 
-                          <div className="mt-3 flex items-center justify-between text-sm font-semibold text-slate-500">
+                          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm font-semibold text-slate-500">
                             <span>
-                              {formatearFecha(match.match_date)} ·{" "}
-                              {match.match_time} · {match.field}
+                              {formatearFechaSegura(match.match_date)} ·{" "}
+                              {match.match_time ?? "Hora pendiente"} ·{" "}
+                              {match.field ?? "Campo pendiente"}
                             </span>
+
                             <span
                               className={`rounded-full px-3 py-1 text-xs font-black ${
                                 finalizado
@@ -441,19 +517,19 @@ export default function FaseGruposPage() {
                             </span>
                           </div>
 
-                          {match.mvp_open && votoCompleto && (
+                          {match.mvp_open && votoEmitido && (
                             <div className="mt-3 rounded-xl bg-emerald-100 px-3 py-3 text-center text-sm font-black text-emerald-800">
                               ✅ Voto emitido
                             </div>
                           )}
 
-                          {match.mvp_open && !votoCompleto && (
-                            <a
+                          {match.mvp_open && !votoEmitido && (
+                            <Link
                               href={`/votar-mvp?match=${match.id}`}
                               className="mt-3 block rounded-xl bg-red-600 px-3 py-3 text-center text-sm font-black text-white shadow"
                             >
                               Votar MVP de este partido
-                            </a>
+                            </Link>
                           )}
                         </div>
                       );

@@ -32,7 +32,7 @@ export default function MvpPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [votes, setVotes] = useState<Vote[]>([]);
   const [loading, setLoading] = useState(true);
-  const [idealAbierto, setIdealAbierto] = useState(true);
+  const [idealAbierto, setIdealAbierto] = useState(false);
   const [restoAbierto, setRestoAbierto] = useState(false);
 
   useEffect(() => {

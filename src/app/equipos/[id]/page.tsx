@@ -488,12 +488,7 @@ export default function EquipoDetalle() {
         </div>
 
         <div className="mt-5 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-xl font-black">Plantilla</h2>
-            <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-black text-white">
-              {jugadores.length} jugadores
-            </span>
-          </div>
+          <h2 className="text-xl font-black">Plantilla</h2>
 
           {jugadores.length === 0 ? (
             <p className="mt-4 rounded-2xl bg-slate-50 p-4 font-bold text-slate-500">

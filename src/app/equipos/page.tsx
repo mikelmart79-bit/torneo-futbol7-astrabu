@@ -125,12 +125,7 @@ export default function EquiposPage() {
                   className="overflow-hidden rounded-3xl bg-white/95 shadow-2xl"
                 >
                   <div className="bg-red-600 px-5 py-4 text-white">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-lg font-black">{grupo.name}</p>
-                      <p className="rounded-full bg-white/20 px-3 py-1 text-xs font-black">
-                        {equiposGrupo.length} equipos
-                      </p>
-                    </div>
+                    <p className="text-lg font-black">{grupo.name}</p>
                   </div>
 
                   <div className="space-y-3 p-4">

@@ -9,12 +9,20 @@ type Group = {
   sort_order: number;
 };
 
+type Team = {
+  id: string;
+  name: string;
+};
+
 type Match = {
   id: string;
+  tipo: "grupo" | "final";
   group_name: string;
-  match_date: string;
-  match_time: string;
-  field: string;
+  phase?: string;
+  title?: string;
+  match_date: string | null;
+  match_time: string | null;
+  field: string | null;
   home_team_id: string;
   away_team_id: string;
   home_score: number | null;
@@ -23,9 +31,23 @@ type Match = {
   away_team: { name: string } | null;
 };
 
-type RawMatch = Omit<Match, "home_team" | "away_team"> & {
+type RawMatch = Omit<Match, "tipo" | "home_team" | "away_team"> & {
   home_team: { name: string }[] | { name: string } | null;
   away_team: { name: string }[] | { name: string } | null;
+};
+
+type FinalMatch = {
+  id: string;
+  phase: string;
+  title: string;
+  home_ref: string;
+  away_ref: string;
+  match_date: string | null;
+  match_time: string | null;
+  field: string | null;
+  home_score: number | null;
+  away_score: number | null;
+  mvp_open: boolean | null;
 };
 
 type Player = {
@@ -63,6 +85,7 @@ function getUserId() {
 
 export default function VotarMvpPage() {
   const [groups, setGroups] = useState<Group[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [selectedGroup, setSelectedGroup] = useState("");
   const [selectedMatchId, setSelectedMatchId] = useState("");
@@ -92,10 +115,20 @@ export default function VotarMvpPage() {
   }, []);
 
   const gruposConPartidos = useMemo(() => {
-    return groups.filter((group) =>
-      matches.some((match) => match.group_name === group.name)
-    );
-  }, [groups, matches]);
+    const nombres = Array.from(new Set(matches.map((match) => match.group_name)));
+
+    return nombres.map((name, index) => ({
+      id: name || String(index),
+      name,
+      sort_order: index + 1,
+    }));
+  }, [matches]);
+
+  function buscarEquipoPorNombre(nombre: string, equipos: Team[]) {
+    const limpio = nombre.trim().toLowerCase();
+
+    return equipos.find((team) => team.name.trim().toLowerCase() === limpio);
+  }
 
   async function cargarDatos() {
     const { data: groupsData } = await supabase
@@ -105,6 +138,14 @@ export default function VotarMvpPage() {
 
     const grupos = (groupsData ?? []) as Group[];
     setGroups(grupos);
+
+    const { data: teamsData } = await supabase
+      .from("teams")
+      .select("id, name")
+      .order("name", { ascending: true });
+
+    const equipos = (teamsData ?? []) as Team[];
+    setTeams(equipos);
 
     const { data: matchesData, error: matchesError } = await supabase
       .from("matches")
@@ -134,34 +175,67 @@ export default function VotarMvpPage() {
       return;
     }
 
-    const partidosNormalizados: Match[] = (
+    const partidosGrupo: Match[] = (
       (matchesData as unknown as RawMatch[]) || []
     ).map((match) => ({
       ...match,
+      tipo: "grupo",
+      group_name: match.group_name,
       home_team: normalizarEquipo(match.home_team),
       away_team: normalizarEquipo(match.away_team),
     }));
 
-    setMatches(partidosNormalizados);
+    const { data: finalData, error: finalError } = await supabase
+      .from("final_matches")
+      .select(
+        "id, phase, title, home_ref, away_ref, match_date, match_time, field, home_score, away_score, mvp_open"
+      )
+      .eq("mvp_open", true)
+      .order("sort_order", { ascending: true });
 
-    if (partidosNormalizados.length > 0) {
-      const primerGrupo =
-        grupos.find((group) =>
-          partidosNormalizados.some((match) => match.group_name === group.name)
-        )?.name ||
-        partidosNormalizados[0].group_name ||
-        "";
+    if (finalError) {
+      console.error(finalError);
+      setLoading(false);
+      return;
+    }
 
-      const primerPartido = partidosNormalizados.find(
-        (match) => match.group_name === primerGrupo
-      );
+    const eliminatorias: Match[] = ((finalData ?? []) as FinalMatch[])
+      .map((match) => {
+        const local = buscarEquipoPorNombre(match.home_ref, equipos);
+        const visitante = buscarEquipoPorNombre(match.away_ref, equipos);
+
+        if (!local || !visitante) return null;
+
+        return {
+          id: match.id,
+          tipo: "final" as const,
+          group_name: "Eliminatorias",
+          phase: match.phase,
+          title: match.title,
+          match_date: match.match_date,
+          match_time: match.match_time,
+          field: match.field,
+          home_team_id: local.id,
+          away_team_id: visitante.id,
+          home_score: match.home_score,
+          away_score: match.away_score,
+          home_team: { name: local.name },
+          away_team: { name: visitante.name },
+        };
+      })
+      .filter((match): match is Match => Boolean(match));
+
+    const todosPartidos = [...partidosGrupo, ...eliminatorias];
+
+    setMatches(todosPartidos);
+
+    if (todosPartidos.length > 0) {
+      const primerGrupo = todosPartidos[0].group_name;
+      const primerPartido = todosPartidos[0];
 
       setSelectedGroup(primerGrupo);
-
-      if (primerPartido) {
-        setSelectedMatchId(primerPartido.id);
-        await cargarJugadoresYVotos(primerPartido);
-      }
+      setSelectedMatchId(primerPartido.id);
+      await cargarJugadoresYVotos(primerPartido);
     }
 
     setLoading(false);
@@ -368,7 +442,7 @@ export default function VotarMvpPage() {
           <>
             <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
               <label className="text-sm font-black uppercase text-slate-500">
-                Grupo
+                Fase / grupo
               </label>
 
               <select
@@ -394,8 +468,9 @@ export default function VotarMvpPage() {
               >
                 {matchesGrupo.map((match) => (
                   <option key={match.id} value={match.id}>
+                    {match.tipo === "final" ? `${match.phase} · ` : ""}
                     {match.home_team?.name} vs {match.away_team?.name} ·{" "}
-                    {match.match_date}
+                    {match.match_date ?? "Sin fecha"}
                   </option>
                 ))}
               </select>
@@ -403,15 +478,18 @@ export default function VotarMvpPage() {
               {selectedMatch && (
                 <div className="mt-5 rounded-2xl bg-slate-100 p-4">
                   <p className="text-sm font-black text-red-600">
-                    {selectedMatch.group_name}
+                    {selectedMatch.tipo === "final"
+                      ? `${selectedMatch.phase} · ${selectedMatch.title}`
+                      : selectedMatch.group_name}
                   </p>
                   <h2 className="mt-1 text-xl font-black">
                     {selectedMatch.home_team?.name} vs{" "}
                     {selectedMatch.away_team?.name}
                   </h2>
                   <p className="mt-1 text-sm text-slate-500">
-                    {selectedMatch.match_date} · {selectedMatch.match_time} ·{" "}
-                    {selectedMatch.field}
+                    {selectedMatch.match_date ?? "Fecha pendiente"} ·{" "}
+                    {selectedMatch.match_time ?? "Hora pendiente"} ·{" "}
+                    {selectedMatch.field ?? "Campo pendiente"}
                   </p>
                   <p className="mt-2 text-2xl font-black">
                     {selectedMatch.home_score ?? "-"} -{" "}

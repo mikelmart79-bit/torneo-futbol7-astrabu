@@ -48,6 +48,8 @@ type FinalMatch = {
   field: string | null;
   home_score: number | null;
   away_score: number | null;
+  home_penalties: number | null;
+  away_penalties: number | null;
   status: string;
   sort_order: number;
   mvp_open: boolean | null;
@@ -93,6 +95,8 @@ export default function AdminGestionarPartidosPage() {
   const [finalEstado, setFinalEstado] = useState("Pendiente");
   const [finalHomeScore, setFinalHomeScore] = useState("");
   const [finalAwayScore, setFinalAwayScore] = useState("");
+  const [finalHomePenalties, setFinalHomePenalties] = useState("");
+  const [finalAwayPenalties, setFinalAwayPenalties] = useState("");
   const [finalMvpOpen, setFinalMvpOpen] = useState(false);
   const [finalMensaje, setFinalMensaje] = useState("");
 
@@ -320,6 +324,8 @@ export default function AdminGestionarPartidosPage() {
     setFinalEstado("Pendiente");
     setFinalHomeScore("");
     setFinalAwayScore("");
+    setFinalHomePenalties("");
+    setFinalAwayPenalties("");
     setFinalMvpOpen(false);
     setFinalMensaje("");
   }
@@ -333,6 +339,8 @@ export default function AdminGestionarPartidosPage() {
     setFinalEstado(match.status ?? "Pendiente");
     setFinalHomeScore(match.home_score?.toString() ?? "");
     setFinalAwayScore(match.away_score?.toString() ?? "");
+    setFinalHomePenalties(match.home_penalties?.toString() ?? "");
+    setFinalAwayPenalties(match.away_penalties?.toString() ?? "");
     setFinalMvpOpen(Boolean(match.mvp_open));
     setFinalMensaje("");
   }
@@ -378,11 +386,23 @@ export default function AdminGestionarPartidosPage() {
         return `${tipo === "winner" ? "Ganador" : "Perdedor"} ${matchTitle}`;
       }
 
-      if (origen.home_score === origen.away_score) {
-        return `${tipo === "winner" ? "Ganador" : "Perdedor"} ${matchTitle}`;
+      let ganaLocal: boolean | null = null;
+
+      if (origen.home_score > origen.away_score) {
+        ganaLocal = true;
+      } else if (origen.home_score < origen.away_score) {
+        ganaLocal = false;
+      } else if (
+        origen.home_penalties !== null &&
+        origen.away_penalties !== null &&
+        origen.home_penalties !== origen.away_penalties
+      ) {
+        ganaLocal = origen.home_penalties > origen.away_penalties;
       }
 
-      const ganaLocal = origen.home_score > origen.away_score;
+      if (ganaLocal === null) {
+        return `${tipo === "winner" ? "Ganador" : "Perdedor"} ${matchTitle}`;
+      }
 
       if (tipo === "winner") {
         return ganaLocal ? origen.home_ref : origen.away_ref;
@@ -431,13 +451,45 @@ export default function AdminGestionarPartidosPage() {
       return;
     }
 
+    const homeScore = finalHomeScore === "" ? null : Number(finalHomeScore);
+    const awayScore = finalAwayScore === "" ? null : Number(finalAwayScore);
+    const homePenalties =
+      finalHomePenalties === "" ? null : Number(finalHomePenalties);
+    const awayPenalties =
+      finalAwayPenalties === "" ? null : Number(finalAwayPenalties);
+
+    if (
+      homeScore !== null &&
+      awayScore !== null &&
+      homeScore === awayScore &&
+      ((homePenalties === null && awayPenalties !== null) ||
+        (homePenalties !== null && awayPenalties === null))
+    ) {
+      setFinalMensaje("Si hay penaltis, indica los penaltis de los dos equipos.");
+      return;
+    }
+
+    if (
+      homeScore !== null &&
+      awayScore !== null &&
+      homeScore === awayScore &&
+      homePenalties !== null &&
+      awayPenalties !== null &&
+      homePenalties === awayPenalties
+    ) {
+      setFinalMensaje("Los penaltis no pueden quedar empatados.");
+      return;
+    }
+
     const payload = {
       match_date: finalFecha,
       match_time: finalHora,
       field: finalCampo || "Campo 1",
       status: finalEstado,
-      home_score: finalHomeScore === "" ? null : Number(finalHomeScore),
-      away_score: finalAwayScore === "" ? null : Number(finalAwayScore),
+      home_score: homeScore,
+      away_score: awayScore,
+      home_penalties: homePenalties,
+      away_penalties: awayPenalties,
       mvp_open: finalMvpOpen,
     };
 
@@ -851,6 +903,36 @@ export default function AdminGestionarPartidosPage() {
                                     setFinalAwayScore(event.target.value)
                                   }
                                   className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="rounded-2xl bg-slate-100 p-4">
+                              <p className="text-sm font-black uppercase text-slate-500">
+                                Penaltis si hay empate
+                              </p>
+
+                              <div className="mt-3 grid grid-cols-2 gap-3">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={finalHomePenalties}
+                                  onChange={(event) =>
+                                    setFinalHomePenalties(event.target.value)
+                                  }
+                                  placeholder="Pen. local"
+                                  className="rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
+                                />
+
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={finalAwayPenalties}
+                                  onChange={(event) =>
+                                    setFinalAwayPenalties(event.target.value)
+                                  }
+                                  placeholder="Pen. visitante"
+                                  className="rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
                                 />
                               </div>
                             </div>

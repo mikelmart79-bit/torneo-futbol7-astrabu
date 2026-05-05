@@ -24,6 +24,7 @@ type Match = {
   home_score: number | null;
   away_score: number | null;
   status: string | null;
+  mvp_open: boolean | null;
   home_team: { id: string; name: string } | null;
   away_team: { id: string; name: string } | null;
 };
@@ -94,6 +95,7 @@ export default function FaseGruposPage() {
           home_score,
           away_score,
           status,
+          mvp_open,
           home_team:teams!matches_home_team_id_fkey(id, name),
           away_team:teams!matches_away_team_id_fkey(id, name)
         `)
@@ -400,6 +402,15 @@ export default function FaseGruposPage() {
                               {finalizado ? "Finalizado" : "Pendiente"}
                             </span>
                           </div>
+
+                          {match.mvp_open && (
+                            <a
+                              href={`/votar-mvp?match=${match.id}`}
+                              className="mt-3 block rounded-xl bg-red-600 px-3 py-3 text-center text-sm font-black text-white shadow"
+                            >
+                              Votar MVP de este partido
+                            </a>
+                          )}
                         </div>
                       );
                     })

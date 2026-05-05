@@ -119,7 +119,7 @@ export default function MvpPage() {
   const [loading, setLoading] = useState(true);
   const [errorCarga, setErrorCarga] = useState("");
   const [abiertasAbierto, setAbiertasAbierto] = useState(true);
-  const [idealAbierto, setIdealAbierto] = useState(true);
+  const [idealAbierto, setIdealAbierto] = useState(false);
   const [restoAbierto, setRestoAbierto] = useState(false);
 
   useEffect(() => {

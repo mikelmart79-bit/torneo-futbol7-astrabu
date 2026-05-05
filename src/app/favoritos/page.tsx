@@ -80,6 +80,7 @@ export default function FavoritosPage() {
   const [votes, setVotes] = useState<Vote[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorCarga, setErrorCarga] = useState("");
+  const [equipoAbierto, setEquipoAbierto] = useState("");
 
   useEffect(() => {
     const guardados = localStorage.getItem("equiposFavoritos");
@@ -149,6 +150,7 @@ export default function FavoritosPage() {
   }, []);
 
   const equiposFavoritos = teams.filter((team) => favoritos.includes(team.id));
+  const usarAcordeon = equiposFavoritos.length > 1;
 
   function partidosDelEquipo(teamId: string) {
     return matches.filter(
@@ -190,6 +192,10 @@ export default function FavoritosPage() {
     const nuevosFavoritos = favoritos.filter((id) => id !== teamId);
     setFavoritos(nuevosFavoritos);
     localStorage.setItem("equiposFavoritos", JSON.stringify(nuevosFavoritos));
+
+    if (equipoAbierto === teamId) {
+      setEquipoAbierto("");
+    }
   }
 
   function renderEstadoMvp(match: Match, teamId: string) {
@@ -217,7 +223,11 @@ export default function FavoritosPage() {
     return null;
   }
 
-  function renderPartido(match: Match, teamId: string, tipo: "proximo" | "resultado") {
+  function renderPartido(
+    match: Match,
+    teamId: string,
+    tipo: "proximo" | "resultado"
+  ) {
     return (
       <div key={match.id} className="rounded-2xl bg-slate-50 p-4 shadow-sm">
         <div className="flex items-center justify-between gap-3">
@@ -251,6 +261,51 @@ export default function FavoritosPage() {
         </p>
 
         {renderEstadoMvp(match, teamId)}
+      </div>
+    );
+  }
+
+  function renderContenidoEquipo(team: Team) {
+    const proximos = proximosDelEquipo(team.id);
+    const resultados = resultadosDelEquipo(team.id);
+
+    return (
+      <div className="space-y-5 p-4">
+        <div>
+          <div className="mb-3 rounded-xl bg-slate-950 px-4 py-3 text-white">
+            <p className="text-sm font-black uppercase tracking-widest">
+              Próximos partidos
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {proximos.length === 0 ? (
+              <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">
+                No hay próximos partidos de este equipo.
+              </p>
+            ) : (
+              proximos.map((match) => renderPartido(match, team.id, "proximo"))
+            )}
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-3 rounded-xl bg-red-600 px-4 py-3 text-white">
+            <p className="text-sm font-black uppercase tracking-widest">
+              Resultados
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {resultados.length === 0 ? (
+              <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">
+                Todavía no hay resultados de este equipo.
+              </p>
+            ) : (
+              resultados.map((match) => renderPartido(match, team.id, "resultado"))
+            )}
+          </div>
+        </div>
       </div>
     );
   }
@@ -294,77 +349,58 @@ export default function FavoritosPage() {
             </Link>
           </div>
         ) : (
-          <div className="mt-6 space-y-6">
+          <div className="mt-6 space-y-4">
             {equiposFavoritos.map((team) => {
-              const proximos = proximosDelEquipo(team.id);
-              const resultados = resultadosDelEquipo(team.id);
+              const abierto = !usarAcordeon || equipoAbierto === team.id;
 
               return (
                 <div
                   key={team.id}
                   className="overflow-hidden rounded-3xl bg-white/95 shadow-2xl"
                 >
-                  <div className="bg-red-600 px-5 py-4 text-white">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="break-words text-lg font-black leading-tight">
-                          {team.name}
-                        </p>
-                        <p className="text-sm font-bold text-red-100">
-                          {team.group_name}
-                        </p>
-                      </div>
-
-                      <button
-                        onClick={() => quitarFavorito(team.id)}
-                        className="shrink-0 rounded-full bg-white/20 px-3 py-2 text-xs font-black text-white"
+                  <button
+                    onClick={() => {
+                      if (!usarAcordeon) return;
+                      setEquipoAbierto(abierto ? "" : team.id);
+                    }}
+                    className={`flex w-full items-center justify-between gap-3 px-5 py-4 text-left ${
+                      abierto ? "bg-red-600 text-white" : "bg-white text-slate-900"
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <p className="break-words text-lg font-black leading-tight">
+                        {team.name}
+                      </p>
+                      <p
+                        className={`text-sm font-bold ${
+                          abierto ? "text-red-100" : "text-slate-500"
+                        }`}
                       >
-                        Quitar
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-5 p-4">
-                    <div>
-                      <div className="mb-3 rounded-xl bg-slate-950 px-4 py-3 text-white">
-                        <p className="text-sm font-black uppercase tracking-widest">
-                          Próximos partidos
-                        </p>
-                      </div>
-
-                      <div className="space-y-3">
-                        {proximos.length === 0 ? (
-                          <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">
-                            No hay próximos partidos de este equipo.
-                          </p>
-                        ) : (
-                          proximos.map((match) =>
-                            renderPartido(match, team.id, "proximo")
-                          )
-                        )}
-                      </div>
+                        {team.group_name}
+                      </p>
                     </div>
 
-                    <div>
-                      <div className="mb-3 rounded-xl bg-red-600 px-4 py-3 text-white">
-                        <p className="text-sm font-black uppercase tracking-widest">
-                          Resultados
-                        </p>
+                    {usarAcordeon && (
+                      <span className="shrink-0 text-2xl font-black">
+                        {abierto ? "−" : "+"}
+                      </span>
+                    )}
+                  </button>
+
+                  {abierto && (
+                    <>
+                      <div className="border-t border-white/20 bg-red-600 px-5 pb-4">
+                        <button
+                          onClick={() => quitarFavorito(team.id)}
+                          className="w-full rounded-xl bg-white/20 py-3 text-sm font-black text-white shadow"
+                        >
+                          Quitar de favoritos
+                        </button>
                       </div>
 
-                      <div className="space-y-3">
-                        {resultados.length === 0 ? (
-                          <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">
-                            Todavía no hay resultados de este equipo.
-                          </p>
-                        ) : (
-                          resultados.map((match) =>
-                            renderPartido(match, team.id, "resultado")
-                          )
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                      {renderContenidoEquipo(team)}
+                    </>
+                  )}
                 </div>
               );
             })}

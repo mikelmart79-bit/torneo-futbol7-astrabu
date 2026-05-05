@@ -18,6 +18,7 @@ type Match = {
   home_score: number | null;
   away_score: number | null;
   status: string | null;
+  mvp_open: boolean | null;
   home_team: { id: string; name: string } | null;
   away_team: { id: string; name: string } | null;
 };
@@ -25,6 +26,14 @@ type Match = {
 type RawMatch = Omit<Match, "home_team" | "away_team"> & {
   home_team: { id: string; name: string }[] | { id: string; name: string } | null;
   away_team: { id: string; name: string }[] | { id: string; name: string } | null;
+};
+
+type Vote = {
+  id: string;
+  match_id: string;
+  user_id: string;
+  player_id: string;
+  team_id: string | null;
 };
 
 function normalizarEquipo(
@@ -35,15 +44,29 @@ function normalizarEquipo(
   return equipo;
 }
 
+function getUserId() {
+  let userId = localStorage.getItem("torneo_user_id");
+
+  if (!userId) {
+    userId = crypto.randomUUID();
+    localStorage.setItem("torneo_user_id", userId);
+  }
+
+  return userId;
+}
+
 export default function FavoritosPage() {
   const [favoritos, setFavoritos] = useState<string[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
+  const [votes, setVotes] = useState<Vote[]>([]);
   const [equipoAbierto, setEquipoAbierto] = useState("");
 
   useEffect(() => {
     const guardados = localStorage.getItem("equiposFavoritos");
     const ids = guardados ? JSON.parse(guardados) : [];
+    const userId = getUserId();
+
     setFavoritos(ids);
 
     async function cargarDatos() {
@@ -62,11 +85,17 @@ export default function FavoritosPage() {
           home_score,
           away_score,
           status,
+          mvp_open,
           home_team:teams!matches_home_team_id_fkey(id, name),
           away_team:teams!matches_away_team_id_fkey(id, name)
         `)
         .order("match_date", { ascending: true })
         .order("match_time", { ascending: true });
+
+      const { data: votesData } = await supabase
+        .from("mvp_votes")
+        .select("id, match_id, user_id, player_id, team_id")
+        .eq("user_id", userId);
 
       const partidosNormalizados: Match[] = (
         (matchesData as unknown as RawMatch[]) || []
@@ -76,15 +105,9 @@ export default function FavoritosPage() {
         away_team: normalizarEquipo(match.away_team),
       }));
 
-      const equipos = (teamsData ?? []) as Team[];
-
-      setTeams(equipos);
+      setTeams((teamsData ?? []) as Team[]);
       setMatches(partidosNormalizados);
-
-      const primerFavorito = equipos.find((team) => ids.includes(team.id));
-      if (primerFavorito) {
-        setEquipoAbierto("");
-      }
+      setVotes((votesData ?? []) as Vote[]);
     }
 
     cargarDatos();
@@ -110,6 +133,12 @@ export default function FavoritosPage() {
     );
   }
 
+  function votoEmitido(matchId: string, teamId: string) {
+    return votes.some(
+      (vote) => vote.match_id === matchId && vote.team_id === teamId
+    );
+  }
+
   function quitarFavorito(teamId: string) {
     const nuevosFavoritos = favoritos.filter((id) => id !== teamId);
     setFavoritos(nuevosFavoritos);
@@ -118,6 +147,31 @@ export default function FavoritosPage() {
     if (equipoAbierto === teamId) {
       setEquipoAbierto(nuevosFavoritos[0] ?? "");
     }
+  }
+
+  function renderEstadoMvp(match: Match, teamId: string) {
+    const yaVotado = votoEmitido(match.id, teamId);
+
+    if (yaVotado) {
+      return (
+        <div className="mt-3 rounded-xl bg-emerald-100 px-3 py-2 text-sm font-black text-emerald-800">
+          ✅ Voto emitido
+        </div>
+      );
+    }
+
+    if (match.mvp_open) {
+      return (
+        <a
+          href={`/votar-mvp?match=${match.id}`}
+          className="mt-3 block rounded-xl bg-red-600 px-3 py-2 text-center text-sm font-black text-white shadow"
+        >
+          Votar MVP
+        </a>
+      );
+    }
+
+    return null;
   }
 
   return (
@@ -232,6 +286,8 @@ export default function FavoritosPage() {
                                 <p className="mt-3 text-sm font-bold text-slate-500">
                                   {formatearFecha(match.match_date)}
                                 </p>
+
+                                {renderEstadoMvp(match, team.id)}
                               </div>
                             ))
                           )}
@@ -282,6 +338,8 @@ export default function FavoritosPage() {
                                 <p className="mt-3 text-sm font-bold text-slate-500">
                                   {formatearFecha(match.match_date)}
                                 </p>
+
+                                {renderEstadoMvp(match, team.id)}
                               </div>
                             ))
                           )}

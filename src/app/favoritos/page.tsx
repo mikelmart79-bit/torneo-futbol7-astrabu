@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { formatearFecha } from "@/lib/formatDate";
@@ -439,14 +440,21 @@ export default function FavoritosPage() {
   }
 
   function marcadorResultado(match: Match) {
-    const marcador = `${match.home_score} - ${match.away_score}`;
+    const marcador = `${match.home_score ?? "-"} - ${match.away_score ?? "-"}`;
+
+    const hayPenaltis =
+      match.home_penalties !== null &&
+      match.home_penalties !== undefined &&
+      match.away_penalties !== null &&
+      match.away_penalties !== undefined;
 
     if (
       match.home_score !== null &&
+      match.home_score !== undefined &&
       match.away_score !== null &&
+      match.away_score !== undefined &&
       match.home_score === match.away_score &&
-      match.home_penalties !== null &&
-      match.away_penalties !== null
+      hayPenaltis
     ) {
       return `${marcador} · Pen. ${match.home_penalties}-${match.away_penalties}`;
     }
@@ -485,7 +493,9 @@ export default function FavoritosPage() {
 
           <div className="shrink-0 rounded-2xl bg-slate-950 px-3 py-2 text-center text-white shadow">
             {tipo === "resultado" ? (
-              <p className="text-xl font-black">{marcadorResultado(match)}</p>
+              <p className="whitespace-nowrap text-lg font-black">
+                {marcadorResultado(match)}
+              </p>
             ) : (
               <p className="text-lg font-black text-red-400">
                 {match.match_time ?? "--:--"}
@@ -603,7 +613,7 @@ export default function FavoritosPage() {
     seccion: Seccion;
     titulo: string;
     color: "rojo" | "negro";
-    children: React.ReactNode;
+    children: ReactNode;
   }) {
     const abierta = seccionEstaAbierta(teamId, seccion);
 

@@ -101,28 +101,30 @@ export default function InicioPage() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-[1fr_auto_1fr] items-stretch gap-3">
-                <div className="flex min-h-[118px] flex-col justify-end text-center">
-                  <p className="flex min-h-[58px] items-end justify-center text-center text-lg font-black leading-tight">
-                    {partido.home_team?.name}
-                  </p>
+              <div className="rounded-3xl bg-slate-50 p-5 text-center shadow-inner">
+                <p className="text-xl font-black leading-tight text-slate-950">
+                  {partido.home_team?.name}
+                </p>
+
+                <div className="my-4 flex items-center justify-center gap-4">
+                  <div className="h-px flex-1 bg-slate-200" />
+
+                  <div className="rounded-2xl bg-slate-900 px-6 py-3 text-white shadow-lg">
+                    <p className="text-xs font-black uppercase text-slate-300">
+                      {partido.match_date}
+                    </p>
+                    <p className="text-3xl font-black">{partido.match_time}</p>
+                    <p className="text-xs font-bold text-slate-300">
+                      {partido.field}
+                    </p>
+                  </div>
+
+                  <div className="h-px flex-1 bg-slate-200" />
                 </div>
 
-                <div className="self-center rounded-2xl bg-slate-900 px-4 py-3 text-center text-white shadow-lg">
-                  <p className="text-xs font-black uppercase text-slate-300">
-                    {partido.match_date}
-                  </p>
-                  <p className="text-2xl font-black">{partido.match_time}</p>
-                  <p className="text-xs font-bold text-slate-300">
-                    {partido.field}
-                  </p>
-                </div>
-
-                <div className="flex min-h-[118px] flex-col justify-end text-center">
-                  <p className="flex min-h-[58px] items-end justify-center text-center text-lg font-black leading-tight">
-                    {partido.away_team?.name}
-                  </p>
-                </div>
+                <p className="text-xl font-black leading-tight text-slate-950">
+                  {partido.away_team?.name}
+                </p>
               </div>
             </div>
           ) : (

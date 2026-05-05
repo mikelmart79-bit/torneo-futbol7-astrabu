@@ -66,14 +66,12 @@ export default function InicioPage() {
       />
 
       <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-24">
-        {/* HEADER */}
         <div className="rounded-3xl bg-black/60 px-4 py-5 text-white shadow-2xl backdrop-blur">
           <h1 className="whitespace-nowrap text-center text-lg font-black sm:text-xl">
             Torneo Fútbol 7 Astrabudua
           </h1>
         </div>
 
-        {/* PROXIMOS PARTIDOS */}
         <div className="mt-6 overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
           <div className="bg-red-600 px-5 py-3 text-center">
             <p className="text-sm font-black uppercase tracking-widest text-white">
@@ -103,20 +101,14 @@ export default function InicioPage() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-3">
-                {/* LOCAL */}
-                <div className="flex min-h-[128px] flex-col items-center justify-start text-center">
-                  <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-lg font-black text-emerald-700">
-                    {partido.home_team?.name?.slice(0, 2).toUpperCase()}
-                  </div>
-
-                  <p className="flex min-h-[48px] items-center justify-center text-center text-base font-black leading-tight">
+              <div className="grid grid-cols-[1fr_auto_1fr] items-stretch gap-3">
+                <div className="flex min-h-[118px] flex-col justify-end text-center">
+                  <p className="flex min-h-[58px] items-end justify-center text-center text-lg font-black leading-tight">
                     {partido.home_team?.name}
                   </p>
                 </div>
 
-                {/* CENTRO */}
-                <div className="rounded-2xl bg-slate-900 px-4 py-3 text-center text-white shadow-lg">
+                <div className="self-center rounded-2xl bg-slate-900 px-4 py-3 text-center text-white shadow-lg">
                   <p className="text-xs font-black uppercase text-slate-300">
                     {partido.match_date}
                   </p>
@@ -126,13 +118,8 @@ export default function InicioPage() {
                   </p>
                 </div>
 
-                {/* VISITANTE */}
-                <div className="flex min-h-[128px] flex-col items-center justify-start text-center">
-                  <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-red-100 text-lg font-black text-red-600">
-                    {partido.away_team?.name?.slice(0, 2).toUpperCase()}
-                  </div>
-
-                  <p className="flex min-h-[48px] items-center justify-center text-center text-base font-black leading-tight">
+                <div className="flex min-h-[118px] flex-col justify-end text-center">
+                  <p className="flex min-h-[58px] items-end justify-center text-center text-lg font-black leading-tight">
                     {partido.away_team?.name}
                   </p>
                 </div>
@@ -145,7 +132,6 @@ export default function InicioPage() {
           )}
         </div>
 
-        {/* BOTONES */}
         <div className="mt-6 grid grid-cols-2 gap-3">
           <a
             href="/equipos"
@@ -170,13 +156,12 @@ export default function InicioPage() {
 
           <a
             href="/favoritos"
-            className="rounded-2xl bg-red-600 p-4 text-lg font-black text-white shadow"
+            className="rounded-2xl bg-white/95 p-4 text-lg font-black shadow"
           >
             Favoritos
           </a>
         </div>
 
-        {/* PANEL ADMIN ABAJO */}
         <a
           href="/admin"
           className="mt-4 block w-full rounded-2xl bg-slate-950 p-4 text-center text-lg font-black text-white shadow"

@@ -115,7 +115,9 @@ export default function VotarMvpPage() {
   }, []);
 
   const gruposConPartidos = useMemo(() => {
-    const nombres = Array.from(new Set(matches.map((match) => match.group_name)));
+    const nombres = Array.from(
+      new Set(matches.map((match) => match.group_name))
+    );
 
     return nombres.map((name, index) => ({
       id: name || String(index),
@@ -199,7 +201,7 @@ export default function VotarMvpPage() {
       return;
     }
 
-    const eliminatorias: Match[] = ((finalData ?? []) as FinalMatch[])
+    const eliminatorias = ((finalData ?? []) as FinalMatch[])
       .map((match): Match | null => {
         const local = buscarEquipoPorNombre(match.home_ref, equipos);
         const visitante = buscarEquipoPorNombre(match.away_ref, equipos);
@@ -230,12 +232,18 @@ export default function VotarMvpPage() {
     setMatches(todosPartidos);
 
     if (todosPartidos.length > 0) {
-      const primerGrupo = todosPartidos[0].group_name;
-      const primerPartido = todosPartidos[0];
+      const params = new URLSearchParams(window.location.search);
+      const matchParam = params.get("match");
 
-      setSelectedGroup(primerGrupo);
-      setSelectedMatchId(primerPartido.id);
-      await cargarJugadoresYVotos(primerPartido);
+      const partidoUrl = matchParam
+        ? todosPartidos.find((match) => match.id === matchParam)
+        : null;
+
+      const partidoInicial = partidoUrl ?? todosPartidos[0];
+
+      setSelectedGroup(partidoInicial.group_name);
+      setSelectedMatchId(partidoInicial.id);
+      await cargarJugadoresYVotos(partidoInicial);
     }
 
     setLoading(false);

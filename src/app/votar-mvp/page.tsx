@@ -4,12 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { formatearFecha } from "@/lib/formatDate";
 
-type Group = {
-  id: string;
-  name: string;
-  sort_order: number;
-};
-
 type Team = {
   id: string;
   name: string;
@@ -55,7 +49,7 @@ type Player = {
   id: string;
   team_id: string;
   name: string;
-  number: number;
+  number: number | null;
 };
 
 type Vote = {
@@ -63,6 +57,7 @@ type Vote = {
   match_id: string;
   player_id: string;
   user_id: string;
+  team_id: string | null;
 };
 
 function normalizarEquipo(
@@ -84,9 +79,13 @@ function getUserId() {
   return userId;
 }
 
+function buscarEquipoPorNombre(nombre: string, equipos: Team[]) {
+  const limpio = nombre.trim().toLowerCase();
+
+  return equipos.find((team) => team.name.trim().toLowerCase() === limpio);
+}
+
 export default function VotarMvpPage() {
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [selectedGroup, setSelectedGroup] = useState("");
   const [selectedMatchId, setSelectedMatchId] = useState("");
@@ -95,6 +94,7 @@ export default function VotarMvpPage() {
   const [userId, setUserId] = useState("");
   const [mensaje, setMensaje] = useState("");
   const [loading, setLoading] = useState(true);
+  const [errorCarga, setErrorCarga] = useState("");
 
   const selectedMatch = matches.find((match) => match.id === selectedMatchId);
 
@@ -111,7 +111,8 @@ export default function VotarMvpPage() {
     : [];
 
   useEffect(() => {
-    setUserId(getUserId());
+    const currentUserId = getUserId();
+    setUserId(currentUserId);
     cargarDatos();
   }, []);
 
@@ -127,28 +128,22 @@ export default function VotarMvpPage() {
     }));
   }, [matches]);
 
-  function buscarEquipoPorNombre(nombre: string, equipos: Team[]) {
-    const limpio = nombre.trim().toLowerCase();
-
-    return equipos.find((team) => team.name.trim().toLowerCase() === limpio);
-  }
-
   async function cargarDatos() {
-    const { data: groupsData } = await supabase
-      .from("groups")
-      .select("id, name, sort_order")
-      .order("sort_order", { ascending: true });
+    setLoading(true);
+    setErrorCarga("");
 
-    const grupos = (groupsData ?? []) as Group[];
-    setGroups(grupos);
-
-    const { data: teamsData } = await supabase
+    const { data: teamsData, error: teamsError } = await supabase
       .from("teams")
       .select("id, name")
       .order("name", { ascending: true });
 
+    if (teamsError) {
+      setErrorCarga("No se han podido cargar los equipos.");
+      setLoading(false);
+      return;
+    }
+
     const equipos = (teamsData ?? []) as Team[];
-    setTeams(equipos);
 
     const { data: matchesData, error: matchesError } = await supabase
       .from("matches")
@@ -173,7 +168,7 @@ export default function VotarMvpPage() {
       .order("match_time", { ascending: true });
 
     if (matchesError) {
-      console.error(matchesError);
+      setErrorCarga("No se han podido cargar las votaciones.");
       setLoading(false);
       return;
     }
@@ -183,7 +178,7 @@ export default function VotarMvpPage() {
     ).map((match) => ({
       ...match,
       tipo: "grupo" as const,
-      group_name: match.group_name,
+      group_name: match.group_name || "Fase de grupos",
       home_team: normalizarEquipo(match.home_team),
       away_team: normalizarEquipo(match.away_team),
     }));
@@ -197,7 +192,7 @@ export default function VotarMvpPage() {
       .order("sort_order", { ascending: true });
 
     if (finalError) {
-      console.error(finalError);
+      setErrorCarga("No se han podido cargar las eliminatorias MVP.");
       setLoading(false);
       return;
     }
@@ -251,16 +246,21 @@ export default function VotarMvpPage() {
   }
 
   async function cargarJugadoresYVotos(match: Match) {
-    const { data: playersData } = await supabase
+    const { data: playersData, error: playersError } = await supabase
       .from("players")
       .select("id, team_id, name, number")
       .in("team_id", [match.home_team_id, match.away_team_id])
       .order("number", { ascending: true });
 
-    const { data: votesData } = await supabase
+    const { data: votesData, error: votesError } = await supabase
       .from("mvp_votes")
-      .select("id, match_id, player_id, user_id")
+      .select("id, match_id, player_id, user_id, team_id")
       .eq("match_id", match.id);
+
+    if (playersError || votesError) {
+      setMensaje("No se han podido cargar jugadores o votos.");
+      return;
+    }
 
     setPlayers((playersData ?? []) as Player[]);
     setVotes((votesData ?? []) as Vote[]);
@@ -306,7 +306,7 @@ export default function VotarMvpPage() {
       (vote) =>
         vote.match_id === selectedMatchId &&
         vote.user_id === userId &&
-        idsJugadoresEquipo.includes(vote.player_id)
+        (vote.team_id === teamId || idsJugadoresEquipo.includes(vote.player_id))
     );
   }
 
@@ -315,8 +315,9 @@ export default function VotarMvpPage() {
       .filter((player) => player.team_id === teamId)
       .map((player) => player.id);
 
-    return votes.filter((vote) => idsJugadoresEquipo.includes(vote.player_id))
-      .length;
+    return votes.filter(
+      (vote) => vote.team_id === teamId || idsJugadoresEquipo.includes(vote.player_id)
+    ).length;
   }
 
   const yaVotoLocal = selectedMatch
@@ -364,20 +365,20 @@ export default function VotarMvpPage() {
     return (
       <div className="overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
         <div className="bg-red-600 px-5 py-3 text-white">
-          <p className="text-sm font-black uppercase tracking-widest">
+          <p className="break-words text-sm font-black uppercase tracking-widest">
             {nombreEquipo}
           </p>
         </div>
 
         <div className="space-y-3 p-4">
           {yaVotado && (
-            <div className="rounded-xl bg-emerald-100 p-3 text-sm font-bold text-emerald-800">
-              Voto emitido para este equipo.
+            <div className="rounded-xl bg-emerald-100 p-3 text-sm font-black text-emerald-800">
+              ✅ Voto emitido para este equipo.
             </div>
           )}
 
           {jugadores.length === 0 ? (
-            <p className="text-sm font-bold text-slate-500">
+            <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">
               No hay jugadores cargados para este equipo.
             </p>
           ) : (
@@ -394,13 +395,15 @@ export default function VotarMvpPage() {
                   className="rounded-2xl bg-slate-50 p-4 shadow-sm"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-lg font-black text-red-600">
-                        {player.number}
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-lg font-black text-red-600">
+                        {player.number ?? "-"}
                       </div>
 
-                      <div>
-                        <p className="font-black">{player.name}</p>
+                      <div className="min-w-0">
+                        <p className="break-words font-black leading-tight">
+                          {player.name}
+                        </p>
                         <p className="text-xs font-bold text-slate-500">
                           {votosJugador} votos · {porcentaje}%
                         </p>
@@ -410,7 +413,7 @@ export default function VotarMvpPage() {
                     <button
                       onClick={() => votar(player)}
                       disabled={yaVotado}
-                      className={`rounded-xl px-4 py-2 text-sm font-black ${
+                      className={`shrink-0 rounded-xl px-4 py-2 text-sm font-black ${
                         yaVotado
                           ? "bg-slate-300 text-slate-500"
                           : "bg-red-600 text-white"
@@ -455,6 +458,10 @@ export default function VotarMvpPage() {
           <div className="mt-6 rounded-2xl bg-white/95 p-5 font-bold shadow">
             Cargando votaciones...
           </div>
+        ) : errorCarga ? (
+          <div className="mt-6 rounded-2xl bg-red-100 p-5 font-bold text-red-700 shadow">
+            {errorCarga}
+          </div>
         ) : matches.length === 0 ? (
           <div className="mt-6 rounded-2xl bg-white/95 p-5 font-bold shadow">
             No hay votaciones MVP abiertas.
@@ -497,7 +504,9 @@ export default function VotarMvpPage() {
                   <option key={match.id} value={match.id}>
                     {match.tipo === "final" ? `${match.phase} · ` : ""}
                     {match.home_team?.name} vs {match.away_team?.name} ·{" "}
-                    {formatearFecha(match.match_date)}
+                    {match.match_date
+                      ? formatearFecha(match.match_date)
+                      : "Fecha pendiente"}
                   </option>
                 ))}
               </select>
@@ -509,16 +518,18 @@ export default function VotarMvpPage() {
                       ? `${selectedMatch.phase} · ${selectedMatch.title}`
                       : selectedMatch.group_name}
                   </p>
-                  <h2 className="mt-1 text-xl font-black">
+                  <h2 className="mt-1 break-words text-xl font-black leading-tight">
                     {selectedMatch.home_team?.name} vs{" "}
                     {selectedMatch.away_team?.name}
                   </h2>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {formatearFecha(selectedMatch.match_date)} ·{" "}
-                    {selectedMatch.match_time ?? "Hora pendiente"} ·{" "}
+                  <p className="mt-2 text-sm font-bold text-slate-500">
+                    {selectedMatch.match_date
+                      ? formatearFecha(selectedMatch.match_date)
+                      : "Fecha pendiente"}{" "}
+                    · {selectedMatch.match_time ?? "Hora pendiente"} ·{" "}
                     {selectedMatch.field ?? "Campo pendiente"}
                   </p>
-                  <p className="mt-2 text-2xl font-black">
+                  <p className="mt-3 text-2xl font-black">
                     {selectedMatch.home_score ?? "-"} -{" "}
                     {selectedMatch.away_score ?? "-"}
                   </p>

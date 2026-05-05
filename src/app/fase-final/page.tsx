@@ -14,6 +14,8 @@ type FinalMatch = {
   field: string | null;
   home_score: number | null;
   away_score: number | null;
+  home_penalties: number | null;
+  away_penalties: number | null;
   status: string;
   sort_order: number;
 };
@@ -85,7 +87,7 @@ export default function FaseFinalPage() {
                   >
                     <div>
                       <p className="text-xl font-black">{fase}</p>
-                      </div>
+                    </div>
 
                     <span className="text-3xl font-black">
                       {abierta ? "−" : "+"}
@@ -101,6 +103,9 @@ export default function FaseFinalPage() {
                       ) : (
                         cruces.map((match) => {
                           const finalizado = match.status === "Finalizado";
+                          const hayPenaltis =
+                            match.home_penalties !== null &&
+                            match.away_penalties !== null;
 
                           return (
                             <div
@@ -142,6 +147,13 @@ export default function FaseFinalPage() {
                                   {match.away_score ?? "-"}
                                 </p>
                               </div>
+
+                              {hayPenaltis && (
+                                <div className="mt-3 rounded-xl bg-amber-100 px-3 py-2 text-center text-sm font-black text-amber-800">
+                                  Penaltis: {match.home_penalties} -{" "}
+                                  {match.away_penalties}
+                                </div>
+                              )}
 
                               <p className="mt-4 text-sm font-semibold text-slate-500">
                                 {match.match_date ?? "Fecha pendiente"} ·{" "}

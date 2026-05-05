@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import AdminGuard from "@/components/AdminGuard";
 import { supabase } from "@/lib/supabase";
+import { formatearFecha } from "@/lib/formatDate";
 
 type Group = {
   id: string;
@@ -10,32 +11,56 @@ type Group = {
   sort_order: number;
 };
 
-type Match = {
+type Team = {
   id: string;
+  name: string;
+};
+
+type MvpMatch = {
+  id: string;
+  tipo: "grupo" | "final";
   group_name: string;
-  match_date: string;
-  match_time: string;
-  field: string;
+  phase?: string;
+  title?: string;
+  match_date: string | null;
+  match_time: string | null;
+  field: string | null;
   home_team_id: string;
   away_team_id: string;
   home_score: number | null;
   away_score: number | null;
-  status: string;
-  mvp_open: boolean;
+  status: string | null;
+  mvp_open: boolean | null;
   home_team: { name: string } | null;
   away_team: { name: string } | null;
 };
 
-type RawMatch = Omit<Match, "home_team" | "away_team"> & {
+type RawGroupMatch = Omit<MvpMatch, "tipo" | "home_team" | "away_team"> & {
   home_team: { name: string }[] | { name: string } | null;
   away_team: { name: string }[] | { name: string } | null;
+};
+
+type FinalMatch = {
+  id: string;
+  phase: string;
+  title: string;
+  home_ref: string;
+  away_ref: string;
+  match_date: string | null;
+  match_time: string | null;
+  field: string | null;
+  home_score: number | null;
+  away_score: number | null;
+  status: string | null;
+  sort_order: number;
+  mvp_open: boolean | null;
 };
 
 type Player = {
   id: string;
   team_id: string;
   name: string;
-  number: number;
+  number: number | null;
 };
 
 type Vote = {
@@ -47,49 +72,100 @@ type Vote = {
 };
 
 function normalizarEquipo(
-  equipo: RawMatch["home_team"]
+  equipo: RawGroupMatch["home_team"]
 ): { name: string } | null {
   if (!equipo) return null;
   if (Array.isArray(equipo)) return equipo[0] ?? null;
   return equipo;
 }
 
+function buscarEquipoPorNombre(nombre: string, equipos: Team[]) {
+  const limpio = nombre.trim().toLowerCase();
+
+  return equipos.find((team) => team.name.trim().toLowerCase() === limpio);
+}
+
+function formatearFechaSegura(fecha: string | null) {
+  if (!fecha) return "Fecha pendiente";
+  return formatearFecha(fecha);
+}
+
 export default function AdminMvpPage() {
   const [groups, setGroups] = useState<Group[]>([]);
-  const [matches, setMatches] = useState<Match[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [matches, setMatches] = useState<MvpMatch[]>([]);
+
   const [grupoActivo, setGrupoActivo] = useState("");
   const [selectedMatchId, setSelectedMatchId] = useState("");
+
   const [players, setPlayers] = useState<Player[]>([]);
   const [votes, setVotes] = useState<Vote[]>([]);
+
   const [mensaje, setMensaje] = useState("");
   const [loading, setLoading] = useState(true);
+
+  const gruposConPartidos = useMemo(() => {
+    const nombresPartidos = Array.from(
+      new Set(matches.map((match) => match.group_name).filter(Boolean))
+    );
+
+    const nombresOrdenados = groups
+      .map((group) => group.name)
+      .filter((name) => nombresPartidos.includes(name));
+
+    const extras = nombresPartidos.filter(
+      (name) => !nombresOrdenados.includes(name)
+    );
+
+    return [...nombresOrdenados, ...extras];
+  }, [groups, matches]);
 
   const matchesGrupo = matches.filter(
     (match) => match.group_name === grupoActivo
   );
 
-  const selectedMatch = matchesGrupo.find(
-    (match) => match.id === selectedMatchId
-  );
+  const selectedMatch =
+    matches.find((match) => match.id === selectedMatchId) ?? null;
 
   const totalVotos = votes.length;
+  const totalVotantes = new Set(votes.map((vote) => vote.user_id)).size;
 
   useEffect(() => {
     cargarDatos();
   }, []);
 
-  async function cargarDatos() {
+  async function cargarDatos(matchMantenerId?: string, grupoMantener?: string) {
     setLoading(true);
 
-    const { data: groupsData } = await supabase
+    const { data: groupsData, error: groupsError } = await supabase
       .from("groups")
       .select("id, name, sort_order")
       .order("sort_order", { ascending: true });
 
+    if (groupsError) {
+      setMensaje("Error cargando grupos.");
+      setLoading(false);
+      return;
+    }
+
     const grupos = (groupsData ?? []) as Group[];
     setGroups(grupos);
 
-    const { data, error } = await supabase
+    const { data: teamsData, error: teamsError } = await supabase
+      .from("teams")
+      .select("id, name")
+      .order("name", { ascending: true });
+
+    if (teamsError) {
+      setMensaje("Error cargando equipos.");
+      setLoading(false);
+      return;
+    }
+
+    const equipos = (teamsData ?? []) as Team[];
+    setTeams(equipos);
+
+    const { data: groupMatchesData, error: matchesError } = await supabase
       .from("matches")
       .select(`
         id,
@@ -110,48 +186,117 @@ export default function AdminMvpPage() {
       .order("match_date", { ascending: true })
       .order("match_time", { ascending: true });
 
-    if (error) {
-      setMensaje("Error cargando partidos.");
+    if (matchesError) {
+      setMensaje("Error cargando partidos de grupos.");
       setLoading(false);
       return;
     }
 
-    const partidos: Match[] = ((data as unknown as RawMatch[]) || []).map(
-      (match) => ({
-        ...match,
-        home_team: normalizarEquipo(match.home_team),
-        away_team: normalizarEquipo(match.away_team),
-      })
+    const partidosGrupo: MvpMatch[] = (
+      (groupMatchesData as unknown as RawGroupMatch[]) || []
+    ).map((match) => ({
+      ...match,
+      tipo: "grupo" as const,
+      group_name: match.group_name || "Fase de grupos",
+      home_team: normalizarEquipo(match.home_team),
+      away_team: normalizarEquipo(match.away_team),
+    }));
+
+    const { data: finalData, error: finalError } = await supabase
+      .from("final_matches")
+      .select(
+        "id, phase, title, home_ref, away_ref, match_date, match_time, field, home_score, away_score, status, sort_order, mvp_open"
+      )
+      .order("sort_order", { ascending: true });
+
+    if (finalError) {
+      setMensaje("Error cargando eliminatorias.");
+      setLoading(false);
+      return;
+    }
+
+    const eliminatorias: MvpMatch[] = ((finalData ?? []) as FinalMatch[]).map(
+      (match) => {
+        const local = buscarEquipoPorNombre(match.home_ref, equipos);
+        const visitante = buscarEquipoPorNombre(match.away_ref, equipos);
+
+        return {
+          id: match.id,
+          tipo: "final" as const,
+          group_name: "Eliminatorias",
+          phase: match.phase,
+          title: match.title,
+          match_date: match.match_date,
+          match_time: match.match_time,
+          field: match.field,
+          home_team_id: local?.id ?? "",
+          away_team_id: visitante?.id ?? "",
+          home_score: match.home_score,
+          away_score: match.away_score,
+          status: match.status,
+          mvp_open: match.mvp_open,
+          home_team: { name: match.home_ref },
+          away_team: { name: match.away_ref },
+        };
+      }
     );
 
-    setMatches(partidos);
+    const todosPartidos = [...partidosGrupo, ...eliminatorias];
+    setMatches(todosPartidos);
 
-    const primerGrupo = grupos[0]?.name || partidos[0]?.group_name || "";
-    setGrupoActivo(primerGrupo);
+    const partidoMantener = matchMantenerId
+      ? todosPartidos.find((match) => match.id === matchMantenerId)
+      : null;
 
-    const primerPartido = partidos.find(
-      (match) => match.group_name === primerGrupo
-    );
+    const grupoInicial =
+      grupoMantener ||
+      partidoMantener?.group_name ||
+      grupos[0]?.name ||
+      todosPartidos[0]?.group_name ||
+      "";
 
-    if (primerPartido) {
-      setSelectedMatchId(primerPartido.id);
-      await cargarDatosPartido(primerPartido);
+    setGrupoActivo(grupoInicial);
+
+    const partidoInicial =
+      partidoMantener ??
+      todosPartidos.find((match) => match.group_name === grupoInicial) ??
+      todosPartidos[0] ??
+      null;
+
+    if (partidoInicial) {
+      setSelectedMatchId(partidoInicial.id);
+      await cargarDatosPartido(partidoInicial);
+    } else {
+      setSelectedMatchId("");
+      setPlayers([]);
+      setVotes([]);
     }
 
     setLoading(false);
   }
 
-  async function cargarDatosPartido(match: Match) {
-    const { data: playersData } = await supabase
-      .from("players")
-      .select("id, team_id, name, number")
-      .in("team_id", [match.home_team_id, match.away_team_id])
-      .order("number", { ascending: true });
+  async function cargarDatosPartido(match: MvpMatch) {
+    const idsEquipos = [match.home_team_id, match.away_team_id].filter(Boolean);
 
-    const { data: votesData } = await supabase
+    const { data: playersData, error: playersError } =
+      idsEquipos.length > 0
+        ? await supabase
+            .from("players")
+            .select("id, team_id, name, number")
+            .in("team_id", idsEquipos)
+            .order("number", { ascending: true })
+            .order("name", { ascending: true })
+        : { data: [], error: null };
+
+    const { data: votesData, error: votesError } = await supabase
       .from("mvp_votes")
       .select("id, match_id, player_id, user_id, team_id")
       .eq("match_id", match.id);
+
+    if (playersError || votesError) {
+      setMensaje("Error cargando jugadores o votos.");
+      return;
+    }
 
     setPlayers((playersData ?? []) as Player[]);
     setVotes((votesData ?? []) as Vote[]);
@@ -188,8 +333,10 @@ export default function AdminMvpPage() {
   async function cambiarEstadoMvp(abierto: boolean) {
     if (!selectedMatch) return;
 
+    const tabla = selectedMatch.tipo === "grupo" ? "matches" : "final_matches";
+
     const { error } = await supabase
-      .from("matches")
+      .from(tabla)
       .update({ mvp_open: abierto })
       .eq("id", selectedMatch.id);
 
@@ -199,7 +346,7 @@ export default function AdminMvpPage() {
     }
 
     setMensaje(abierto ? "Votación MVP abierta." : "Votación MVP cerrada.");
-    await cargarDatos();
+    await cargarDatos(selectedMatch.id, selectedMatch.group_name);
   }
 
   async function borrarVotos() {
@@ -234,56 +381,79 @@ export default function AdminMvpPage() {
       .filter((player) => player.team_id === teamId)
       .map((player) => player.id);
 
-    return votes.filter((vote) => ids.includes(vote.player_id)).length;
+    return votes.filter(
+      (vote) => vote.team_id === teamId || ids.includes(vote.player_id)
+    ).length;
   }
 
   function renderResultadosEquipo(nombre: string, teamId: string) {
     const jugadores = players.filter((player) => player.team_id === teamId);
     const total = totalVotosEquipo(teamId);
 
-    const ordenados = [...jugadores].sort(
-      (a, b) => votosJugador(b.id) - votosJugador(a.id)
-    );
+    const ordenados = [...jugadores].sort((a, b) => {
+      const votosB = votosJugador(b.id);
+      const votosA = votosJugador(a.id);
+
+      if (votosB !== votosA) return votosB - votosA;
+
+      return (a.number ?? 999) - (b.number ?? 999);
+    });
 
     return (
       <div className="overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
         <div className="bg-red-600 px-5 py-3 text-white">
-          <p className="text-sm font-black uppercase tracking-widest">
+          <p className="break-words text-sm font-black uppercase tracking-widest">
             {nombre}
+          </p>
+          <p className="mt-1 text-xs font-bold text-red-100">
+            {total} voto{total === 1 ? "" : "s"} para este equipo
           </p>
         </div>
 
         <div className="space-y-3 p-4">
           {ordenados.length === 0 ? (
-            <p className="text-sm font-bold text-slate-500">
-              No hay jugadores cargados.
+            <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">
+              No hay jugadores cargados o no se ha podido vincular el equipo.
             </p>
           ) : (
-            ordenados.map((player) => {
+            ordenados.map((player, index) => {
               const votos = votosJugador(player.id);
               const porcentaje =
                 total === 0 ? 0 : Math.round((votos / total) * 100);
+              const lider = index === 0 && votos > 0;
 
               return (
                 <div
                   key={player.id}
-                  className="rounded-2xl bg-slate-50 p-4 shadow-sm"
+                  className={`rounded-2xl p-4 shadow-sm ${
+                    lider
+                      ? "bg-emerald-50 ring-1 ring-emerald-200"
+                      : "bg-slate-50"
+                  }`}
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-100 text-sm font-black text-red-600">
-                        {player.number}
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div
+                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-black ${
+                          lider
+                            ? "bg-emerald-600 text-white"
+                            : "bg-emerald-100 text-red-600"
+                        }`}
+                      >
+                        {player.number ?? "-"}
                       </div>
 
-                      <div>
-                        <p className="font-black">{player.name}</p>
+                      <div className="min-w-0">
+                        <p className="break-words font-black leading-tight">
+                          {player.name}
+                        </p>
                         <p className="text-xs font-bold text-slate-500">
                           {votos} votos · {porcentaje}%
                         </p>
                       </div>
                     </div>
 
-                    <p className="text-2xl font-black text-red-600">
+                    <p className="shrink-0 text-2xl font-black text-red-600">
                       {votos}
                     </p>
                   </div>
@@ -294,6 +464,12 @@ export default function AdminMvpPage() {
                       style={{ width: `${porcentaje}%` }}
                     />
                   </div>
+
+                  {lider && (
+                    <p className="mt-2 text-xs font-black text-emerald-700">
+                      MVP provisional del equipo
+                    </p>
+                  )}
                 </div>
               );
             })
@@ -302,6 +478,11 @@ export default function AdminMvpPage() {
       </div>
     );
   }
+
+  const mensajeCorrecto =
+    mensaje.includes("abierta") ||
+    mensaje.includes("cerrada") ||
+    mensaje.includes("correctamente");
 
   return (
     <AdminGuard>
@@ -320,19 +501,22 @@ export default function AdminMvpPage() {
             <h1 className="mt-2 text-center text-3xl font-black">
               Votaciones MVP
             </h1>
+            <p className="mt-2 text-center text-sm font-bold text-emerald-100">
+              Estado y recuento de votos
+            </p>
           </div>
 
           <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
             {loading ? (
               <p className="font-bold text-slate-500">Cargando votaciones...</p>
-            ) : groups.length === 0 ? (
+            ) : matches.length === 0 ? (
               <p className="font-bold text-slate-500">
-                Todavía no hay grupos creados.
+                Todavía no hay partidos creados.
               </p>
             ) : (
               <>
                 <label className="text-sm font-black uppercase text-slate-500">
-                  Grupo
+                  Fase / grupo
                 </label>
 
                 <select
@@ -340,9 +524,9 @@ export default function AdminMvpPage() {
                   onChange={(event) => cambiarGrupo(event.target.value)}
                   className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
                 >
-                  {groups.map((grupo) => (
-                    <option key={grupo.id} value={grupo.name}>
-                      {grupo.name}
+                  {gruposConPartidos.map((grupo) => (
+                    <option key={grupo} value={grupo}>
+                      {grupo}
                     </option>
                   ))}
                 </select>
@@ -356,45 +540,76 @@ export default function AdminMvpPage() {
                   onChange={(event) => cambiarPartido(event.target.value)}
                   className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
                 >
-                  {matchesGrupo.map((match) => (
-                    <option key={match.id} value={match.id}>
-                      {match.home_team?.name ?? "Local"} vs{" "}
-                      {match.away_team?.name ?? "Visitante"} ·{" "}
-                      {match.match_date} · {match.match_time}
-                    </option>
-                  ))}
+                  {matchesGrupo.length === 0 ? (
+                    <option value="">No hay partidos</option>
+                  ) : (
+                    matchesGrupo.map((match) => (
+                      <option key={match.id} value={match.id}>
+                        {match.tipo === "final" ? `${match.phase} · ` : ""}
+                        {match.home_team?.name ?? "Local"} vs{" "}
+                        {match.away_team?.name ?? "Visitante"} ·{" "}
+                        {formatearFechaSegura(match.match_date)} ·{" "}
+                        {match.match_time ?? "Hora pendiente"}
+                      </option>
+                    ))
+                  )}
                 </select>
 
                 {selectedMatch ? (
                   <>
                     <div className="mt-5 rounded-2xl bg-slate-100 p-4">
                       <p className="text-sm font-black text-red-600">
-                        {selectedMatch.group_name}
+                        {selectedMatch.tipo === "final"
+                          ? `${selectedMatch.phase} · ${
+                              selectedMatch.title ?? "Eliminatoria"
+                            }`
+                          : selectedMatch.group_name}
                       </p>
-                      <h2 className="mt-1 text-xl font-black">
+
+                      <h2 className="mt-1 break-words text-xl font-black leading-tight">
                         {selectedMatch.home_team?.name} vs{" "}
                         {selectedMatch.away_team?.name}
                       </h2>
-                      <p className="mt-1 text-sm font-semibold text-slate-500">
-                        {selectedMatch.match_date} ·{" "}
-                        {selectedMatch.match_time} · {selectedMatch.field}
+
+                      <p className="mt-2 text-sm font-semibold text-slate-500">
+                        {formatearFechaSegura(selectedMatch.match_date)} ·{" "}
+                        {selectedMatch.match_time ?? "Hora pendiente"} ·{" "}
+                        {selectedMatch.field ?? "Campo pendiente"}
                       </p>
 
-                      <p className="mt-2 text-sm font-black">
-                        Estado votación:{" "}
-                        <span
-                          className={
-                            selectedMatch.mvp_open
-                              ? "text-emerald-700"
-                              : "text-red-600"
-                          }
-                        >
-                          {selectedMatch.mvp_open ? "Abierta" : "Cerrada"}
-                        </span>
+                      <p className="mt-3 text-2xl font-black">
+                        {selectedMatch.home_score ?? "-"} -{" "}
+                        {selectedMatch.away_score ?? "-"}
                       </p>
 
-                      <p className="mt-1 text-sm font-bold text-slate-500">
-                        Total votos: {totalVotos}
+                      <div className="mt-4 grid grid-cols-2 gap-3">
+                        <div className="rounded-xl bg-white p-3 text-center shadow-sm">
+                          <p className="text-xs font-black uppercase text-slate-500">
+                            Votación
+                          </p>
+                          <p
+                            className={`mt-1 text-lg font-black ${
+                              selectedMatch.mvp_open
+                                ? "text-emerald-700"
+                                : "text-red-600"
+                            }`}
+                          >
+                            {selectedMatch.mvp_open ? "Abierta" : "Cerrada"}
+                          </p>
+                        </div>
+
+                        <div className="rounded-xl bg-white p-3 text-center shadow-sm">
+                          <p className="text-xs font-black uppercase text-slate-500">
+                            Votos
+                          </p>
+                          <p className="mt-1 text-lg font-black text-red-600">
+                            {totalVotos}
+                          </p>
+                        </div>
+                      </div>
+
+                      <p className="mt-3 text-sm font-bold text-slate-500">
+                        Votantes registrados: {totalVotantes}
                       </p>
                     </div>
 
@@ -423,12 +638,18 @@ export default function AdminMvpPage() {
                   </>
                 ) : (
                   <p className="mt-5 rounded-2xl bg-slate-100 p-4 font-bold text-slate-500">
-                    No hay partidos cargados en este grupo.
+                    No hay partidos cargados en esta fase o grupo.
                   </p>
                 )}
 
                 {mensaje && (
-                  <div className="mt-4 rounded-xl bg-emerald-100 p-3 text-sm font-bold text-emerald-800">
+                  <div
+                    className={`mt-4 rounded-xl p-3 text-sm font-bold ${
+                      mensajeCorrecto
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-red-100 text-red-700"
+                    }`}
+                  >
                     {mensaje}
                   </div>
                 )}

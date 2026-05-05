@@ -21,27 +21,60 @@ type FinalMatch = {
   mvp_open: boolean | null;
 };
 
+type Vote = {
+  id: string;
+  match_id: string;
+  user_id: string;
+};
+
+function getUserId() {
+  let userId = localStorage.getItem("torneo_user_id");
+
+  if (!userId) {
+    userId = crypto.randomUUID();
+    localStorage.setItem("torneo_user_id", userId);
+  }
+
+  return userId;
+}
+
 export default function FaseFinalPage() {
   const [matches, setMatches] = useState<FinalMatch[]>([]);
+  const [votes, setVotes] = useState<Vote[]>([]);
+  const [userId, setUserId] = useState("");
   const [loading, setLoading] = useState(true);
   const [faseAbierta, setFaseAbierta] = useState("");
 
   useEffect(() => {
-    async function cargarCruces() {
-      const { data, error } = await supabase
-        .from("final_matches")
-        .select("*")
-        .order("sort_order", { ascending: true });
+    const usuario = getUserId();
+    setUserId(usuario);
+    cargarCruces(usuario);
+  }, []);
 
-      if (!error) {
-        setMatches(data ?? []);
-      }
+  async function cargarCruces(usuario: string) {
+    const { data, error } = await supabase
+      .from("final_matches")
+      .select("*")
+      .order("sort_order", { ascending: true });
 
-      setLoading(false);
+    if (!error) {
+      setMatches(data ?? []);
     }
 
-    cargarCruces();
-  }, []);
+    const { data: votesData } = await supabase
+      .from("mvp_votes")
+      .select("id, match_id, user_id")
+      .eq("user_id", usuario);
+
+    setVotes((votesData ?? []) as Vote[]);
+    setLoading(false);
+  }
+
+  function votosUsuarioEnPartido(matchId: string) {
+    return votes.filter(
+      (vote) => vote.match_id === matchId && vote.user_id === userId
+    ).length;
+  }
 
   const fases = ["Cuartos", "Semifinales", "Tercer puesto", "Final"];
 
@@ -108,6 +141,9 @@ export default function FaseFinalPage() {
                             match.home_penalties !== null &&
                             match.away_penalties !== null;
 
+                          const votosEmitidos = votosUsuarioEnPartido(match.id);
+                          const votoCompleto = votosEmitidos >= 2;
+
                           return (
                             <div
                               key={match.id}
@@ -156,7 +192,13 @@ export default function FaseFinalPage() {
                                 </div>
                               )}
 
-                              {match.mvp_open && (
+                              {match.mvp_open && votoCompleto && (
+                                <div className="mt-3 rounded-xl bg-emerald-100 px-3 py-3 text-center text-sm font-black text-emerald-800">
+                                  ✅ Voto emitido
+                                </div>
+                              )}
+
+                              {match.mvp_open && !votoCompleto && (
                                 <a
                                   href={`/votar-mvp?match=${match.id}`}
                                   className="mt-3 block rounded-xl bg-red-600 px-3 py-3 text-center text-sm font-black text-white shadow"

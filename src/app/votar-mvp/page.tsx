@@ -318,6 +318,16 @@ export default function VotarMvpPage() {
       .length;
   }
 
+  const yaVotoLocal = selectedMatch
+    ? usuarioYaVotoEquipo(selectedMatch.home_team_id)
+    : false;
+
+  const yaVotoVisitante = selectedMatch
+    ? usuarioYaVotoEquipo(selectedMatch.away_team_id)
+    : false;
+
+  const votoPartidoCompleto = yaVotoLocal && yaVotoVisitante;
+
   async function votar(player: Player) {
     if (!selectedMatch) return;
 
@@ -359,7 +369,7 @@ export default function VotarMvpPage() {
         <div className="space-y-3 p-4">
           {yaVotado && (
             <div className="rounded-xl bg-emerald-100 p-3 text-sm font-bold text-emerald-800">
-              Ya has votado un jugador de este equipo.
+              Voto emitido para este equipo.
             </div>
           )}
 
@@ -403,7 +413,7 @@ export default function VotarMvpPage() {
                           : "bg-red-600 text-white"
                       }`}
                     >
-                      Votar
+                      {yaVotado ? "Votado" : "Votar"}
                     </button>
                   </div>
 
@@ -449,6 +459,12 @@ export default function VotarMvpPage() {
         ) : (
           <>
             <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
+              {votoPartidoCompleto && (
+                <div className="mb-4 rounded-xl bg-emerald-100 p-3 text-sm font-black text-emerald-800">
+                  ✅ Voto emitido en este partido.
+                </div>
+              )}
+
               <label className="text-sm font-black uppercase text-slate-500">
                 Fase / grupo
               </label>
@@ -507,7 +523,13 @@ export default function VotarMvpPage() {
               )}
 
               {mensaje && (
-                <div className="mt-4 rounded-xl bg-red-100 p-3 text-sm font-bold text-red-700">
+                <div
+                  className={`mt-4 rounded-xl p-3 text-sm font-bold ${
+                    mensaje.includes("correctamente")
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-red-100 text-red-700"
+                  }`}
+                >
                   {mensaje}
                 </div>
               )}

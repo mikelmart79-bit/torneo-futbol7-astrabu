@@ -15,18 +15,18 @@ const principales: AdminLink[] = [
   {
     href: "/admin/partidos",
     title: "Resultados",
-    description: "Meter resultados y actualizar estados.",
+    description: "Meter resultados y activar votación MVP",
     variant: "primary",
   },
   {
     href: "/admin/gestionar-partidos",
-    title: "Gestionar partidos",
+    title: "Configurar fase de grupos",
     description: "Crear, editar o eliminar partidos.",
   },
   {
     href: "/admin/fase-final",
     title: "Configurar eliminatorias",
-    description: "Cruces, final, tercer puesto y MVP.",
+    description: "Crear, editar Cruces, semis, tercer puesto y final",
   },
 ];
 

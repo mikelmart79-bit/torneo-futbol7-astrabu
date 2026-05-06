@@ -2,19 +2,19 @@ import Link from "next/link";
 
 export default function Home() {
   return (
-    <main className="relative flex h-[100svh] min-h-screen items-center justify-center overflow-hidden bg-black">
+    <main className="relative flex h-[100svh] w-full items-center justify-center overflow-hidden bg-black">
       <img
         src="/torneo-verano.png"
         alt="Fondo"
         className="absolute inset-0 h-full w-full object-cover opacity-40 blur-sm"
       />
 
-      <section className="relative z-10 flex h-full w-full max-w-md items-center justify-center px-5 py-3">
-        <div className="relative flex max-h-[calc(100svh-24px)] w-full items-center justify-center overflow-hidden rounded-3xl shadow-2xl">
+      <section className="relative z-10 flex h-full w-full max-w-md items-center justify-center px-5 pb-20 pt-4">
+        <div className="relative flex h-full max-h-[calc(100svh-96px)] w-full items-center justify-center overflow-hidden rounded-3xl shadow-2xl">
           <img
             src="/torneo-verano.png"
             alt="Torneo Verano 2026 Astrabudua"
-            className="h-auto max-h-[calc(100svh-24px)] w-auto max-w-full object-contain"
+            className="h-full max-h-[calc(100svh-96px)] w-auto max-w-full object-contain"
           />
 
           <div className="absolute inset-x-0 bottom-[29%] flex justify-center px-8">

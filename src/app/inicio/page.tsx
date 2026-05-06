@@ -335,28 +335,28 @@ export default function InicioPage() {
         <div className="mt-4 grid grid-cols-2 gap-2">
           <a
             href="/equipos"
-            className="rounded-2xl bg-white/95 p-3 text-base font-black shadow"
+            className="flex min-h-[52px] items-center justify-center rounded-2xl bg-white/95 px-4 py-2.5 text-center text-base font-black leading-tight shadow"
           >
             Equipos
           </a>
 
           <a
             href="/favoritos"
-            className="rounded-2xl bg-white/95 p-3 text-base font-black shadow"
+            className="flex min-h-[52px] items-center justify-center rounded-2xl bg-white/95 px-4 py-2.5 text-center text-base font-black leading-tight shadow"
           >
             Favoritos
           </a>
 
           <a
             href="/mvp"
-            className="rounded-2xl bg-white/95 p-3 text-base font-black shadow"
+            className="flex min-h-[52px] items-center justify-center rounded-2xl bg-white/95 px-4 py-2.5 text-center text-base font-black leading-tight shadow"
           >
             MVP
           </a>
 
           <a
             href="/normativa"
-            className="rounded-2xl bg-white/95 p-3 text-base font-black shadow"
+            className="flex min-h-[52px] items-center justify-center rounded-2xl bg-white/95 px-4 py-2.5 text-center text-base font-black leading-tight shadow"
           >
             Normativa
           </a>

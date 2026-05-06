@@ -344,7 +344,6 @@ export default function FaseGruposPage() {
                     Clasificación
                   </p>
                   <p className="text-sm font-bold">
-                    {grupoActivo} · pasan {equiposQuePasan}
                   </p>
                 </div>
 

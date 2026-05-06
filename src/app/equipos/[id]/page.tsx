@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { formatearFecha } from "@/lib/formatDate";
 
 type Team = {
   id: string;
@@ -20,107 +19,6 @@ type Player = {
   name: string;
   number: number | null;
 };
-
-type TeamRef = {
-  name: string;
-};
-
-type RawGroupMatch = {
-  id: string;
-  group_name: string | null;
-  match_date: string | null;
-  match_time: string | null;
-  field: string | null;
-  home_score: number | null;
-  away_score: number | null;
-  status: string | null;
-  mvp_open: boolean | null;
-  home_team: TeamRef[] | TeamRef | null;
-  away_team: TeamRef[] | TeamRef | null;
-};
-
-type FinalMatch = {
-  id: string;
-  phase: string;
-  title: string;
-  home_ref: string;
-  away_ref: string;
-  match_date: string | null;
-  match_time: string | null;
-  field: string | null;
-  home_score: number | null;
-  away_score: number | null;
-  home_penalties: number | null;
-  away_penalties: number | null;
-  status: string | null;
-  mvp_open: boolean | null;
-  sort_order: number;
-};
-
-type MatchCard = {
-  id: string;
-  tipo: "grupo" | "final";
-  etiqueta: string;
-  match_date: string | null;
-  match_time: string | null;
-  field: string | null;
-  home_name: string;
-  away_name: string;
-  home_score: number | null;
-  away_score: number | null;
-  home_penalties?: number | null;
-  away_penalties?: number | null;
-  status: string | null;
-  mvp_open: boolean | null;
-};
-
-function normalizarEquipo(equipo: RawGroupMatch["home_team"]): TeamRef | null {
-  if (!equipo) return null;
-  if (Array.isArray(equipo)) return equipo[0] ?? null;
-  return equipo;
-}
-
-function normalizarTexto(texto: string) {
-  return texto.trim().toLowerCase();
-}
-
-function fechaLocalHoy() {
-  const ahora = new Date();
-  const year = ahora.getFullYear();
-  const month = String(ahora.getMonth() + 1).padStart(2, "0");
-  const day = String(ahora.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-}
-
-function horaLocalActual() {
-  const ahora = new Date();
-  const hours = String(ahora.getHours()).padStart(2, "0");
-  const minutes = String(ahora.getMinutes()).padStart(2, "0");
-
-  return `${hours}:${minutes}`;
-}
-
-function formatearFechaSegura(fecha: string | null) {
-  if (!fecha) return "Fecha pendiente";
-  return formatearFecha(fecha);
-}
-
-function partidoEsFuturo(match: MatchCard) {
-  if (!match.match_date || !match.match_time) return true;
-
-  const hoy = fechaLocalHoy();
-  const horaActual = horaLocalActual();
-
-  if (match.match_date > hoy) return true;
-  if (match.match_date === hoy && match.match_time >= horaActual) return true;
-
-  return false;
-}
-
-function partidoConResultado(match: MatchCard) {
-  return match.home_score !== null && match.away_score !== null;
-}
 
 function ShirtIcon({ color }: { color: string }) {
   return (
@@ -148,7 +46,6 @@ export default function EquipoDetalle() {
 
   const [equipo, setEquipo] = useState<Team | null>(null);
   const [jugadores, setJugadores] = useState<Player[]>([]);
-  const [partidos, setPartidos] = useState<MatchCard[]>([]);
   const [favoritos, setFavoritos] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorCarga, setErrorCarga] = useState("");
@@ -182,8 +79,7 @@ export default function EquipoDetalle() {
         return;
       }
 
-      const equipoActual = teamData as Team;
-      setEquipo(equipoActual);
+      setEquipo(teamData as Team);
 
       const { data: playersData, error: playersError } = await supabase
         .from("players")
@@ -198,99 +94,7 @@ export default function EquipoDetalle() {
         return;
       }
 
-      const { data: matchesData, error: matchesError } = await supabase
-        .from("matches")
-        .select(`
-          id,
-          group_name,
-          match_date,
-          match_time,
-          field,
-          home_score,
-          away_score,
-          status,
-          mvp_open,
-          home_team:teams!matches_home_team_id_fkey(name),
-          away_team:teams!matches_away_team_id_fkey(name)
-        `)
-        .or(`home_team_id.eq.${id},away_team_id.eq.${id}`)
-        .order("match_date", { ascending: true })
-        .order("match_time", { ascending: true });
-
-      if (matchesError) {
-        setErrorCarga("No se han podido cargar los partidos del equipo.");
-        setLoading(false);
-        return;
-      }
-
-      const partidosGrupo: MatchCard[] = (
-        (matchesData as unknown as RawGroupMatch[]) || []
-      ).map((match) => {
-        const local = normalizarEquipo(match.home_team);
-        const visitante = normalizarEquipo(match.away_team);
-
-        return {
-          id: match.id,
-          tipo: "grupo" as const,
-          etiqueta: match.group_name ?? "Fase de grupos",
-          match_date: match.match_date,
-          match_time: match.match_time,
-          field: match.field,
-          home_name: local?.name ?? "Local",
-          away_name: visitante?.name ?? "Visitante",
-          home_score: match.home_score,
-          away_score: match.away_score,
-          status: match.status,
-          mvp_open: match.mvp_open,
-        };
-      });
-
-      const { data: finalData } = await supabase
-        .from("final_matches")
-        .select(
-          "id, phase, title, home_ref, away_ref, match_date, match_time, field, home_score, away_score, home_penalties, away_penalties, status, mvp_open, sort_order"
-        )
-        .order("sort_order", { ascending: true });
-
-      const nombreEquipo = normalizarTexto(equipoActual.name);
-
-      const eliminatorias: MatchCard[] = ((finalData ?? []) as FinalMatch[])
-        .filter(
-          (match) =>
-            normalizarTexto(match.home_ref) === nombreEquipo ||
-            normalizarTexto(match.away_ref) === nombreEquipo
-        )
-        .map((match) => ({
-          id: match.id,
-          tipo: "final" as const,
-          etiqueta: `${match.phase} · ${match.title}`,
-          match_date: match.match_date,
-          match_time: match.match_time,
-          field: match.field,
-          home_name: match.home_ref,
-          away_name: match.away_ref,
-          home_score: match.home_score,
-          away_score: match.away_score,
-          home_penalties: match.home_penalties,
-          away_penalties: match.away_penalties,
-          status: match.status,
-          mvp_open: match.mvp_open,
-        }));
-
-      const todosPartidos = [...partidosGrupo, ...eliminatorias].sort((a, b) => {
-        const fechaA = a.match_date ?? "9999-12-31";
-        const fechaB = b.match_date ?? "9999-12-31";
-
-        if (fechaA !== fechaB) return fechaA.localeCompare(fechaB);
-
-        const horaA = a.match_time ?? "99:99";
-        const horaB = b.match_time ?? "99:99";
-
-        return horaA.localeCompare(horaB);
-      });
-
       setJugadores((playersData ?? []) as Player[]);
-      setPartidos(todosPartidos);
       setLoading(false);
     }
 
@@ -308,70 +112,6 @@ export default function EquipoDetalle() {
     localStorage.setItem("equiposFavoritos", JSON.stringify(nuevosFavoritos));
   }
 
-  function renderPartido(match: MatchCard) {
-    const hayPenaltis =
-      match.home_penalties !== null &&
-      match.home_penalties !== undefined &&
-      match.away_penalties !== null &&
-      match.away_penalties !== undefined;
-
-    return (
-      <div key={match.id} className="rounded-2xl bg-slate-50 p-4 shadow-sm">
-        <p className="text-xs font-black uppercase text-red-600">
-          {match.etiqueta}
-        </p>
-
-        <div className="mt-3 flex items-center justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="break-words text-base font-black leading-tight">
-              {match.home_name}
-            </p>
-            <p className="text-xs font-black uppercase text-slate-400">vs</p>
-            <p className="break-words text-base font-black leading-tight">
-              {match.away_name}
-            </p>
-          </div>
-
-          <div className="shrink-0 rounded-2xl bg-slate-950 px-3 py-2 text-center text-white shadow">
-            {partidoConResultado(match) ? (
-              <p className="text-2xl font-black">
-                {match.home_score} - {match.away_score}
-              </p>
-            ) : (
-              <p className="text-lg font-black text-red-400">
-                {match.match_time ?? "--:--"}
-              </p>
-            )}
-
-            <p className="text-xs font-bold text-slate-300">
-              {match.field ?? "Campo pendiente"}
-            </p>
-          </div>
-        </div>
-
-        {hayPenaltis && (
-          <div className="mt-3 rounded-xl bg-amber-100 px-3 py-2 text-center text-sm font-black text-amber-800">
-            Penaltis: {match.home_penalties} - {match.away_penalties}
-          </div>
-        )}
-
-        <p className="mt-3 text-sm font-bold text-slate-500">
-          {formatearFechaSegura(match.match_date)} ·{" "}
-          {match.match_time ?? "Hora pendiente"}
-        </p>
-
-        {match.mvp_open && (
-          <Link
-            href={`/votar-mvp?match=${match.id}`}
-            className="mt-3 block rounded-xl bg-red-600 px-3 py-2 text-center text-sm font-black text-white shadow"
-          >
-            Votar MVP
-          </Link>
-        )}
-      </div>
-    );
-  }
-
   if (loading) {
     return (
       <main className="relative min-h-screen overflow-hidden bg-black text-slate-900">
@@ -380,6 +120,7 @@ export default function EquipoDetalle() {
           alt="Fondo torneo"
           className="fixed inset-0 h-screen w-screen object-cover opacity-35 blur-sm"
         />
+
         <section className="relative z-10 mx-auto max-w-md px-4 py-6">
           <div className="rounded-3xl bg-white/95 p-5 font-bold shadow">
             Cargando equipo...
@@ -397,11 +138,13 @@ export default function EquipoDetalle() {
           alt="Fondo torneo"
           className="fixed inset-0 h-screen w-screen object-cover opacity-35 blur-sm"
         />
+
         <section className="relative z-10 mx-auto max-w-md px-4 py-6">
           <div className="rounded-3xl bg-white/95 p-5 shadow">
             <p className="font-bold">
               {errorCarga || "Equipo no encontrado."}
             </p>
+
             <Link
               href="/equipos"
               className="mt-4 inline-block font-black text-red-600"
@@ -417,12 +160,6 @@ export default function EquipoDetalle() {
   const colorLocal = equipo.home_color || "#047857";
   const colorVisitante = equipo.away_color || "#dc2626";
   const esFavorito = favoritos.includes(equipo.id);
-
-  const proximos = partidos.filter(
-    (match) => !partidoConResultado(match) && partidoEsFuturo(match)
-  );
-
-  const resultados = partidos.filter((match) => partidoConResultado(match));
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-black text-slate-900">
@@ -510,42 +247,6 @@ export default function EquipoDetalle() {
                   </p>
                 </div>
               ))}
-            </div>
-          )}
-        </div>
-
-        <div className="mt-5 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
-          <div className="mb-3 rounded-xl bg-slate-950 px-4 py-3 text-white">
-            <p className="text-sm font-black uppercase tracking-widest">
-              Próximos partidos
-            </p>
-          </div>
-
-          {proximos.length === 0 ? (
-            <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">
-              No hay próximos partidos de este equipo.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {proximos.map((match) => renderPartido(match))}
-            </div>
-          )}
-        </div>
-
-        <div className="mt-5 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
-          <div className="mb-3 rounded-xl bg-red-600 px-4 py-3 text-white">
-            <p className="text-sm font-black uppercase tracking-widest">
-              Resultados
-            </p>
-          </div>
-
-          {resultados.length === 0 ? (
-            <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">
-              Todavía no hay resultados de este equipo.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {resultados.map((match) => renderPartido(match))}
             </div>
           )}
         </div>

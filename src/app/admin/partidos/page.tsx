@@ -217,8 +217,14 @@ export default function AdminPartidosPage() {
     const cruces = (finalData ?? []) as FinalMatch[];
     setFinalMatches(cruces);
 
+    const existeFaseActual = cruces.some(
+      (match) => match.phase === finalPhase
+    );
+
     const faseInicial =
-      opciones?.faseMantener || finalPhase || cruces[0]?.phase || "Cuartos";
+      opciones?.faseMantener ||
+      (existeFaseActual ? finalPhase : cruces[0]?.phase) ||
+      "Cuartos";
 
     setFinalPhase(faseInicial);
 
@@ -1012,6 +1018,7 @@ export default function AdminPartidosPage() {
                             onChange={(event) => cambiarFaseFinal(event.target.value)}
                             className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
                           >
+                            <option>Octavos</option>
                             <option>Cuartos</option>
                             <option>Semifinales</option>
                             <option>Tercer puesto</option>

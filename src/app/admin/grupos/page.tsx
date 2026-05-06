@@ -8,6 +8,7 @@ type Group = {
   id: string;
   name: string;
   sort_order: number;
+  qualified_count: number;
 };
 
 export default function AdminGruposPage() {
@@ -15,6 +16,7 @@ export default function AdminGruposPage() {
   const [selectedId, setSelectedId] = useState("");
   const [nombre, setNombre] = useState("");
   const [orden, setOrden] = useState("1");
+  const [qualifiedCount, setQualifiedCount] = useState("2");
   const [mensaje, setMensaje] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -27,7 +29,7 @@ export default function AdminGruposPage() {
 
     const { data, error } = await supabase
       .from("groups")
-      .select("id, name, sort_order")
+      .select("id, name, sort_order, qualified_count")
       .order("sort_order", { ascending: true });
 
     if (error) {
@@ -54,6 +56,7 @@ export default function AdminGruposPage() {
     setSelectedId(group.id);
     setNombre(group.name);
     setOrden(group.sort_order.toString());
+    setQualifiedCount((group.qualified_count ?? 2).toString());
     setMensaje("");
   }
 
@@ -61,10 +64,14 @@ export default function AdminGruposPage() {
     setSelectedId("");
     setNombre("");
     setOrden((groups.length + 1).toString());
+    setQualifiedCount("2");
     setMensaje("");
   }
 
-  async function actualizarReferenciasGrupo(nombreAnterior: string, nombreNuevo: string) {
+  async function actualizarReferenciasGrupo(
+    nombreAnterior: string,
+    nombreNuevo: string
+  ) {
     if (!nombreAnterior || !nombreNuevo || nombreAnterior === nombreNuevo) return;
 
     const { error: teamsError } = await supabase
@@ -91,7 +98,9 @@ export default function AdminGruposPage() {
       .eq("home_group", nombreAnterior);
 
     if (finalHomeError) {
-      throw new Error("No se han podido actualizar referencias locales de fase final.");
+      throw new Error(
+        "No se han podido actualizar referencias locales de fase final."
+      );
     }
 
     const { error: finalAwayError } = await supabase
@@ -100,15 +109,23 @@ export default function AdminGruposPage() {
       .eq("away_group", nombreAnterior);
 
     if (finalAwayError) {
-      throw new Error("No se han podido actualizar referencias visitantes de fase final.");
+      throw new Error(
+        "No se han podido actualizar referencias visitantes de fase final."
+      );
     }
   }
 
   async function guardarGrupo() {
     const nombreLimpio = nombre.trim();
+    const pasan = Number(qualifiedCount);
 
     if (!nombreLimpio) {
       setMensaje("Escribe el nombre del grupo.");
+      return;
+    }
+
+    if (!Number.isFinite(pasan) || pasan < 0) {
+      setMensaje("Indica un número válido de equipos que pasan.");
       return;
     }
 
@@ -118,6 +135,7 @@ export default function AdminGruposPage() {
     const payload = {
       name: nombreLimpio,
       sort_order: Number(orden) || 1,
+      qualified_count: Math.floor(pasan),
     };
 
     const { error } = selectedId
@@ -222,6 +240,7 @@ export default function AdminGruposPage() {
     setSelectedId("");
     setNombre("");
     setOrden("1");
+    setQualifiedCount("2");
     await cargarGrupos();
   }
 
@@ -242,9 +261,7 @@ export default function AdminGruposPage() {
             <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
               Torneo Fútbol 7 Astrabudua
             </p>
-            <h1 className="mt-2 text-center text-3xl font-black">
-              Grupos
-            </h1>
+            <h1 className="mt-2 text-center text-3xl font-black">Grupos</h1>
             <p className="mt-2 text-center text-sm font-bold text-emerald-100">
               Gestión de grupos del torneo
             </p>
@@ -276,7 +293,8 @@ export default function AdminGruposPage() {
                   <option value="">Nuevo grupo</option>
                   {groups.map((group) => (
                     <option key={group.id} value={group.id}>
-                      {group.sort_order}. {group.name}
+                      {group.sort_order}. {group.name} · pasan{" "}
+                      {group.qualified_count ?? 2}
                     </option>
                   ))}
                 </select>
@@ -312,6 +330,24 @@ export default function AdminGruposPage() {
                     onChange={(event) => setOrden(event.target.value)}
                     className="mt-2 w-full rounded-xl border border-slate-300 p-3 font-bold"
                   />
+                </div>
+
+                <div className="mt-4">
+                  <label className="text-sm font-black uppercase text-slate-500">
+                    Equipos que pasan
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={qualifiedCount}
+                    onChange={(event) => setQualifiedCount(event.target.value)}
+                    className="mt-2 w-full rounded-xl border border-slate-300 p-3 font-bold"
+                    placeholder="2"
+                  />
+                  <p className="mt-2 text-xs font-bold text-slate-500">
+                    Este número se usará para marcar los clasificados en la
+                    clasificación pública.
+                  </p>
                 </div>
 
                 <button
@@ -369,6 +405,16 @@ export default function AdminGruposPage() {
                         </p>
                         <p className="mt-1 break-words text-lg font-black leading-tight">
                           {group.name}
+                        </p>
+                        <p
+                          className={`mt-1 text-sm font-bold ${
+                            selectedId === group.id
+                              ? "text-red-100"
+                              : "text-slate-500"
+                          }`}
+                        >
+                          Pasan {group.qualified_count ?? 2} equipo
+                          {(group.qualified_count ?? 2) === 1 ? "" : "s"}
                         </p>
                       </button>
                     ))}

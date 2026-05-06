@@ -9,6 +9,7 @@ type Group = {
   id: string;
   name: string;
   sort_order: number;
+  qualified_count: number;
 };
 
 type Team = {
@@ -104,7 +105,7 @@ export default function FaseGruposPage() {
 
       const { data: groupsData, error: groupsError } = await supabase
         .from("groups")
-        .select("id, name, sort_order")
+        .select("id, name, sort_order, qualified_count")
         .order("sort_order", { ascending: true });
 
       const { data: teamsData, error: teamsError } = await supabase
@@ -191,6 +192,9 @@ export default function FaseGruposPage() {
   const matchesGrupo = matches.filter(
     (match) => match.group_name === grupoActivo
   );
+
+  const grupoActual = groups.find((group) => group.name === grupoActivo);
+  const equiposQuePasan = grupoActual?.qualified_count ?? 2;
 
   function votosUsuarioEnPartido(matchId: string) {
     return votes.filter(
@@ -339,7 +343,9 @@ export default function FaseGruposPage() {
                   <p className="text-xs font-black uppercase tracking-widest">
                     Clasificación
                   </p>
-                  <p className="text-sm font-bold">{grupoActivo}</p>
+                  <p className="text-sm font-bold">
+                    {grupoActivo} · pasan {equiposQuePasan}
+                  </p>
                 </div>
 
                 <span className="text-2xl font-black">
@@ -363,7 +369,7 @@ export default function FaseGruposPage() {
                       </p>
                     ) : (
                       clasificacion.map((row, index) => {
-                        const clasificado = index < 2;
+                        const clasificado = index < equiposQuePasan;
 
                         return (
                           <div
@@ -432,18 +438,18 @@ export default function FaseGruposPage() {
             </div>
 
             <div className="mt-6 overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
-	    <button
-                                       onClick={() => setPartidosAbiertos(!partidosAbiertos)}
-                                       className="flex w-full items-center justify-between bg-slate-950 px-5 py-4 text-left text-white"
-                              >
-                                        <p  className="text-sm font-black uppercase tracking-widest">
-                                             Partidos del grupo
-                              </p>
+              <button
+                onClick={() => setPartidosAbiertos(!partidosAbiertos)}
+                className="flex w-full items-center justify-between bg-slate-950 px-5 py-4 text-left text-white"
+              >
+                <p className="text-sm font-black uppercase tracking-widest">
+                  Partidos del grupo
+                </p>
 
-                              <span className="text-2xl font-black">
-                                   {partidosAbiertos ? "−" : "+"}
-                              </span>
-                            </button>
+                <span className="text-2xl font-black">
+                  {partidosAbiertos ? "−" : "+"}
+                </span>
+              </button>
 
               {partidosAbiertos && (
                 <div className="space-y-3 p-4">

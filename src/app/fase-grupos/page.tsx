@@ -339,13 +339,9 @@ export default function FaseGruposPage() {
                 onClick={() => setClasificacionAbierta(!clasificacionAbierta)}
                 className="flex w-full items-center justify-between bg-red-600 px-5 py-4 text-left text-white"
               >
-                <div>
-                  <p className="text-xs font-black uppercase tracking-widest">
-                    Clasificación
-                  </p>
-                  <p className="text-sm font-bold">
-                  </p>
-                </div>
+                <p className="text-sm font-black uppercase tracking-widest">
+                  Clasificación
+                </p>
 
                 <span className="text-2xl font-black">
                   {clasificacionAbierta ? "−" : "+"}
@@ -473,7 +469,7 @@ export default function FaseGruposPage() {
                               <p className="break-words text-base font-black leading-tight">
                                 {match.home_team?.name}
                               </p>
-                              <p className="text-xm font-black uppercase text-slate-400">
+                              <p className="text-xs font-black uppercase text-slate-400">
                                 vs
                               </p>
                               <p className="break-words text-base font-black leading-tight">

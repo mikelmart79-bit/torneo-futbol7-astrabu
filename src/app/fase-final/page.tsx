@@ -53,6 +53,7 @@ function estadoBonito(status: string | null) {
 
 function estaFinalizado(status: string | null) {
   const estado = estadoBonito(status).toLowerCase();
+
   return estado === "finalizado" || estado === "cerrado";
 }
 
@@ -205,24 +206,23 @@ export default function FaseFinalPage() {
               return (
                 <div
                   key={fase}
-                  className="overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur"
+                  className={`overflow-hidden rounded-3xl shadow-2xl backdrop-blur ${
+                    esFinal
+                      ? "bg-amber-100/95 ring-2 ring-amber-300"
+                      : "bg-white/95"
+                  }`}
                 >
                   <button
                     onClick={() => setFaseAbierta(abierta ? "" : fase)}
-                    className={`flex w-full items-center justify-between gap-3 px-5 py-4 text-left ${
+                    className={`flex w-full items-center justify-between gap-3 px-5 py-5 text-left ${
                       esFinal
-                        ? "bg-amber-400 text-slate-950"
+                        ? "bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 text-slate-950"
                         : "bg-red-600 text-white"
                     }`}
                   >
-                    <div>
-                      <p className="text-xl font-black">{fase}</p>
-                      <p
-                        className={`text-xs font-bold ${
-                          esFinal ? "text-slate-800" : "text-red-100"
-                        }`}
-                      >
-                        {cruces.length} partido{cruces.length === 1 ? "" : "s"}
+                    <div className="min-w-0">
+                      <p className="break-words text-2xl font-black leading-tight">
+                        {esFinal ? "🏆 Gran Final" : fase}
                       </p>
                     </div>
 
@@ -245,7 +245,9 @@ export default function FaseFinalPage() {
                             match.away_score !== null;
                           const hayPenaltis =
                             match.home_penalties !== null &&
-                            match.away_penalties !== null;
+                            match.home_penalties !== undefined &&
+                            match.away_penalties !== null &&
+                            match.away_penalties !== undefined;
 
                           return (
                             <div

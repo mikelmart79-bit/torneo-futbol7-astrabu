@@ -6,6 +6,13 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { formatearFecha } from "@/lib/formatDate";
 
+type Group = {
+  id: string;
+  name: string;
+  sort_order: number;
+  qualified_count: number;
+};
+
 type Team = {
   id: string;
   name: string;
@@ -138,6 +145,7 @@ function ordenarPartidos(partidos: Match[]) {
 
 export default function FavoritosPage() {
   const [favoritos, setFavoritos] = useState<string[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [votes, setVotes] = useState<Vote[]>([]);
@@ -164,6 +172,11 @@ export default function FavoritosPage() {
     async function cargarDatos() {
       setLoading(true);
       setErrorCarga("");
+
+      const { data: groupsData, error: groupsError } = await supabase
+        .from("groups")
+        .select("id, name, sort_order, qualified_count")
+        .order("sort_order", { ascending: true });
 
       const { data: teamsData, error: teamsError } = await supabase
         .from("teams")
@@ -215,7 +228,7 @@ export default function FavoritosPage() {
         .select("id, match_id, user_id, player_id, team_id")
         .eq("user_id", userId);
 
-      if (teamsError || matchesError || finalError || votesError) {
+      if (groupsError || teamsError || matchesError || finalError || votesError) {
         setErrorCarga("No se han podido cargar tus favoritos.");
         setLoading(false);
         return;
@@ -255,6 +268,7 @@ export default function FavoritosPage() {
         })
       );
 
+      setGroups((groupsData ?? []) as Group[]);
       setTeams((teamsData ?? []) as Team[]);
       setMatches(ordenarPartidos([...partidosGrupo, ...partidosFinales]));
       setVotes((votesData ?? []) as Vote[]);
@@ -281,6 +295,14 @@ export default function FavoritosPage() {
       ...prev,
       [key]: !prev[key],
     }));
+  }
+
+  function equiposQuePasanGrupo(groupName: string | null) {
+    if (!groupName) return 2;
+
+    const group = groups.find((item) => item.name === groupName);
+
+    return group?.qualified_count ?? 2;
   }
 
   function partidoPerteneceAlEquipo(match: Match, team: Team) {
@@ -521,6 +543,7 @@ export default function FavoritosPage() {
 
   function renderClasificacion(team: Team) {
     const tabla = clasificacionGrupo(team.group_name);
+    const equiposQuePasan = equiposQuePasanGrupo(team.group_name);
 
     return (
       <div className="space-y-2">
@@ -530,6 +553,11 @@ export default function FavoritosPage() {
           </p>
         ) : (
           <>
+            <p className="rounded-2xl bg-emerald-50 px-3 py-2 text-xs font-black uppercase tracking-widest text-emerald-800 ring-1 ring-emerald-200">
+              Pasan {equiposQuePasan} equipo
+              {equiposQuePasan === 1 ? "" : "s"}
+            </p>
+
             <div className="grid grid-cols-[1fr_36px_42px_46px] gap-2 border-b border-slate-200 px-2 pb-2 text-xs font-black uppercase text-slate-500">
               <span>Equipo</span>
               <span className="text-center">PJ</span>
@@ -538,7 +566,7 @@ export default function FavoritosPage() {
             </div>
 
             {tabla.map((row, index) => {
-              const clasificado = index < 2;
+              const clasificado = index < equiposQuePasan;
               const esEquipoFavorito = row.teamId === team.id;
 
               return (

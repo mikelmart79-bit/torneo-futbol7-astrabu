@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { formatearFecha } from "@/lib/formatDate";
 
@@ -104,8 +105,11 @@ function nombreFaseBonito(partido: Match) {
 }
 
 export default function InicioPage() {
+  const router = useRouter();
+
   const [partidos, setPartidos] = useState<Match[]>([]);
   const [indicePartido, setIndicePartido] = useState(0);
+  const [toquesAdmin, setToquesAdmin] = useState(0);
 
   const partido = partidos[indicePartido] ?? null;
 
@@ -195,6 +199,19 @@ export default function InicioPage() {
     cargarProximos();
   }, []);
 
+  function accesoAdminOculto() {
+    setToquesAdmin((actual) => {
+      const nuevo = actual + 1;
+
+      if (nuevo >= 5) {
+        router.push("/admin");
+        return 0;
+      }
+
+      return nuevo;
+    });
+  }
+
   function anteriorPartido() {
     if (partidos.length <= 1) return;
 
@@ -221,7 +238,10 @@ export default function InicioPage() {
 
       <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-24">
         <div className="rounded-3xl bg-black/60 px-4 py-5 text-white shadow-2xl backdrop-blur">
-          <h1 className="text-center text-lg font-black whitespace-nowrap sm:text-xl">
+          <h1
+            onClick={accesoAdminOculto}
+            className="cursor-default select-none text-center text-lg font-black whitespace-nowrap sm:text-xl"
+          >
             Torneo Fútbol 7 Astrabudua
           </h1>
         </div>
@@ -331,13 +351,6 @@ export default function InicioPage() {
             Normativa
           </a>
         </div>
-
-        <a
-          href="/admin"
-          className="mt-5 block w-full rounded-2xl bg-black/85 p-4 text-center text-lg font-black text-white shadow"
-        >
-          Panel admin
-        </a>
       </section>
     </main>
   );

@@ -57,6 +57,12 @@ function estaFinalizado(status: string | null) {
   return estado === "finalizado" || estado === "cerrado";
 }
 
+function normalizarFase(fase: string) {
+  if (fase === "Tercer Y cuarto puesto") return "Tercer puesto";
+  if (fase === "Tercer y cuarto puesto") return "Tercer puesto";
+  return fase;
+}
+
 export default function FaseFinalPage() {
   const [matches, setMatches] = useState<FinalMatch[]>([]);
   const [votes, setVotes] = useState<Vote[]>([]);
@@ -100,10 +106,20 @@ export default function FaseFinalPage() {
   }
 
   const fases = useMemo(() => {
-    const ordenPreferido = ["Cuartos", "Semifinales", "Tercer Y cuarto puesto", "Final"];
+    const ordenPreferido = [
+      "Octavos",
+      "Cuartos",
+      "Semifinales",
+      "Tercer puesto",
+      "Final",
+    ];
 
     const fasesReales = Array.from(
-      new Set(matches.map((match) => match.phase).filter(Boolean))
+      new Set(
+        matches
+          .map((match) => normalizarFase(match.phase))
+          .filter(Boolean)
+      )
     );
 
     return fasesReales.sort((a, b) => {
@@ -199,7 +215,9 @@ export default function FaseFinalPage() {
         ) : (
           <div className="mt-6 space-y-4">
             {fases.map((fase) => {
-              const cruces = matches.filter((match) => match.phase === fase);
+              const cruces = matches.filter(
+                (match) => normalizarFase(match.phase) === fase
+              );
               const abierta = faseAbierta === fase;
               const esFinal = fase.toLowerCase() === "final";
 

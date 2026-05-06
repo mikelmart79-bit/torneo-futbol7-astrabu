@@ -10,6 +10,7 @@ type Match = {
   tipo: "grupo" | "final";
   phase?: string | null;
   title?: string | null;
+  group_name?: string | null;
   match_date: string | null;
   match_time: string | null;
   field: string | null;
@@ -21,6 +22,7 @@ type Match = {
 
 type RawMatch = {
   id: string;
+  group_name: string | null;
   match_date: string | null;
   match_time: string | null;
   field: string | null;
@@ -99,9 +101,15 @@ function ordenarPartidos(partidos: Match[]) {
 }
 
 function nombreFaseBonito(partido: Match) {
-  if (partido.tipo === "grupo") return null;
-  if (partido.phase === "Final") return "Gran Final";
-  return partido.phase ?? "Eliminatoria";
+  if (partido.tipo === "grupo") return partido.group_name ?? "Grupo";
+
+  if (partido.phase === "Final") return partido.title ?? "Gran Final";
+
+  if (partido.phase && partido.title) {
+    return `${partido.phase} · ${partido.title}`;
+  }
+
+  return partido.phase ?? partido.title ?? "Eliminatoria";
 }
 
 export default function InicioPage() {
@@ -119,6 +127,7 @@ export default function InicioPage() {
         .from("matches")
         .select(`
           id,
+          group_name,
           match_date,
           match_time,
           field,
@@ -158,6 +167,7 @@ export default function InicioPage() {
       ).map((match) => ({
         id: match.id,
         tipo: "grupo",
+        group_name: match.group_name,
         match_date: match.match_date,
         match_time: match.match_time,
         field: match.field,
@@ -173,14 +183,13 @@ export default function InicioPage() {
           tipo: "final",
           phase: match.phase,
           title: match.title,
+          group_name: null,
           match_date: match.match_date,
           match_time: match.match_time,
           field: match.field,
           home_score: match.home_score,
           away_score: match.away_score,
-          home_team: match.home_ref
-            ? { name: match.home_ref }
-            : { name: "Local" },
+          home_team: match.home_ref ? { name: match.home_ref } : { name: "Local" },
           away_team: match.away_ref
             ? { name: match.away_ref }
             : { name: "Visitante" },
@@ -256,17 +265,14 @@ export default function InicioPage() {
           {partido ? (
             <div className="p-5">
               <div className="rounded-3xl bg-slate-50 p-4 shadow-inner">
-                {partido.tipo === "final" && (
-                  <div className="mb-4 rounded-2xl bg-slate-950 px-4 py-2 text-center text-white shadow">
-                    <p className="text-xs font-black uppercase tracking-widest text-red-300">
-                      Eliminatorias
-                    </p>
-                    <p className="mt-1 text-sm font-black">
-                      {nombreFaseBonito(partido)}
-                      {partido.title ? ` · ${partido.title}` : ""}
-                    </p>
-                  </div>
-                )}
+                <div className="mb-4 rounded-2xl bg-slate-950 px-4 py-3 text-center text-white shadow">
+                  <p className="text-xs font-black uppercase tracking-widest text-red-300">
+                    {partido.tipo === "grupo" ? "Fase de grupos" : "Eliminatorias"}
+                  </p>
+                  <p className="mt-1 text-sm font-black">
+                    {nombreFaseBonito(partido)}
+                  </p>
+                </div>
 
                 <div className="flex items-center gap-3">
                   <button

@@ -145,7 +145,7 @@ export default function FaseFinalPage() {
 
     if (votosEmitidos >= 2) {
       return (
-        <div className="mt-3 rounded-xl bg-emerald-100 px-3 py-3 text-center text-sm font-black text-emerald-800">
+        <div className="mt-3 rounded-xl bg-emerald-100 px-3 py-2 text-center text-sm font-black text-emerald-800">
           ✅ Voto emitido
         </div>
       );
@@ -153,7 +153,7 @@ export default function FaseFinalPage() {
 
     if (votosEmitidos === 1) {
       return (
-        <div className="mt-3 rounded-xl bg-emerald-100 px-3 py-3 text-center text-sm font-black text-emerald-800">
+        <div className="mt-3 rounded-xl bg-emerald-100 px-3 py-2 text-center text-sm font-black text-emerald-800">
           ✅ Voto iniciado
         </div>
       );
@@ -162,7 +162,7 @@ export default function FaseFinalPage() {
     return (
       <Link
         href={`/votar-mvp?match=${match.id}`}
-        className="mt-3 block rounded-xl bg-red-600 px-3 py-3 text-center text-sm font-black text-white shadow"
+        className="mt-3 block rounded-xl bg-red-600 px-3 py-2 text-center text-sm font-black text-white shadow"
       >
         Votar MVP de este partido
       </Link>
@@ -211,7 +211,7 @@ export default function FaseFinalPage() {
             Todavía no hay eliminatorias configuradas.
           </div>
         ) : (
-          <div className="mt-6 space-y-4">
+          <div className="mt-6 space-y-3">
             {fases.map((fase) => {
               const cruces = matches.filter(
                 (match) => normalizarFase(match.phase) === fase
@@ -231,25 +231,25 @@ export default function FaseFinalPage() {
                 >
                   <button
                     onClick={() => setFaseAbierta(abierta ? "" : fase)}
-                    className={`flex w-full items-center justify-between gap-3 px-5 py-5 text-left ${
+                    className={`flex w-full items-center justify-between gap-3 px-5 py-4 text-left ${
                       esFinal
                         ? "bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 text-slate-950"
                         : "bg-emerald-50 text-slate-950"
                     }`}
                   >
                     <div className="min-w-0">
-                      <p className="break-words text-2xl font-black leading-tight">
+                      <p className="break-words text-xl font-black leading-tight">
                         {esFinal ? "🏆 Gran Final" : fase}
                       </p>
                     </div>
 
-                    <span className="shrink-0 text-3xl font-black">
+                    <span className="shrink-0 text-2xl font-black">
                       {abierta ? "−" : "+"}
                     </span>
                   </button>
 
                   {abierta && (
-                    <div className="space-y-3 p-4">
+                    <div className="space-y-3 p-3">
                       {cruces.length === 0 ? (
                         <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">
                           Todavía no hay cruces configurados.
@@ -271,7 +271,7 @@ export default function FaseFinalPage() {
                           return (
                             <div
                               key={match.id}
-                              className={`rounded-2xl p-4 shadow ${
+                              className={`rounded-2xl p-3 shadow ${
                                 esFinal
                                   ? "bg-amber-50 ring-1 ring-amber-200"
                                   : "bg-emerald-50 ring-1 ring-emerald-200"
@@ -279,7 +279,7 @@ export default function FaseFinalPage() {
                             >
                               <div className="flex items-center justify-between gap-3">
                                 <p
-                                  className={`break-words text-sm font-black uppercase ${
+                                  className={`break-words text-xs font-black uppercase tracking-wide ${
                                     esFinal
                                       ? "text-amber-700"
                                       : "text-slate-900"
@@ -289,7 +289,7 @@ export default function FaseFinalPage() {
                                 </p>
 
                                 <span
-                                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-black ${
+                                  className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-black ${
                                     finalizado
                                       ? "bg-emerald-100 text-emerald-700"
                                       : "bg-slate-200 text-slate-600"
@@ -299,21 +299,21 @@ export default function FaseFinalPage() {
                                 </span>
                               </div>
 
-                              <div className="mt-4 rounded-2xl bg-white p-4 shadow-sm">
-                                <div className="grid grid-cols-[1fr_58px] items-center gap-3">
-                                  <p className="break-words text-lg font-black leading-tight">
+                              <div className="mt-3 rounded-2xl bg-white p-3 shadow-sm">
+                                <div className="grid grid-cols-[1fr_52px] items-center gap-3">
+                                  <p className="break-words text-base font-black leading-tight">
                                     {match.home_ref}
                                   </p>
 
-                                  <p className="rounded-xl bg-slate-950 py-2 text-center text-2xl font-black text-white">
+                                  <p className="rounded-xl bg-slate-950 py-2 text-center text-xl font-black text-white">
                                     {hayResultado ? match.home_score : "-"}
                                   </p>
 
-                                  <p className="break-words text-lg font-black leading-tight">
+                                  <p className="break-words text-base font-black leading-tight">
                                     {match.away_ref}
                                   </p>
 
-                                  <p className="rounded-xl bg-slate-950 py-2 text-center text-2xl font-black text-white">
+                                  <p className="rounded-xl bg-slate-950 py-2 text-center text-xl font-black text-white">
                                     {hayResultado ? match.away_score : "-"}
                                   </p>
                                 </div>
@@ -328,7 +328,7 @@ export default function FaseFinalPage() {
 
                               {renderEstadoMvp(match)}
 
-                              <p className="mt-4 text-sm font-semibold text-slate-500">
+                              <p className="mt-3 text-sm font-semibold text-slate-500">
                                 {renderFecha(match)}
                               </p>
                             </div>

@@ -189,7 +189,9 @@ export default function InicioPage() {
           field: match.field,
           home_score: match.home_score,
           away_score: match.away_score,
-          home_team: match.home_ref ? { name: match.home_ref } : { name: "Local" },
+          home_team: match.home_ref
+            ? { name: match.home_ref }
+            : { name: "Local" },
           away_team: match.away_ref
             ? { name: match.away_ref }
             : { name: "Visitante" },
@@ -245,29 +247,31 @@ export default function InicioPage() {
         className="fixed inset-0 h-screen w-screen object-cover opacity-35 blur-sm"
       />
 
-      <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-24">
-        <div className="rounded-3xl bg-black/60 px-4 py-5 text-white shadow-2xl backdrop-blur">
+      <section className="relative z-10 mx-auto flex min-h-screen max-w-md flex-col px-4 py-3 pb-4">
+        <div className="rounded-3xl bg-black/60 px-4 py-4 text-white shadow-2xl backdrop-blur">
           <h1
             onClick={accesoAdminOculto}
-            className="cursor-default select-none text-center text-lg font-black whitespace-nowrap sm:text-xl"
+            className="cursor-default select-none whitespace-nowrap text-center text-base font-black sm:text-lg"
           >
             Torneo Fútbol 7 Astrabudua
           </h1>
         </div>
 
-        <div className="mt-6 overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
-          <div className="bg-red-600 px-5 py-3 text-center">
+        <div className="mt-4 overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
+          <div className="bg-red-600 px-5 py-2.5 text-center">
             <p className="text-sm font-black uppercase tracking-widest text-white">
               Próximos partidos
             </p>
           </div>
 
           {partido ? (
-            <div className="p-5">
-              <div className="rounded-3xl bg-slate-50 p-4 shadow-inner">
-                <div className="mb-4 rounded-2xl bg-slate-950 px-4 py-3 text-center text-white shadow">
-                  <p className="text-xs font-black uppercase tracking-widest text-red-300">
-                    {partido.tipo === "grupo" ? "Fase de grupos" : "Eliminatorias"}
+            <div className="p-4">
+              <div className="rounded-3xl bg-slate-50 p-3 shadow-inner">
+                <div className="mb-3 rounded-2xl bg-slate-950 px-4 py-2 text-center text-white shadow">
+                  <p className="text-[11px] font-black uppercase tracking-widest text-red-300">
+                    {partido.tipo === "grupo"
+                      ? "Fase de grupos"
+                      : "Eliminatorias"}
                   </p>
                   <p className="mt-1 text-sm font-black">
                     {nombreFaseBonito(partido)}
@@ -278,21 +282,21 @@ export default function InicioPage() {
                   <button
                     onClick={anteriorPartido}
                     disabled={partidos.length <= 1}
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-950 text-2xl font-black text-white shadow disabled:bg-slate-300 disabled:text-white"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-950 text-2xl font-black text-white shadow disabled:bg-slate-300 disabled:text-white"
                   >
                     ‹
                   </button>
 
                   <div className="min-w-0 flex-1 text-center">
-                    <p className="truncate text-xl font-black leading-tight text-slate-950">
+                    <p className="truncate text-lg font-black leading-tight text-slate-950">
                       {partido.home_team?.name ?? "Local"}
                     </p>
 
-                    <p className="my-2 text-xs font-black uppercase tracking-widest text-red-600">
+                    <p className="my-1.5 text-xs font-black uppercase tracking-widest text-red-600">
                       vs
                     </p>
 
-                    <p className="truncate text-xl font-black leading-tight text-slate-950">
+                    <p className="truncate text-lg font-black leading-tight text-slate-950">
                       {partido.away_team?.name ?? "Visitante"}
                     </p>
                   </div>
@@ -300,14 +304,14 @@ export default function InicioPage() {
                   <button
                     onClick={siguientePartido}
                     disabled={partidos.length <= 1}
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-950 text-2xl font-black text-white shadow disabled:bg-slate-300 disabled:text-white"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-950 text-2xl font-black text-white shadow disabled:bg-slate-300 disabled:text-white"
                   >
                     ›
                   </button>
                 </div>
 
-                <div className="mx-auto mt-5 max-w-[220px] rounded-2xl bg-slate-950 px-4 py-3 text-center text-white shadow-lg">
-                  <p className="text-xs font-black uppercase text-slate-300">
+                <div className="mx-auto mt-4 max-w-[200px] rounded-2xl bg-slate-950 px-4 py-2.5 text-center text-white shadow-lg">
+                  <p className="text-[11px] font-black uppercase text-slate-300">
                     {partido.match_date
                       ? formatearFecha(partido.match_date)
                       : "Fecha pendiente"}
@@ -328,31 +332,31 @@ export default function InicioPage() {
           )}
         </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-3">
+        <div className="mt-4 grid grid-cols-2 gap-2">
           <a
             href="/equipos"
-            className="rounded-2xl bg-white/95 p-4 text-lg font-black shadow"
+            className="rounded-2xl bg-white/95 p-3 text-base font-black shadow"
           >
             Equipos
           </a>
 
           <a
             href="/favoritos"
-            className="rounded-2xl bg-white/95 p-4 text-lg font-black shadow"
+            className="rounded-2xl bg-white/95 p-3 text-base font-black shadow"
           >
             Favoritos
           </a>
 
           <a
             href="/mvp"
-            className="rounded-2xl bg-white/95 p-4 text-lg font-black shadow"
+            className="rounded-2xl bg-white/95 p-3 text-base font-black shadow"
           >
             MVP
           </a>
 
           <a
             href="/normativa"
-            className="rounded-2xl bg-white/95 p-4 text-lg font-black shadow"
+            className="rounded-2xl bg-white/95 p-3 text-base font-black shadow"
           >
             Normativa
           </a>

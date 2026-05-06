@@ -53,7 +53,6 @@ function estadoBonito(status: string | null) {
 
 function estaFinalizado(status: string | null) {
   const estado = estadoBonito(status).toLowerCase();
-
   return estado === "finalizado" || estado === "cerrado";
 }
 
@@ -95,11 +94,7 @@ export default function FaseFinalPage() {
 
     setMatches(cruces);
     setVotes((votesData ?? []) as Vote[]);
-
-    if (cruces.length > 0) {
-      setFaseAbierta(cruces[0].phase);
-    }
-
+    setFaseAbierta("");
     setLoading(false);
   }
 
@@ -215,14 +210,16 @@ export default function FaseFinalPage() {
                   <button
                     onClick={() => setFaseAbierta(abierta ? "" : fase)}
                     className={`flex w-full items-center justify-between gap-3 px-5 py-4 text-left ${
-                      esFinal ? "bg-red-600 text-white" : "bg-slate-950 text-white"
+                      esFinal
+                        ? "bg-amber-400 text-slate-950"
+                        : "bg-red-600 text-white"
                     }`}
                   >
                     <div>
                       <p className="text-xl font-black">{fase}</p>
                       <p
                         className={`text-xs font-bold ${
-                          esFinal ? "text-red-100" : "text-slate-300"
+                          esFinal ? "text-slate-800" : "text-red-100"
                         }`}
                       >
                         {cruces.length} partido{cruces.length === 1 ? "" : "s"}
@@ -255,12 +252,16 @@ export default function FaseFinalPage() {
                               key={match.id}
                               className={`rounded-2xl p-4 shadow ${
                                 esFinal
-                                  ? "bg-red-50 ring-1 ring-red-100"
-                                  : "bg-slate-50"
+                                  ? "bg-amber-50 ring-1 ring-amber-200"
+                                  : "bg-red-50 ring-1 ring-red-100"
                               }`}
                             >
                               <div className="flex items-center justify-between gap-3">
-                                <p className="break-words text-sm font-black uppercase text-red-600">
+                                <p
+                                  className={`break-words text-sm font-black uppercase ${
+                                    esFinal ? "text-amber-700" : "text-red-600"
+                                  }`}
+                                >
                                   {match.title}
                                 </p>
 

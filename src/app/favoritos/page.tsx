@@ -82,7 +82,7 @@ type Row = {
   pts: number;
 };
 
-type Seccion = "clasificacion" | "proximos" | "resultados";
+type Seccion = "calendario" | "clasificacion";
 
 function normalizarEquipo(
   equipo: RawMatch["home_team"]
@@ -105,23 +105,6 @@ function getUserId() {
   }
 
   return userId;
-}
-
-function fechaLocalHoy() {
-  const ahora = new Date();
-  const year = ahora.getFullYear();
-  const month = String(ahora.getMonth() + 1).padStart(2, "0");
-  const day = String(ahora.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-}
-
-function horaLocalActual() {
-  const ahora = new Date();
-  const hours = String(ahora.getHours()).padStart(2, "0");
-  const minutes = String(ahora.getMinutes()).padStart(2, "0");
-
-  return `${hours}:${minutes}`;
 }
 
 function formatearFechaSegura(fecha: string | null) {
@@ -322,30 +305,8 @@ export default function FavoritosPage() {
     return matches.filter((match) => partidoPerteneceAlEquipo(match, team));
   }
 
-  function partidoEsFuturo(match: Match) {
-    if (!match.match_date || !match.match_time) return true;
-
-    const hoy = fechaLocalHoy();
-    const horaActual = horaLocalActual();
-
-    if (match.match_date > hoy) return true;
-    if (match.match_date === hoy && match.match_time >= horaActual) return true;
-
-    return false;
-  }
-
-  function proximosDelEquipo(team: Team) {
-    return partidosDelEquipo(team).filter(
-      (match) =>
-        (match.home_score === null || match.away_score === null) &&
-        partidoEsFuturo(match)
-    );
-  }
-
-  function resultadosDelEquipo(team: Team) {
-    return partidosDelEquipo(team).filter(
-      (match) => match.home_score !== null && match.away_score !== null
-    );
+  function calendarioDelEquipo(team: Team) {
+    return ordenarPartidos(partidosDelEquipo(team));
   }
 
   function clasificacionGrupo(groupName: string | null) {
@@ -484,13 +445,23 @@ export default function FavoritosPage() {
     return marcador;
   }
 
-  function renderPartido(
-    match: Match,
-    teamId: string,
-    tipo: "proximo" | "resultado"
-  ) {
+  function renderPartido(match: Match, teamId: string) {
+    const finalizado =
+      match.home_score !== null && match.away_score !== null;
+
     return (
       <div key={match.id} className="rounded-2xl bg-slate-50 p-4 shadow-sm">
+        {match.tipo === "grupo" && (
+          <div className="mb-3 rounded-xl bg-emerald-50 px-3 py-2 text-slate-950 ring-1 ring-emerald-200">
+            <p className="text-xs font-black uppercase tracking-widest text-emerald-800">
+              Fase de grupos
+            </p>
+            <p className="mt-1 text-sm font-bold">
+              {match.group_name ?? "Grupo"}
+            </p>
+          </div>
+        )}
+
         {match.tipo === "final" && (
           <div className="mb-3 rounded-xl bg-slate-900 px-3 py-2 text-white">
             <p className="text-xs font-black uppercase tracking-widest">
@@ -514,7 +485,7 @@ export default function FavoritosPage() {
           </div>
 
           <div className="flex min-h-[64px] min-w-[92px] shrink-0 items-center justify-center rounded-2xl bg-slate-950 px-3 py-2 text-center text-white shadow">
-            {tipo === "resultado" ? (
+            {finalizado ? (
               <p className="whitespace-nowrap text-lg font-black">
                 {marcadorResultado(match)}
               </p>
@@ -549,11 +520,6 @@ export default function FavoritosPage() {
           </p>
         ) : (
           <>
-            <p className="rounded-2xl bg-emerald-50 px-3 py-2 text-xs font-black uppercase tracking-widest text-emerald-800 ring-1 ring-emerald-200">
-              Pasan {equiposQuePasan} equipo
-              {equiposQuePasan === 1 ? "" : "s"}
-            </p>
-
             <div className="grid grid-cols-[1fr_36px_42px_46px] gap-2 border-b border-slate-200 px-2 pb-2 text-xs font-black uppercase text-slate-500">
               <span>Equipo</span>
               <span className="text-center">PJ</span>
@@ -636,7 +602,7 @@ export default function FavoritosPage() {
     teamId: string;
     seccion: Seccion;
     titulo: string;
-    color: "rojo" | "negro";
+    color: "rojo" | "negro" | "verde";
     children: ReactNode;
   }) {
     const abierta = seccionEstaAbierta(teamId, seccion);
@@ -645,8 +611,12 @@ export default function FavoritosPage() {
       <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
         <button
           onClick={() => toggleSeccion(teamId, seccion)}
-          className={`flex w-full items-center justify-between px-4 py-3 text-left text-white ${
-            color === "rojo" ? "bg-red-600" : "bg-slate-950"
+          className={`flex w-full items-center justify-between px-4 py-3 text-left ${
+            color === "rojo"
+              ? "bg-red-600 text-white"
+              : color === "verde"
+                ? "bg-emerald-50 text-slate-950 ring-1 ring-emerald-200"
+                : "bg-slate-950 text-white"
           }`}
         >
           <p className="text-sm font-black uppercase tracking-widest">
@@ -695,8 +665,7 @@ export default function FavoritosPage() {
           <div className="mt-6 space-y-4">
             {equiposFavoritos.map((team) => {
               const abierto = equipoAbierto === team.id;
-              const proximos = proximosDelEquipo(team);
-              const resultados = resultadosDelEquipo(team);
+              const calendario = calendarioDelEquipo(team);
 
               return (
                 <div
@@ -740,44 +709,27 @@ export default function FavoritosPage() {
 
                       {renderBloqueInterno({
                         teamId: team.id,
+                        seccion: "calendario",
+                        titulo: "Calendario",
+                        color: "verde",
+                        children:
+                          calendario.length === 0 ? (
+                            <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">
+                              No hay partidos de este equipo.
+                            </p>
+                          ) : (
+                            calendario.map((match) =>
+                              renderPartido(match, team.id)
+                            )
+                          ),
+                      })}
+
+                      {renderBloqueInterno({
+                        teamId: team.id,
                         seccion: "clasificacion",
                         titulo: "Clasificación",
                         color: "rojo",
                         children: renderClasificacion(team),
-                      })}
-
-                      {renderBloqueInterno({
-                        teamId: team.id,
-                        seccion: "proximos",
-                        titulo: "Próximos partidos",
-                        color: "negro",
-                        children:
-                          proximos.length === 0 ? (
-                            <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">
-                              No hay próximos partidos de este equipo.
-                            </p>
-                          ) : (
-                            proximos.map((match) =>
-                              renderPartido(match, team.id, "proximo")
-                            )
-                          ),
-                      })}
-
-                      {renderBloqueInterno({
-                        teamId: team.id,
-                        seccion: "resultados",
-                        titulo: "Resultados",
-                        color: "rojo",
-                        children:
-                          resultados.length === 0 ? (
-                            <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">
-                              Todavía no hay resultados de este equipo.
-                            </p>
-                          ) : (
-                            resultados.map((match) =>
-                              renderPartido(match, team.id, "resultado")
-                            )
-                          ),
                       })}
                     </div>
                   )}

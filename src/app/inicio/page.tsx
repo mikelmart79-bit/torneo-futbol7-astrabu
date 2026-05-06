@@ -71,14 +71,11 @@ function horaLocalActual() {
 function esPartidoProximo(partido: Match) {
   if (!partido.match_date || !partido.match_time) return false;
 
-  if (partido.home_score !== null && partido.away_score !== null) {
-    return false;
-  }
-
   const hoy = fechaLocalHoy();
   const horaActual = horaLocalActual();
 
   if (partido.match_date > hoy) return true;
+
   if (partido.match_date === hoy && partido.match_time >= horaActual) {
     return true;
   }

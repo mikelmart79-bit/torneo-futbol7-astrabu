@@ -239,7 +239,7 @@ export default function FaseFinalPage() {
                   >
                     <div className="min-w-0">
                       <p className="break-words text-xl font-black leading-tight">
-                        {esFinal ? "🏆 Gran Final" : fase}
+                        {esFinal ? "🏆 Final " : fase}
                       </p>
                     </div>
 

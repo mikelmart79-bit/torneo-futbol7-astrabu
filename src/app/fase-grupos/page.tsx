@@ -381,7 +381,7 @@ export default function FaseGruposPage() {
                               </p>
                             </div>
 
-                            <div className="shrink-0 rounded-2xl bg-slate-950 px-3 py-2 text-center text-white shadow">
+                            <div className="flex min-h-[64px] min-w-[92px] shrink-0 items-center justify-center rounded-2xl bg-slate-950 px-3 py-2 text-center text-white shadow">
                               {finalizado ? (
                                 <p className="text-2xl font-black">
                                   {match.home_score} - {match.away_score}
@@ -391,10 +391,6 @@ export default function FaseGruposPage() {
                                   {match.match_time ?? "--:--"}
                                 </p>
                               )}
-
-                              <p className="text-xs font-bold text-slate-300">
-                                {match.field ?? "Campo"}
-                              </p>
                             </div>
                           </div>
 

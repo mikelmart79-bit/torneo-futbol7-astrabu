@@ -473,7 +473,7 @@ export default function FaseGruposPage() {
                               <p className="break-words text-base font-black leading-tight">
                                 {match.home_team?.name}
                               </p>
-                              <p className="text-xs font-black uppercase text-slate-400">
+                              <p className="text-xm font-black uppercase text-slate-400">
                                 vs
                               </p>
                               <p className="break-words text-base font-black leading-tight">

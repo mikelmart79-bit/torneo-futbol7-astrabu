@@ -116,9 +116,7 @@ export default function FaseFinalPage() {
 
     const fasesReales = Array.from(
       new Set(
-        matches
-          .map((match) => normalizarFase(match.phase))
-          .filter(Boolean)
+        matches.map((match) => normalizarFase(match.phase)).filter(Boolean)
       )
     );
 
@@ -218,6 +216,7 @@ export default function FaseFinalPage() {
               const cruces = matches.filter(
                 (match) => normalizarFase(match.phase) === fase
               );
+
               const abierta = faseAbierta === fase;
               const esFinal = fase.toLowerCase() === "final";
 
@@ -227,7 +226,7 @@ export default function FaseFinalPage() {
                   className={`overflow-hidden rounded-3xl shadow-2xl backdrop-blur ${
                     esFinal
                       ? "bg-amber-100/95 ring-2 ring-amber-300"
-                      : "bg-white/95"
+                      : "bg-emerald-50/95 ring-1 ring-emerald-200"
                   }`}
                 >
                   <button
@@ -235,7 +234,7 @@ export default function FaseFinalPage() {
                     className={`flex w-full items-center justify-between gap-3 px-5 py-5 text-left ${
                       esFinal
                         ? "bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 text-slate-950"
-                        : "bg-red-600 text-white"
+                        : "bg-emerald-50 text-slate-950"
                     }`}
                   >
                     <div className="min-w-0">
@@ -258,9 +257,11 @@ export default function FaseFinalPage() {
                       ) : (
                         cruces.map((match) => {
                           const finalizado = estaFinalizado(match.status);
+
                           const hayResultado =
                             match.home_score !== null &&
                             match.away_score !== null;
+
                           const hayPenaltis =
                             match.home_penalties !== null &&
                             match.home_penalties !== undefined &&
@@ -273,13 +274,15 @@ export default function FaseFinalPage() {
                               className={`rounded-2xl p-4 shadow ${
                                 esFinal
                                   ? "bg-amber-50 ring-1 ring-amber-200"
-                                  : "bg-red-50 ring-1 ring-red-100"
+                                  : "bg-emerald-50 ring-1 ring-emerald-200"
                               }`}
                             >
                               <div className="flex items-center justify-between gap-3">
                                 <p
                                   className={`break-words text-sm font-black uppercase ${
-                                    esFinal ? "text-amber-700" : "text-red-600"
+                                    esFinal
+                                      ? "text-amber-700"
+                                      : "text-slate-900"
                                   }`}
                                 >
                                   {match.title}

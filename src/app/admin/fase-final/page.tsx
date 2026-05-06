@@ -382,6 +382,7 @@ export default function AdminFaseFinalPage() {
                       onChange={(e) => setPhase(e.target.value)}
                       className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
                     >
+                      <option>Octavos</option>
                       <option>Cuartos</option>
                       <option>Semifinales</option>
                       <option>Tercer puesto</option>
@@ -409,7 +410,7 @@ export default function AdminFaseFinalPage() {
                   <input
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Cuarto 1, Semifinal 1, Final..."
+                    placeholder="Octavo 1, Cuarto 1, Semifinal 1, Final..."
                     className="mt-2 w-full rounded-xl border border-slate-300 p-3 font-bold"
                   />
                 </div>

@@ -100,7 +100,7 @@ export default function FaseFinalPage() {
   }
 
   const fases = useMemo(() => {
-    const ordenPreferido = ["Cuartos", "Semifinales", "Tercer puesto", "Final"];
+    const ordenPreferido = ["Cuartos", "Semifinales", "Tercer Y cuarto puesto", "Final"];
 
     const fasesReales = Array.from(
       new Set(matches.map((match) => match.phase).filter(Boolean))

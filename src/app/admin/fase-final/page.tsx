@@ -129,7 +129,7 @@ export default function FaseFinalPage() {
     
     setMatches(cruces);
     setVotes((votesData ?? []) as Vote[]);
-    setFaseAbierta(fasesOrdenadas[0] ?? "");
+    setFaseAbierta("");
     setLoading(false);
   }
 

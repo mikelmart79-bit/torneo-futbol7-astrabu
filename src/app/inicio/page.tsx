@@ -360,6 +360,13 @@ export default function InicioPage() {
           >
             Normativa
           </a>
+
+          <a
+            href="/bota-oro"
+            className="col-span-2 flex min-h-[56px] items-center justify-center rounded-2xl bg-red-600 px-4 py-3 text-center text-lg font-black leading-tight text-white shadow"
+          >
+            Bota de Oro
+          </a>
         </div>
       </section>
     </main>

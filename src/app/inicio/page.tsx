@@ -101,7 +101,7 @@ function ordenarPartidos(partidos: Match[]) {
 }
 
 function nombreFaseBonito(partido: Match) {
-  if (partido.tipo === "grupo") return partido.group_name ?? "Grupo";
+  if (partido.tipo === "grupo") return partido.group_name ?? "Clasificación";
 
   if (partido.phase === "Final") return partido.title ?? "Gran Final";
 
@@ -270,9 +270,10 @@ export default function InicioPage() {
                 <div className="mb-3 rounded-2xl bg-slate-950 px-4 py-2 text-center text-white shadow">
                   <p className="text-[11px] font-black uppercase tracking-widest text-red-300">
                     {partido.tipo === "grupo"
-                      ? "Fase de grupos"
+                      ? "Clasificación"
                       : "Eliminatorias"}
                   </p>
+
                   <p className="mt-1 text-sm font-black">
                     {nombreFaseBonito(partido)}
                   </p>
@@ -316,9 +317,11 @@ export default function InicioPage() {
                       ? formatearFecha(partido.match_date)
                       : "Fecha pendiente"}
                   </p>
+
                   <p className="text-3xl font-black leading-none">
                     {partido.match_time ?? "--:--"}
                   </p>
+
                   <p className="mt-1 text-xs font-bold text-slate-300">
                     {partido.field ?? "Campo pendiente"}
                   </p>
@@ -363,9 +366,16 @@ export default function InicioPage() {
 
           <a
             href="/bota-oro"
-            className="col-span-2 flex min-h-[56px] items-center justify-center rounded-2xl bg-red-600 px-4 py-3 text-center text-lg font-black leading-tight text-white shadow"
+            className="flex min-h-[56px] items-center justify-center rounded-2xl bg-red-600 px-4 py-3 text-center text-lg font-black leading-tight text-white shadow"
           >
             Bota de Oro
+          </a>
+
+          <a
+            href="/sancionados"
+            className="flex min-h-[56px] items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-center text-lg font-black leading-tight text-white shadow"
+          >
+            Sancionados
           </a>
         </div>
       </section>

@@ -254,9 +254,9 @@ export default function InicioPage() {
         className="fixed inset-0 h-screen w-screen object-cover opacity-35 blur-sm"
       />
 
-      <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-28 sm:max-w-2xl lg:max-w-3xl">
+      <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-24">
         <div className="rounded-3xl bg-black/60 px-4 py-5 text-white shadow-2xl backdrop-blur">
-          <h1 className="whitespace-nowrap text-center text-lg font-black uppercase tracking-[0.2em] text-emerald-100 sm:text-2xl">
+          <h1 className="whitespace-nowrap text-center text-lg font-black uppercase tracking-[0.2em] text-emerald-100">
             Torneo Fútbol 7 Astrabudua
           </h1>
         </div>
@@ -352,7 +352,7 @@ export default function InicioPage() {
           Calendario
         </Link>
 
-        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="mt-3 grid grid-cols-2 gap-3">
           <Link
             href="/equipos"
             className="rounded-2xl bg-white/95 p-4 text-center text-lg font-black text-slate-900 shadow"

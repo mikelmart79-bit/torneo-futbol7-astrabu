@@ -13,20 +13,15 @@ type AdminLink = {
 
 const principales: AdminLink[] = [
   {
-    href: "/admin/partidos",
-    title: "Resultados",
-    description: "Meter resultados y activar votación MVP.",
-    variant: "primary",
-  },
-  {
     href: "/admin/fichas-partido",
-    title: "Fichas de partido",
-    description: "Jugadores, goles, tarjetas y sanciones.",
+    title: "Resultados y fichas de partido",
+    description: "Marcador, jugadores, goles, tarjetas, sanciones y MVP.",
+    variant: "primary",
   },
   {
     href: "/admin/gestionar-partidos",
     title: "Configurar partidos",
-    description: "Crear, editar o eliminar partidos del grupo único.",
+    description: "Crear, editar o eliminar partidos de clasificación.",
   },
   {
     href: "/admin/fase-final",
@@ -38,8 +33,8 @@ const principales: AdminLink[] = [
 const datos: AdminLink[] = [
   {
     href: "/admin/grupos",
-    title: "Gestionar grupo",
-    description: "Configurar el grupo único de clasificación.",
+    title: "Gestionar clasificación",
+    description: "Configurar la fase de clasificación.",
   },
   {
     href: "/admin/equipos",
@@ -91,7 +86,7 @@ function AdminCard({ item }: { item: AdminLink }) {
 export default function AdminPage() {
   async function borrarDatosTorneo() {
     const confirmar1 = window.confirm(
-      "⚠️ Esto borrará TODOS los datos del torneo:\n\n- grupo\n- equipos\n- jugadores\n- partidos\n- fichas de partido\n- goles\n- tarjetas\n- sanciones\n- eliminatorias\n- votos MVP\n\n¿Quieres continuar?"
+      "⚠️ Esto borrará TODOS los datos del torneo:\n\n- clasificación\n- equipos\n- jugadores\n- partidos\n- fichas de partido\n- goles\n- tarjetas\n- sanciones\n- eliminatorias\n- votos MVP\n\n¿Quieres continuar?"
     );
 
     if (!confirmar1) return;
@@ -186,8 +181,8 @@ export default function AdminPage() {
             </p>
 
             <p className="mt-2 text-xs font-bold text-red-700">
-              Se eliminarán grupo, equipos, jugadores, partidos, fichas, goles,
-              tarjetas, sanciones, eliminatorias y votos MVP.
+              Se eliminarán clasificación, equipos, jugadores, partidos, fichas,
+              goles, tarjetas, sanciones, eliminatorias y votos MVP.
             </p>
 
             <button

@@ -42,10 +42,6 @@ function ShirtIcon({ color }: { color: string }) {
   );
 }
 
-function textoTipoJugador(tipo: PlayerType | null) {
-  return tipo === "F" ? "Federado" : "Municipio";
-}
-
 export default function EquipoDetalle() {
   const params = useParams();
   const idParam = params.id;
@@ -271,10 +267,6 @@ export default function EquipoDetalle() {
                       <p className="break-words text-lg font-black leading-tight">
                         {player.name}
                       </p>
-
-                      <p className="mt-1 text-xs font-bold uppercase text-slate-500">
-                        {textoTipoJugador(tipo)}
-                      </p>
                     </div>
 
                     <div
@@ -283,7 +275,6 @@ export default function EquipoDetalle() {
                           ? "bg-emerald-100 text-emerald-700"
                           : "bg-slate-200 text-slate-700"
                       }`}
-                      title={textoTipoJugador(tipo)}
                     >
                       {tipo}
                     </div>

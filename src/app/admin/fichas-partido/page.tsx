@@ -35,6 +35,7 @@ type GroupMatch = {
   home_score: number | null;
   away_score: number | null;
   status: string | null;
+  mvp_open: boolean | null;
   home_team: TeamRef | null;
   away_team: TeamRef | null;
 };
@@ -55,8 +56,20 @@ type FinalMatch = {
   field: string | null;
   home_score: number | null;
   away_score: number | null;
+  home_penalties: number | null;
+  away_penalties: number | null;
   status: string | null;
   sort_order: number;
+  mvp_open: boolean | null;
+  home_source_type?: string | null;
+  home_source_match_title?: string | null;
+  away_source_type?: string | null;
+  away_source_match_title?: string | null;
+};
+
+type MatchPayload = {
+  match_id: string | null;
+  final_match_id: string | null;
 };
 
 type MatchPlayerRow = {
@@ -69,7 +82,6 @@ type GoalRow = {
   id: string;
   player_id: string;
   team_id: string;
-  minute: number | null;
 };
 
 type CardRow = {
@@ -77,17 +89,14 @@ type CardRow = {
   player_id: string;
   team_id: string;
   card_type: "yellow" | "red";
-  minute: number | null;
 };
 
-type SuspensionRow = {
-  id: string;
-  player_id: string;
-  team_id: string;
-  reason: string;
-  games: number;
-  served: number;
-  status: string;
+type FichaRow = {
+  player: Player;
+  played: boolean;
+  goals: number;
+  yellow: number;
+  red: number;
 };
 
 function normalizarEquipo(equipo: RawGroupMatch["home_team"]): TeamRef | null {
@@ -100,13 +109,19 @@ function normalizarTexto(texto: string | null | undefined) {
   return (texto ?? "").trim().toLowerCase();
 }
 
-function numeroDesdeInput(valor: string) {
-  return valor.trim() === "" ? null : Number.parseInt(valor, 10);
-}
-
 function formatearFechaSegura(fecha: string | null) {
   if (!fecha) return "Fecha pendiente";
   return formatearFecha(fecha);
+}
+
+function numeroDesdeInput(valor: string) {
+  if (valor.trim() === "") return null;
+  const numero = Number.parseInt(valor, 10);
+  return Number.isNaN(numero) ? null : numero;
+}
+
+function opcionesNumero(max: number) {
+  return Array.from({ length: max + 1 }, (_, index) => index);
 }
 
 export default function AdminFichasPartidoPage() {
@@ -117,38 +132,30 @@ export default function AdminFichasPartidoPage() {
   const [groupMatches, setGroupMatches] = useState<GroupMatch[]>([]);
   const [finalMatches, setFinalMatches] = useState<FinalMatch[]>([]);
 
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [matchPlayers, setMatchPlayers] = useState<MatchPlayerRow[]>([]);
-  const [goals, setGoals] = useState<GoalRow[]>([]);
-  const [cards, setCards] = useState<CardRow[]>([]);
-  const [suspensions, setSuspensions] = useState<SuspensionRow[]>([]);
-
-  const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
+  const [homeTeam, setHomeTeam] = useState<TeamRef | null>(null);
+  const [awayTeam, setAwayTeam] = useState<TeamRef | null>(null);
 
   const [fichaTitulo, setFichaTitulo] = useState("");
   const [fichaSubtitulo, setFichaSubtitulo] = useState("");
   const [fichaAviso, setFichaAviso] = useState("");
 
-  const [goalPlayerId, setGoalPlayerId] = useState("");
-  const [goalMinute, setGoalMinute] = useState("");
+  const [rows, setRows] = useState<FichaRow[]>([]);
+  const [estado, setEstado] = useState("Pendiente");
+  const [mvpOpen, setMvpOpen] = useState(false);
 
-  const [cardPlayerId, setCardPlayerId] = useState("");
-  const [cardType, setCardType] = useState<"yellow" | "red">("yellow");
-  const [cardMinute, setCardMinute] = useState("");
-
-  const [suspensionPlayerId, setSuspensionPlayerId] = useState("");
-  const [suspensionReason, setSuspensionReason] = useState("");
-  const [suspensionGames, setSuspensionGames] = useState("1");
+  const [homePenalties, setHomePenalties] = useState("");
+  const [awayPenalties, setAwayPenalties] = useState("");
 
   const [mensaje, setMensaje] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadingFicha, setLoadingFicha] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     cargarDatos();
   }, []);
 
-  function payloadPartido(tipo: MatchType, id: string) {
+  function payloadPartido(tipo: MatchType, id: string): MatchPayload {
     return tipo === "grupo"
       ? { match_id: id, final_match_id: null }
       : { match_id: null, final_match_id: id };
@@ -162,46 +169,31 @@ export default function AdminFichasPartidoPage() {
     return teams.find((team) => team.id === teamId)?.name ?? "Equipo";
   }
 
-  function nombreJugador(playerId: string) {
-    const player = players.find((item) => item.id === playerId);
-    if (!player) return "Jugador";
-    return player.number !== null
-      ? `${player.number} · ${player.name}`
-      : player.name;
+  function nombreEquipoDesde(equipos: Team[], teamId: string) {
+    return equipos.find((team) => team.id === teamId)?.name ?? "Equipo";
   }
 
-  function equipoJugador(playerId: string) {
-    const player = players.find((item) => item.id === playerId);
-    if (!player) return "";
-    return nombreEquipo(player.team_id);
-  }
-
-  function jugadorCompleto(player: Player) {
-    const dorsal = player.number !== null ? `${player.number} · ` : "";
-    return `${dorsal}${player.name} · ${nombreEquipo(player.team_id)}`;
+  function jugadorNombre(player: Player) {
+    return player.number !== null ? `${player.number} · ${player.name}` : player.name;
   }
 
   function limpiarFicha() {
-    setPlayers([]);
-    setMatchPlayers([]);
-    setGoals([]);
-    setCards([]);
-    setSuspensions([]);
-    setSelectedPlayerIds([]);
+    setHomeTeam(null);
+    setAwayTeam(null);
     setFichaTitulo("");
     setFichaSubtitulo("");
     setFichaAviso("");
-    setGoalPlayerId("");
-    setGoalMinute("");
-    setCardPlayerId("");
-    setCardType("yellow");
-    setCardMinute("");
-    setSuspensionPlayerId("");
-    setSuspensionReason("");
-    setSuspensionGames("1");
+    setRows([]);
+    setEstado("Pendiente");
+    setMvpOpen(false);
+    setHomePenalties("");
+    setAwayPenalties("");
   }
 
-  async function cargarDatos() {
+  async function cargarDatos(opciones?: {
+    tipoMantener?: MatchType;
+    idMantener?: string;
+  }) {
     setLoading(true);
 
     const { data: teamsData, error: teamsError } = await supabase
@@ -210,7 +202,8 @@ export default function AdminFichasPartidoPage() {
       .order("name", { ascending: true });
 
     if (teamsError) {
-      setMensaje("No se han podido cargar los equipos.");
+      console.error("Error cargando equipos:", teamsError);
+      setMensaje(`No se han podido cargar los equipos: ${teamsError.message}`);
       setLoading(false);
       return;
     }
@@ -230,6 +223,7 @@ export default function AdminFichasPartidoPage() {
         home_score,
         away_score,
         status,
+        mvp_open,
         home_team:teams!matches_home_team_id_fkey(id, name),
         away_team:teams!matches_away_team_id_fkey(id, name)
       `
@@ -238,7 +232,8 @@ export default function AdminFichasPartidoPage() {
       .order("match_time", { ascending: true });
 
     if (matchesError) {
-      setMensaje("No se han podido cargar los partidos.");
+      console.error("Error cargando partidos:", matchesError);
+      setMensaje(`No se han podido cargar los partidos: ${matchesError.message}`);
       setLoading(false);
       return;
     }
@@ -256,12 +251,35 @@ export default function AdminFichasPartidoPage() {
     const { data: finalData, error: finalError } = await supabase
       .from("final_matches")
       .select(
-        "id, phase, title, home_ref, away_ref, match_date, match_time, field, home_score, away_score, status, sort_order"
+        `
+        id,
+        phase,
+        title,
+        home_ref,
+        away_ref,
+        match_date,
+        match_time,
+        field,
+        home_score,
+        away_score,
+        home_penalties,
+        away_penalties,
+        status,
+        sort_order,
+        mvp_open,
+        home_source_type,
+        home_source_match_title,
+        away_source_type,
+        away_source_match_title
+      `
       )
       .order("sort_order", { ascending: true });
 
     if (finalError) {
-      setMensaje("No se han podido cargar las eliminatorias.");
+      console.error("Error cargando eliminatorias:", finalError);
+      setMensaje(
+        `No se han podido cargar las eliminatorias: ${finalError.message}`
+      );
       setLoading(false);
       return;
     }
@@ -269,20 +287,27 @@ export default function AdminFichasPartidoPage() {
     const eliminatorias = (finalData ?? []) as FinalMatch[];
     setFinalMatches(eliminatorias);
 
-    const primerId = partidos[0]?.id ?? eliminatorias[0]?.id ?? "";
-    const primerTipo: MatchType = partidos[0]?.id ? "grupo" : "final";
+    const tipoInicial =
+      opciones?.tipoMantener ??
+      (partidos.length > 0 ? "grupo" : ("final" as MatchType));
 
-    setMatchType(primerTipo);
-    setSelectedId(primerId);
+    const idInicial =
+      opciones?.idMantener ??
+      (tipoInicial === "grupo" ? partidos[0]?.id ?? "" : eliminatorias[0]?.id ?? "");
 
-    if (primerId) {
-      await cargarFicha(primerTipo, primerId, equipos, partidos, eliminatorias);
+    setMatchType(tipoInicial);
+    setSelectedId(idInicial);
+
+    if (idInicial) {
+      await cargarFicha(tipoInicial, idInicial, equipos, partidos, eliminatorias);
+    } else {
+      limpiarFicha();
     }
 
     setLoading(false);
   }
 
-  function obtenerEquiposFicha(
+  function obtenerContextoFicha(
     tipo: MatchType,
     id: string,
     equipos: Team[],
@@ -291,18 +316,20 @@ export default function AdminFichasPartidoPage() {
   ) {
     if (tipo === "grupo") {
       const partido = partidos.find((item) => item.id === id);
+
       if (!partido) {
         return {
           titulo: "",
           subtitulo: "",
           aviso: "No se ha encontrado el partido.",
-          equiposFicha: [] as TeamRef[],
+          local: null as TeamRef | null,
+          visitante: null as TeamRef | null,
+          estadoFicha: "Pendiente",
+          mvpFicha: false,
+          penLocal: "",
+          penVisitante: "",
         };
       }
-
-      const equiposFicha = [partido.home_team, partido.away_team].filter(
-        Boolean
-      ) as TeamRef[];
 
       return {
         titulo: `${partido.home_team?.name ?? "Local"} vs ${
@@ -312,48 +339,58 @@ export default function AdminFichasPartidoPage() {
           partido.match_time ?? "Hora pendiente"
         } · ${partido.field ?? "Campo pendiente"}`,
         aviso: "",
-        equiposFicha,
+        local: partido.home_team,
+        visitante: partido.away_team,
+        estadoFicha: partido.status ?? "Pendiente",
+        mvpFicha: Boolean(partido.mvp_open),
+        penLocal: "",
+        penVisitante: "",
       };
     }
 
     const eliminatoria = eliminatorias.find((item) => item.id === id);
+
     if (!eliminatoria) {
       return {
         titulo: "",
         subtitulo: "",
         aviso: "No se ha encontrado la eliminatoria.",
-        equiposFicha: [] as TeamRef[],
+        local: null as TeamRef | null,
+        visitante: null as TeamRef | null,
+        estadoFicha: "Pendiente",
+        mvpFicha: false,
+        penLocal: "",
+        penVisitante: "",
       };
     }
 
     const local = equipos.find(
       (team) => normalizarTexto(team.name) === normalizarTexto(eliminatoria.home_ref)
     );
+
     const visitante = equipos.find(
       (team) => normalizarTexto(team.name) === normalizarTexto(eliminatoria.away_ref)
     );
 
-    const equiposFicha = [local, visitante]
-      .filter(Boolean)
-      .map((team) => ({
-        id: team!.id,
-        name: team!.name,
-      }));
-
     const aviso =
-      equiposFicha.length < 2
+      !local || !visitante
         ? "Esta eliminatoria todavía no tiene los dos equipos resueltos. Cuando aparezcan los nombres reales, podrás completar la ficha."
         : "";
 
     return {
       titulo: `${eliminatoria.home_ref} vs ${eliminatoria.away_ref}`,
-      subtitulo: `${eliminatoria.phase} · ${eliminatoria.title} · ${formatearFechaSegura(
-        eliminatoria.match_date
-      )} · ${eliminatoria.match_time ?? "Hora pendiente"} · ${
-        eliminatoria.field ?? "Campo pendiente"
-      }`,
+      subtitulo: `${eliminatoria.phase} · ${
+        eliminatoria.title
+      } · ${formatearFechaSegura(eliminatoria.match_date)} · ${
+        eliminatoria.match_time ?? "Hora pendiente"
+      } · ${eliminatoria.field ?? "Campo pendiente"}`,
       aviso,
-      equiposFicha,
+      local: local ? { id: local.id, name: local.name } : null,
+      visitante: visitante ? { id: visitante.id, name: visitante.name } : null,
+      estadoFicha: eliminatoria.status ?? "Pendiente",
+      mvpFicha: Boolean(eliminatoria.mvp_open),
+      penLocal: eliminatoria.home_penalties?.toString() ?? "",
+      penVisitante: eliminatoria.away_penalties?.toString() ?? "",
     };
   }
 
@@ -372,7 +409,7 @@ export default function AdminFichasPartidoPage() {
     setLoadingFicha(true);
     setMensaje("");
 
-    const datosFicha = obtenerEquiposFicha(
+    const contexto = obtenerContextoFicha(
       tipo,
       id,
       equiposBase,
@@ -380,87 +417,120 @@ export default function AdminFichasPartidoPage() {
       eliminatoriasBase
     );
 
-    setFichaTitulo(datosFicha.titulo);
-    setFichaSubtitulo(datosFicha.subtitulo);
-    setFichaAviso(datosFicha.aviso);
+    setFichaTitulo(contexto.titulo);
+    setFichaSubtitulo(contexto.subtitulo);
+    setFichaAviso(contexto.aviso);
+    setHomeTeam(contexto.local);
+    setAwayTeam(contexto.visitante);
+    setEstado(contexto.estadoFicha);
+    setMvpOpen(contexto.mvpFicha);
+    setHomePenalties(contexto.penLocal);
+    setAwayPenalties(contexto.penVisitante);
 
-    const teamIds = datosFicha.equiposFicha.map((team) => team.id);
+    const teamIds = [contexto.local?.id, contexto.visitante?.id].filter(
+      Boolean
+    ) as string[];
 
-    let jugadores: Player[] = [];
-
-    if (teamIds.length > 0) {
-      const { data: playersData, error: playersError } = await supabase
-        .from("players")
-        .select("id, team_id, name, number")
-        .in("team_id", teamIds)
-        .order("number", { ascending: true })
-        .order("name", { ascending: true });
-
-      if (playersError) {
-        setMensaje("No se han podido cargar los jugadores.");
-        setLoadingFicha(false);
-        return;
-      }
-
-      jugadores = ((playersData ?? []) as Player[]).sort((a, b) => {
-        const equipoA = nombreEquipo(a.team_id);
-        const equipoB = nombreEquipo(b.team_id);
-        if (equipoA !== equipoB) return equipoA.localeCompare(equipoB);
-
-        const dorsalA = a.number ?? 9999;
-        const dorsalB = b.number ?? 9999;
-        if (dorsalA !== dorsalB) return dorsalA - dorsalB;
-
-        return a.name.localeCompare(b.name);
-      });
+    if (teamIds.length === 0) {
+      setRows([]);
+      setLoadingFicha(false);
+      return;
     }
 
-    setPlayers(jugadores);
+    const { data: playersData, error: playersError } = await supabase
+      .from("players")
+      .select("id, team_id, name, number")
+      .in("team_id", teamIds)
+      .order("number", { ascending: true })
+      .order("name", { ascending: true });
+
+    if (playersError) {
+      console.error("Error cargando jugadores:", playersError);
+      setMensaje(`No se han podido cargar los jugadores: ${playersError.message}`);
+      setLoadingFicha(false);
+      return;
+    }
+
+    const jugadores = ((playersData ?? []) as Player[]).sort((a, b) => {
+      const ordenA = a.team_id === contexto.local?.id ? 0 : 1;
+      const ordenB = b.team_id === contexto.local?.id ? 0 : 1;
+
+      if (ordenA !== ordenB) return ordenA - ordenB;
+
+      const dorsalA = a.number ?? 9999;
+      const dorsalB = b.number ?? 9999;
+
+      if (dorsalA !== dorsalB) return dorsalA - dorsalB;
+
+      return a.name.localeCompare(b.name);
+    });
 
     const columna = columnaPartido(tipo);
 
-    const { data: matchPlayersData } = await supabase
+    const { data: matchPlayersData, error: matchPlayersError } = await supabase
       .from("match_players")
       .select("id, player_id, team_id")
       .eq(columna, id);
 
+    if (matchPlayersError) {
+      console.error("Error cargando participantes:", matchPlayersError);
+      setMensaje(
+        `No se han podido cargar los jugadores de la ficha: ${matchPlayersError.message}`
+      );
+      setLoadingFicha(false);
+      return;
+    }
+
     const participantes = (matchPlayersData ?? []) as MatchPlayerRow[];
-    setMatchPlayers(participantes);
-    setSelectedPlayerIds(participantes.map((item) => item.player_id));
 
-    const { data: goalsData } = await supabase
+    const { data: goalsData, error: goalsError } = await supabase
       .from("match_goals")
-      .select("id, player_id, team_id, minute")
-      .eq(columna, id)
-      .order("created_at", { ascending: true });
+      .select("id, player_id, team_id")
+      .eq(columna, id);
 
-    setGoals((goalsData ?? []) as GoalRow[]);
+    if (goalsError) {
+      console.error("Error cargando goles:", goalsError);
+      setMensaje(`No se han podido cargar los goles: ${goalsError.message}`);
+      setLoadingFicha(false);
+      return;
+    }
 
-    const { data: cardsData } = await supabase
+    const goles = (goalsData ?? []) as GoalRow[];
+
+    const { data: cardsData, error: cardsError } = await supabase
       .from("match_cards")
-      .select("id, player_id, team_id, card_type, minute")
-      .eq(columna, id)
-      .order("created_at", { ascending: true });
+      .select("id, player_id, team_id, card_type")
+      .eq(columna, id);
 
-    setCards((cardsData ?? []) as CardRow[]);
+    if (cardsError) {
+      console.error("Error cargando tarjetas:", cardsError);
+      setMensaje(`No se han podido cargar las tarjetas: ${cardsError.message}`);
+      setLoadingFicha(false);
+      return;
+    }
 
-    const { data: suspensionsData } = await supabase
-      .from("suspensions")
-      .select("id, player_id, team_id, reason, games, served, status")
-      .eq(columna, id)
-      .order("created_at", { ascending: true });
+    const tarjetas = (cardsData ?? []) as CardRow[];
 
-    setSuspensions((suspensionsData ?? []) as SuspensionRow[]);
+    const rowsFicha: FichaRow[] = jugadores.map((player) => {
+      const played = participantes.some((item) => item.player_id === player.id);
+      const goals = goles.filter((item) => item.player_id === player.id).length;
+      const yellow = tarjetas.filter(
+        (item) => item.player_id === player.id && item.card_type === "yellow"
+      ).length;
+      const red = tarjetas.filter(
+        (item) => item.player_id === player.id && item.card_type === "red"
+      ).length;
 
-    setGoalPlayerId("");
-    setGoalMinute("");
-    setCardPlayerId("");
-    setCardType("yellow");
-    setCardMinute("");
-    setSuspensionPlayerId("");
-    setSuspensionReason("");
-    setSuspensionGames("1");
+      return {
+        player,
+        played: played || goals > 0 || yellow > 0 || red > 0,
+        goals,
+        yellow,
+        red,
+      };
+    });
 
+    setRows(rowsFicha);
     setLoadingFicha(false);
   }
 
@@ -470,7 +540,12 @@ export default function AdminFichasPartidoPage() {
 
     setMatchType(tipo);
     setSelectedId(nuevoId);
-    await cargarFicha(tipo, nuevoId);
+
+    if (nuevoId) {
+      await cargarFicha(tipo, nuevoId);
+    } else {
+      limpiarFicha();
+    }
   }
 
   async function cambiarPartido(id: string) {
@@ -478,229 +553,413 @@ export default function AdminFichasPartidoPage() {
     await cargarFicha(matchType, id);
   }
 
-  function toggleJugador(playerId: string) {
-    setSelectedPlayerIds((actuales) =>
-      actuales.includes(playerId)
-        ? actuales.filter((id) => id !== playerId)
-        : [...actuales, playerId]
+  function actualizarJugo(playerId: string, played: boolean) {
+    setRows((actuales) =>
+      actuales.map((row) =>
+        row.player.id === playerId ? { ...row, played } : row
+      )
     );
   }
 
-  async function guardarJugadores() {
-    if (!selectedId) return;
+  function actualizarNumero(
+    playerId: string,
+    campo: "goals" | "yellow" | "red",
+    valor: string
+  ) {
+    const numero = Number.parseInt(valor, 10);
+    const numeroSeguro = Number.isNaN(numero) ? 0 : Math.max(0, numero);
 
-    const columna = columnaPartido(matchType);
+    setRows((actuales) =>
+      actuales.map((row) =>
+        row.player.id === playerId
+          ? {
+              ...row,
+              [campo]: numeroSeguro,
+              played: numeroSeguro > 0 ? true : row.played,
+            }
+          : row
+      )
+    );
+  }
 
-    const { error: deleteError } = await supabase
-      .from("match_players")
-      .delete()
-      .eq(columna, selectedId);
+  function marcarTodos() {
+    setRows((actuales) => actuales.map((row) => ({ ...row, played: true })));
+  }
 
-    if (deleteError) {
-      setMensaje("No se han podido actualizar los jugadores.");
+  function limpiarJugadores() {
+    setRows((actuales) =>
+      actuales.map((row) => ({
+        ...row,
+        played: false,
+        goals: 0,
+        yellow: 0,
+        red: 0,
+      }))
+    );
+  }
+
+  function golesEquipo(teamId: string | undefined) {
+    if (!teamId) return 0;
+
+    return rows.reduce((total, row) => {
+      if (row.player.team_id !== teamId) return total;
+      return total + row.goals;
+    }, 0);
+  }
+
+  const homeScoreCalculado = golesEquipo(homeTeam?.id);
+  const awayScoreCalculado = golesEquipo(awayTeam?.id);
+
+  async function actualizarArrastresFinales() {
+    const { data, error } = await supabase
+      .from("final_matches")
+      .select("*")
+      .order("sort_order", { ascending: true });
+
+    if (error) {
+      console.error("Error actualizando arrastres:", error);
       return;
     }
 
-    const filas = selectedPlayerIds
-      .map((playerId) => {
-        const player = players.find((item) => item.id === playerId);
-        if (!player) return null;
+    let lista = (data ?? []) as FinalMatch[];
 
-        return {
-          ...payloadPartido(matchType, selectedId),
-          player_id: player.id,
-          team_id: player.team_id,
-          played: true,
-        };
-      })
-      .filter(Boolean);
+    function resolver(
+      matchTitle: string | null | undefined,
+      tipo: "winner" | "loser"
+    ) {
+      if (!matchTitle) return "";
 
-    if (filas.length > 0) {
-      const { error: insertError } = await supabase
-        .from("match_players")
-        .insert(filas);
+      const origen = lista.find((match) => match.title === matchTitle);
 
-      if (insertError) {
-        setMensaje("No se han podido guardar los jugadores.");
+      if (!origen) {
+        return `${tipo === "winner" ? "Ganador" : "Perdedor"} ${matchTitle}`;
+      }
+
+      if (origen.home_score === null || origen.away_score === null) {
+        return `${tipo === "winner" ? "Ganador" : "Perdedor"} ${matchTitle}`;
+      }
+
+      let ganaLocal: boolean | null = null;
+
+      if (origen.home_score > origen.away_score) {
+        ganaLocal = true;
+      } else if (origen.home_score < origen.away_score) {
+        ganaLocal = false;
+      } else if (
+        origen.home_penalties !== null &&
+        origen.away_penalties !== null &&
+        origen.home_penalties !== origen.away_penalties
+      ) {
+        ganaLocal = origen.home_penalties > origen.away_penalties;
+      }
+
+      if (ganaLocal === null) {
+        return `${tipo === "winner" ? "Ganador" : "Perdedor"} ${matchTitle}`;
+      }
+
+      if (tipo === "winner") {
+        return ganaLocal ? origen.home_ref : origen.away_ref;
+      }
+
+      return ganaLocal ? origen.away_ref : origen.home_ref;
+    }
+
+    for (let vuelta = 0; vuelta < 5; vuelta++) {
+      lista = lista.map((match) => ({
+        ...match,
+        home_ref:
+          match.home_source_type === "winner"
+            ? resolver(match.home_source_match_title, "winner")
+            : match.home_source_type === "loser"
+            ? resolver(match.home_source_match_title, "loser")
+            : match.home_ref,
+        away_ref:
+          match.away_source_type === "winner"
+            ? resolver(match.away_source_match_title, "winner")
+            : match.away_source_type === "loser"
+            ? resolver(match.away_source_match_title, "loser")
+            : match.away_ref,
+      }));
+    }
+
+    for (const match of lista) {
+      const { error: updateError } = await supabase
+        .from("final_matches")
+        .update({
+          home_ref: match.home_ref,
+          away_ref: match.away_ref,
+        })
+        .eq("id", match.id);
+
+      if (updateError) {
+        console.error("Error actualizando cruce:", updateError);
+        return;
+      }
+    }
+  }
+
+  async function guardarFichaCompleta() {
+    if (!selectedId) {
+      setMensaje("Selecciona un partido.");
+      return;
+    }
+
+    if (!homeTeam || !awayTeam) {
+      setMensaje("El partido todavía no tiene los dos equipos resueltos.");
+      return;
+    }
+
+    const penLocal = numeroDesdeInput(homePenalties);
+    const penVisitante = numeroDesdeInput(awayPenalties);
+
+    if (matchType === "final") {
+      if ((penLocal === null && penVisitante !== null) || (penLocal !== null && penVisitante === null)) {
+        setMensaje("Si indicas penaltis, debes poner los penaltis de los dos equipos.");
+        return;
+      }
+
+      if (
+        penLocal !== null &&
+        penVisitante !== null &&
+        homeScoreCalculado !== awayScoreCalculado
+      ) {
+        setMensaje("Solo debe haber penaltis si el partido acaba empatado.");
+        return;
+      }
+
+      if (
+        penLocal !== null &&
+        penVisitante !== null &&
+        homeScoreCalculado === awayScoreCalculado &&
+        penLocal === penVisitante
+      ) {
+        setMensaje("Los penaltis no pueden quedar empatados.");
         return;
       }
     }
 
-    setMensaje("Jugadores de la ficha guardados.");
-    await cargarFicha(matchType, selectedId);
-  }
+    setSaving(true);
+    setMensaje("");
 
-  async function añadirGol() {
-    if (!selectedId || !goalPlayerId) {
-      setMensaje("Selecciona un jugador para añadir el gol.");
-      return;
-    }
+    const columna = columnaPartido(matchType);
 
-    const player = players.find((item) => item.id === goalPlayerId);
-    if (!player) {
-      setMensaje("No se ha encontrado el jugador.");
-      return;
-    }
+    const deletePlayers = await supabase
+      .from("match_players")
+      .delete()
+      .eq(columna, selectedId);
 
-    const minute = numeroDesdeInput(goalMinute);
-
-    if (minute !== null && minute < 0) {
-      setMensaje("El minuto no puede ser negativo.");
-      return;
-    }
-
-    const { error } = await supabase.from("match_goals").insert({
-      ...payloadPartido(matchType, selectedId),
-      player_id: player.id,
-      team_id: player.team_id,
-      minute,
-    });
-
-    if (error) {
-      setMensaje("No se ha podido añadir el gol.");
-      return;
-    }
-
-    setMensaje("Gol añadido correctamente.");
-    await cargarFicha(matchType, selectedId);
-  }
-
-  async function añadirTarjeta() {
-    if (!selectedId || !cardPlayerId) {
-      setMensaje("Selecciona un jugador para añadir la tarjeta.");
-      return;
-    }
-
-    const player = players.find((item) => item.id === cardPlayerId);
-    if (!player) {
-      setMensaje("No se ha encontrado el jugador.");
-      return;
-    }
-
-    const minute = numeroDesdeInput(cardMinute);
-
-    if (minute !== null && minute < 0) {
-      setMensaje("El minuto no puede ser negativo.");
-      return;
-    }
-
-    const { error } = await supabase.from("match_cards").insert({
-      ...payloadPartido(matchType, selectedId),
-      player_id: player.id,
-      team_id: player.team_id,
-      card_type: cardType,
-      minute,
-    });
-
-    if (error) {
-      setMensaje("No se ha podido añadir la tarjeta.");
-      return;
-    }
-
-    if (cardType === "red") {
-      const crearSancion = window.confirm(
-        "Has añadido una tarjeta roja. ¿Quieres crear una sanción de 1 partido?"
+    if (deletePlayers.error) {
+      console.error("Error borrando jugadores ficha:", deletePlayers.error);
+      setMensaje(
+        `No se han podido actualizar los jugadores: ${deletePlayers.error.message}`
       );
+      setSaving(false);
+      return;
+    }
 
-      if (crearSancion) {
-        await supabase.from("suspensions").insert({
-          ...payloadPartido(matchType, selectedId),
-          player_id: player.id,
-          team_id: player.team_id,
-          reason: "Tarjeta roja",
-          games: 1,
-          served: 0,
-          status: "Pendiente",
-        });
+    const deleteGoals = await supabase
+      .from("match_goals")
+      .delete()
+      .eq(columna, selectedId);
+
+    if (deleteGoals.error) {
+      console.error("Error borrando goles:", deleteGoals.error);
+      setMensaje(`No se han podido actualizar los goles: ${deleteGoals.error.message}`);
+      setSaving(false);
+      return;
+    }
+
+    const deleteCards = await supabase
+      .from("match_cards")
+      .delete()
+      .eq(columna, selectedId);
+
+    if (deleteCards.error) {
+      console.error("Error borrando tarjetas:", deleteCards.error);
+      setMensaje(
+        `No se han podido actualizar las tarjetas: ${deleteCards.error.message}`
+      );
+      setSaving(false);
+      return;
+    }
+
+    const deleteAutoSuspensions = await supabase
+      .from("suspensions")
+      .delete()
+      .eq(columna, selectedId)
+      .eq("reason", "Tarjeta roja");
+
+    if (deleteAutoSuspensions.error) {
+      console.error("Error borrando sanciones automáticas:", deleteAutoSuspensions.error);
+      setMensaje(
+        `No se han podido actualizar las sanciones: ${deleteAutoSuspensions.error.message}`
+      );
+      setSaving(false);
+      return;
+    }
+
+    const filasJugadores = rows
+      .filter(
+        (row) => row.played || row.goals > 0 || row.yellow > 0 || row.red > 0
+      )
+      .map((row) => ({
+        ...payloadPartido(matchType, selectedId),
+        player_id: row.player.id,
+        team_id: row.player.team_id,
+        played: true,
+      }));
+
+    if (filasJugadores.length > 0) {
+      const { error } = await supabase.from("match_players").insert(filasJugadores);
+
+      if (error) {
+        console.error("Error insertando jugadores:", error);
+        setMensaje(`No se han podido guardar los jugadores: ${error.message}`);
+        setSaving(false);
+        return;
       }
     }
 
-    setMensaje("Tarjeta añadida correctamente.");
-    await cargarFicha(matchType, selectedId);
-  }
+    const filasGoles: Array<
+      MatchPayload & {
+        player_id: string;
+        team_id: string;
+        minute: null;
+      }
+    > = [];
 
-  async function añadirSancion() {
-    if (!selectedId || !suspensionPlayerId) {
-      setMensaje("Selecciona un jugador para añadir la sanción.");
-      return;
-    }
-
-    const player = players.find((item) => item.id === suspensionPlayerId);
-    if (!player) {
-      setMensaje("No se ha encontrado el jugador.");
-      return;
-    }
-
-    const games = numeroDesdeInput(suspensionGames) ?? 1;
-
-    if (games <= 0) {
-      setMensaje("Los partidos de sanción deben ser mayores que cero.");
-      return;
-    }
-
-    const { error } = await supabase.from("suspensions").insert({
-      ...payloadPartido(matchType, selectedId),
-      player_id: player.id,
-      team_id: player.team_id,
-      reason: suspensionReason.trim() || "Sanción",
-      games,
-      served: 0,
-      status: "Pendiente",
+    rows.forEach((row) => {
+      for (let i = 0; i < row.goals; i++) {
+        filasGoles.push({
+          ...payloadPartido(matchType, selectedId),
+          player_id: row.player.id,
+          team_id: row.player.team_id,
+          minute: null,
+        });
+      }
     });
 
-    if (error) {
-      setMensaje("No se ha podido añadir la sanción.");
+    if (filasGoles.length > 0) {
+      const { error } = await supabase.from("match_goals").insert(filasGoles);
+
+      if (error) {
+        console.error("Error insertando goles:", error);
+        setMensaje(`No se han podido guardar los goles: ${error.message}`);
+        setSaving(false);
+        return;
+      }
+    }
+
+    const filasTarjetas: Array<
+      MatchPayload & {
+        player_id: string;
+        team_id: string;
+        card_type: "yellow" | "red";
+        minute: null;
+      }
+    > = [];
+
+    rows.forEach((row) => {
+      for (let i = 0; i < row.yellow; i++) {
+        filasTarjetas.push({
+          ...payloadPartido(matchType, selectedId),
+          player_id: row.player.id,
+          team_id: row.player.team_id,
+          card_type: "yellow",
+          minute: null,
+        });
+      }
+
+      for (let i = 0; i < row.red; i++) {
+        filasTarjetas.push({
+          ...payloadPartido(matchType, selectedId),
+          player_id: row.player.id,
+          team_id: row.player.team_id,
+          card_type: "red",
+          minute: null,
+        });
+      }
+    });
+
+    if (filasTarjetas.length > 0) {
+      const { error } = await supabase.from("match_cards").insert(filasTarjetas);
+
+      if (error) {
+        console.error("Error insertando tarjetas:", error);
+        setMensaje(`No se han podido guardar las tarjetas: ${error.message}`);
+        setSaving(false);
+        return;
+      }
+    }
+
+    const filasSanciones = rows
+      .filter((row) => row.red > 0)
+      .map((row) => ({
+        ...payloadPartido(matchType, selectedId),
+        player_id: row.player.id,
+        team_id: row.player.team_id,
+        reason: "Tarjeta roja",
+        games: 1,
+        served: 0,
+        status: "Pendiente",
+      }));
+
+    if (filasSanciones.length > 0) {
+      const { error } = await supabase.from("suspensions").insert(filasSanciones);
+
+      if (error) {
+        console.error("Error insertando sanciones:", error);
+        setMensaje(`No se han podido guardar las sanciones: ${error.message}`);
+        setSaving(false);
+        return;
+      }
+    }
+
+    const updatePayload: Record<string, string | number | boolean | null> = {
+      home_score: homeScoreCalculado,
+      away_score: awayScoreCalculado,
+      status: estado,
+      mvp_open: mvpOpen,
+    };
+
+    if (matchType === "final") {
+      updatePayload.home_penalties = penLocal;
+      updatePayload.away_penalties = penVisitante;
+    }
+
+    const tablaPartido = matchType === "grupo" ? "matches" : "final_matches";
+
+    const { error: updateError } = await supabase
+      .from(tablaPartido)
+      .update(updatePayload)
+      .eq("id", selectedId);
+
+    if (updateError) {
+      console.error("Error actualizando resultado:", updateError);
+      setMensaje(`La ficha se guardó, pero no se actualizó el resultado: ${updateError.message}`);
+      setSaving(false);
       return;
     }
 
-    setMensaje("Sanción añadida correctamente.");
-    await cargarFicha(matchType, selectedId);
-  }
-
-  async function eliminarFila(
-    tabla: "match_goals" | "match_cards" | "suspensions",
-    id: string
-  ) {
-    const confirmar = window.confirm("¿Eliminar este registro?");
-    if (!confirmar) return;
-
-    const { error } = await supabase.from(tabla).delete().eq("id", id);
-
-    if (error) {
-      setMensaje("No se ha podido eliminar el registro.");
-      return;
+    if (matchType === "final") {
+      await actualizarArrastresFinales();
     }
 
-    setMensaje("Registro eliminado.");
-    await cargarFicha(matchType, selectedId);
+    await cargarDatos({
+      tipoMantener: matchType,
+      idMantener: selectedId,
+    });
+
+    setMensaje("Ficha, resultado, tarjetas y sanciones guardados correctamente.");
+    setSaving(false);
   }
 
-  async function cambiarEstadoSancion(sancion: SuspensionRow, estado: string) {
-    const { error } = await supabase
-      .from("suspensions")
-      .update({
-        status: estado,
-        served: estado === "Cumplida" ? sancion.games : 0,
-      })
-      .eq("id", sancion.id);
-
-    if (error) {
-      setMensaje("No se ha podido actualizar la sanción.");
-      return;
-    }
-
-    setMensaje("Sanción actualizada.");
-    await cargarFicha(matchType, selectedId);
-  }
-
-  const partidosDisponibles =
-    matchType === "grupo" ? groupMatches : finalMatches;
+  const partidosDisponibles = matchType === "grupo" ? groupMatches : finalMatches;
 
   const mensajeCorrecto =
+    mensaje.includes("correctamente") ||
     mensaje.includes("guardad") ||
-    mensaje.includes("añadid") ||
-    mensaje.includes("actualizad") ||
-    mensaje.includes("eliminad");
+    mensaje.includes("actualizad");
 
   return (
     <AdminGuard>
@@ -722,7 +981,7 @@ export default function AdminFichasPartidoPage() {
             </h1>
 
             <p className="mt-2 text-center text-sm font-bold text-emerald-100">
-              Jugadores, goles, tarjetas y sanciones
+              Resultado, jugadores, goles, tarjetas y sanciones
             </p>
           </div>
 
@@ -792,338 +1051,261 @@ export default function AdminFichasPartidoPage() {
                 </div>
               ) : selectedId ? (
                 <>
+                  <div className="overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
+                    <div className="bg-red-600 px-5 py-4 text-white">
+                      <p className="text-sm font-black uppercase tracking-widest">
+                        Partido seleccionado
+                      </p>
+
+                      <h2 className="mt-2 text-2xl font-black leading-tight">
+                        {fichaTitulo}
+                      </h2>
+
+                      <p className="mt-2 text-sm font-bold text-red-100">
+                        {fichaSubtitulo}
+                      </p>
+                    </div>
+
+                    <div className="p-5">
+                      {fichaAviso && (
+                        <div className="mb-4 rounded-2xl bg-yellow-100 p-4 text-sm font-bold text-yellow-900">
+                          {fichaAviso}
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                        <div className="text-center">
+                          <p className="text-sm font-black leading-tight">
+                            {homeTeam?.name ?? "Local"}
+                          </p>
+                        </div>
+
+                        <div className="rounded-2xl bg-slate-950 px-5 py-3 text-center text-white shadow">
+                          <p className="text-4xl font-black">
+                            {homeScoreCalculado} - {awayScoreCalculado}
+                          </p>
+                        </div>
+
+                        <div className="text-center">
+                          <p className="text-sm font-black leading-tight">
+                            {awayTeam?.name ?? "Visitante"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-5">
+                        <label className="text-sm font-black uppercase text-slate-500">
+                          Estado del partido
+                        </label>
+
+                        <select
+                          value={estado}
+                          onChange={(event) => setEstado(event.target.value)}
+                          className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
+                        >
+                          <option>Pendiente</option>
+                          <option>En juego</option>
+                          <option>Finalizado</option>
+                          <option>Cerrado</option>
+                        </select>
+                      </div>
+
+                      {matchType === "final" && (
+                        <div className="mt-4 rounded-2xl bg-slate-100 p-4">
+                          <p className="text-sm font-black uppercase text-slate-500">
+                            Penaltis si hay empate
+                          </p>
+
+                          <div className="mt-3 grid grid-cols-2 gap-3">
+                            <input
+                              type="number"
+                              min="0"
+                              value={homePenalties}
+                              onChange={(event) =>
+                                setHomePenalties(event.target.value)
+                              }
+                              placeholder="Pen. local"
+                              className="rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
+                            />
+
+                            <input
+                              type="number"
+                              min="0"
+                              value={awayPenalties}
+                              onChange={(event) =>
+                                setAwayPenalties(event.target.value)
+                              }
+                              placeholder="Pen. visitante"
+                              className="rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      <label className="mt-4 flex items-center justify-between rounded-2xl bg-slate-100 p-4 font-black">
+                        <span>Abrir votación MVP</span>
+
+                        <input
+                          type="checkbox"
+                          checked={mvpOpen}
+                          onChange={(event) => setMvpOpen(event.target.checked)}
+                          className="h-6 w-6"
+                        />
+                      </label>
+                    </div>
+                  </div>
+
                   <div className="rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
-                    <p className="text-sm font-black uppercase tracking-widest text-red-600">
-                      Partido seleccionado
-                    </p>
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-black uppercase tracking-widest text-slate-500">
+                          Ficha rápida
+                        </p>
+                        <p className="mt-1 text-sm font-bold text-slate-500">
+                          Marca quién juega y apunta goles, amarillas y rojas.
+                        </p>
+                      </div>
+                    </div>
 
-                    <h2 className="mt-2 text-2xl font-black leading-tight">
-                      {fichaTitulo}
-                    </h2>
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                      <button
+                        onClick={marcarTodos}
+                        className="rounded-xl bg-slate-900 py-3 text-sm font-black text-white shadow"
+                      >
+                        Marcar todos
+                      </button>
 
-                    <p className="mt-2 text-sm font-bold text-slate-500">
-                      {fichaSubtitulo}
-                    </p>
+                      <button
+                        onClick={limpiarJugadores}
+                        className="rounded-xl bg-slate-200 py-3 text-sm font-black text-slate-900 shadow"
+                      >
+                        Limpiar ficha
+                      </button>
+                    </div>
 
-                    {fichaAviso && (
-                      <div className="mt-4 rounded-2xl bg-yellow-100 p-4 text-sm font-bold text-yellow-900">
-                        {fichaAviso}
+                    {rows.length === 0 ? (
+                      <p className="mt-4 rounded-2xl bg-slate-100 p-4 text-sm font-bold text-slate-500">
+                        No hay jugadores disponibles para esta ficha.
+                      </p>
+                    ) : (
+                      <div className="mt-5 space-y-4">
+                        {rows.map((row) => (
+                          <div
+                            key={row.player.id}
+                            className="rounded-2xl bg-slate-100 p-4 shadow-sm"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="font-black leading-tight">
+                                  {jugadorNombre(row.player)}
+                                </p>
+                                <p className="text-sm font-bold text-slate-500">
+                                  {nombreEquipo(row.player.team_id)}
+                                </p>
+                              </div>
+
+                              <label className="flex flex-col items-center gap-1 text-xs font-black uppercase text-slate-500">
+                                Jugó
+                                <input
+                                  type="checkbox"
+                                  checked={row.played}
+                                  onChange={(event) =>
+                                    actualizarJugo(
+                                      row.player.id,
+                                      event.target.checked
+                                    )
+                                  }
+                                  className="h-6 w-6"
+                                />
+                              </label>
+                            </div>
+
+                            <div className="mt-4 grid grid-cols-3 gap-2">
+                              <div>
+                                <label className="text-xs font-black uppercase text-slate-500">
+                                  Goles
+                                </label>
+
+                                <select
+                                  value={row.goals}
+                                  onChange={(event) =>
+                                    actualizarNumero(
+                                      row.player.id,
+                                      "goals",
+                                      event.target.value
+                                    )
+                                  }
+                                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-lg font-black"
+                                >
+                                  {opcionesNumero(10).map((numero) => (
+                                    <option key={numero} value={numero}>
+                                      {numero}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="text-xs font-black uppercase text-slate-500">
+                                  Amar.
+                                </label>
+
+                                <select
+                                  value={row.yellow}
+                                  onChange={(event) =>
+                                    actualizarNumero(
+                                      row.player.id,
+                                      "yellow",
+                                      event.target.value
+                                    )
+                                  }
+                                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-lg font-black"
+                                >
+                                  {opcionesNumero(2).map((numero) => (
+                                    <option key={numero} value={numero}>
+                                      {numero}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="text-xs font-black uppercase text-slate-500">
+                                  Rojas
+                                </label>
+
+                                <select
+                                  value={row.red}
+                                  onChange={(event) =>
+                                    actualizarNumero(
+                                      row.player.id,
+                                      "red",
+                                      event.target.value
+                                    )
+                                  }
+                                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-lg font-black"
+                                >
+                                  {opcionesNumero(1).map((numero) => (
+                                    <option key={numero} value={numero}>
+                                      {numero}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
 
-                  <div className="rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
-                    <p className="text-sm font-black uppercase tracking-widest text-slate-500">
-                      Jugadores que han jugado
-                    </p>
-
-                    {players.length === 0 ? (
-                      <p className="mt-3 rounded-2xl bg-slate-100 p-4 text-sm font-bold text-slate-500">
-                        No hay jugadores disponibles para esta ficha.
-                      </p>
-                    ) : (
-                      <>
-                        <div className="mt-4 space-y-3">
-                          {players.map((player) => (
-                            <label
-                              key={player.id}
-                              className="flex items-center justify-between gap-3 rounded-2xl bg-slate-100 p-4"
-                            >
-                              <div>
-                                <p className="font-black leading-tight">
-                                  {player.number !== null
-                                    ? `${player.number} · ${player.name}`
-                                    : player.name}
-                                </p>
-                                <p className="text-sm font-bold text-slate-500">
-                                  {nombreEquipo(player.team_id)}
-                                </p>
-                              </div>
-
-                              <input
-                                type="checkbox"
-                                checked={selectedPlayerIds.includes(player.id)}
-                                onChange={() => toggleJugador(player.id)}
-                                className="h-6 w-6"
-                              />
-                            </label>
-                          ))}
-                        </div>
-
-                        <button
-                          onClick={guardarJugadores}
-                          className="mt-5 w-full rounded-xl bg-red-600 py-3 font-black text-white shadow"
-                        >
-                          Guardar jugadores
-                        </button>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
-                    <p className="text-sm font-black uppercase tracking-widest text-red-600">
-                      Goles
-                    </p>
-
-                    <div className="mt-4 space-y-3">
-                      <select
-                        value={goalPlayerId}
-                        onChange={(event) => setGoalPlayerId(event.target.value)}
-                        className="w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
-                      >
-                        <option value="">Seleccionar jugador</option>
-                        {players.map((player) => (
-                          <option key={player.id} value={player.id}>
-                            {jugadorCompleto(player)}
-                          </option>
-                        ))}
-                      </select>
-
-                      <input
-                        type="number"
-                        min="0"
-                        value={goalMinute}
-                        onChange={(event) => setGoalMinute(event.target.value)}
-                        placeholder="Minuto opcional"
-                        className="w-full rounded-xl border border-slate-300 p-3 font-bold"
-                      />
-
-                      <button
-                        onClick={añadirGol}
-                        className="w-full rounded-xl bg-red-600 py-3 font-black text-white shadow"
-                      >
-                        Añadir gol
-                      </button>
-                    </div>
-
-                    <div className="mt-5 space-y-3">
-                      {goals.length === 0 ? (
-                        <p className="rounded-2xl bg-slate-100 p-4 text-sm font-bold text-slate-500">
-                          Todavía no hay goles en esta ficha.
-                        </p>
-                      ) : (
-                        goals.map((goal, index) => (
-                          <div
-                            key={goal.id}
-                            className="flex items-center justify-between gap-3 rounded-2xl bg-slate-100 p-4"
-                          >
-                            <div>
-                              <p className="font-black">
-                                {index + 1}. {nombreJugador(goal.player_id)}
-                              </p>
-                              <p className="text-sm font-bold text-slate-500">
-                                {nombreEquipo(goal.team_id)}
-                                {goal.minute !== null
-                                  ? ` · Min. ${goal.minute}`
-                                  : ""}
-                              </p>
-                            </div>
-
-                            <button
-                              onClick={() => eliminarFila("match_goals", goal.id)}
-                              className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white"
-                            >
-                              Eliminar
-                            </button>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
-                    <p className="text-sm font-black uppercase tracking-widest text-slate-500">
-                      Tarjetas
-                    </p>
-
-                    <div className="mt-4 space-y-3">
-                      <select
-                        value={cardPlayerId}
-                        onChange={(event) => setCardPlayerId(event.target.value)}
-                        className="w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
-                      >
-                        <option value="">Seleccionar jugador</option>
-                        {players.map((player) => (
-                          <option key={player.id} value={player.id}>
-                            {jugadorCompleto(player)}
-                          </option>
-                        ))}
-                      </select>
-
-                      <select
-                        value={cardType}
-                        onChange={(event) =>
-                          setCardType(event.target.value as "yellow" | "red")
-                        }
-                        className="w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
-                      >
-                        <option value="yellow">Tarjeta amarilla</option>
-                        <option value="red">Tarjeta roja</option>
-                      </select>
-
-                      <input
-                        type="number"
-                        min="0"
-                        value={cardMinute}
-                        onChange={(event) => setCardMinute(event.target.value)}
-                        placeholder="Minuto opcional"
-                        className="w-full rounded-xl border border-slate-300 p-3 font-bold"
-                      />
-
-                      <button
-                        onClick={añadirTarjeta}
-                        className="w-full rounded-xl bg-slate-900 py-3 font-black text-white shadow"
-                      >
-                        Añadir tarjeta
-                      </button>
-                    </div>
-
-                    <div className="mt-5 space-y-3">
-                      {cards.length === 0 ? (
-                        <p className="rounded-2xl bg-slate-100 p-4 text-sm font-bold text-slate-500">
-                          Todavía no hay tarjetas en esta ficha.
-                        </p>
-                      ) : (
-                        cards.map((card) => (
-                          <div
-                            key={card.id}
-                            className="flex items-center justify-between gap-3 rounded-2xl bg-slate-100 p-4"
-                          >
-                            <div>
-                              <p className="font-black">
-                                {card.card_type === "yellow" ? "🟨" : "🟥"}{" "}
-                                {nombreJugador(card.player_id)}
-                              </p>
-                              <p className="text-sm font-bold text-slate-500">
-                                {nombreEquipo(card.team_id)}
-                                {card.minute !== null
-                                  ? ` · Min. ${card.minute}`
-                                  : ""}
-                              </p>
-                            </div>
-
-                            <button
-                              onClick={() => eliminarFila("match_cards", card.id)}
-                              className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white"
-                            >
-                              Eliminar
-                            </button>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
-                    <p className="text-sm font-black uppercase tracking-widest text-red-600">
-                      Sancionados
-                    </p>
-
-                    <div className="mt-4 space-y-3">
-                      <select
-                        value={suspensionPlayerId}
-                        onChange={(event) =>
-                          setSuspensionPlayerId(event.target.value)
-                        }
-                        className="w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
-                      >
-                        <option value="">Seleccionar jugador</option>
-                        {players.map((player) => (
-                          <option key={player.id} value={player.id}>
-                            {jugadorCompleto(player)}
-                          </option>
-                        ))}
-                      </select>
-
-                      <input
-                        value={suspensionReason}
-                        onChange={(event) =>
-                          setSuspensionReason(event.target.value)
-                        }
-                        placeholder="Motivo de la sanción"
-                        className="w-full rounded-xl border border-slate-300 p-3 font-bold"
-                      />
-
-                      <input
-                        type="number"
-                        min="1"
-                        value={suspensionGames}
-                        onChange={(event) =>
-                          setSuspensionGames(event.target.value)
-                        }
-                        placeholder="Partidos de sanción"
-                        className="w-full rounded-xl border border-slate-300 p-3 font-bold"
-                      />
-
-                      <button
-                        onClick={añadirSancion}
-                        className="w-full rounded-xl bg-red-600 py-3 font-black text-white shadow"
-                      >
-                        Añadir sanción
-                      </button>
-                    </div>
-
-                    <div className="mt-5 space-y-3">
-                      {suspensions.length === 0 ? (
-                        <p className="rounded-2xl bg-slate-100 p-4 text-sm font-bold text-slate-500">
-                          No hay sanciones asociadas a esta ficha.
-                        </p>
-                      ) : (
-                        suspensions.map((sancion) => (
-                          <div
-                            key={sancion.id}
-                            className="rounded-2xl bg-slate-100 p-4"
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <p className="font-black">
-                                  {nombreJugador(sancion.player_id)}
-                                </p>
-                                <p className="text-sm font-bold text-slate-500">
-                                  {equipoJugador(sancion.player_id)}
-                                </p>
-                                <p className="mt-2 text-sm font-bold text-slate-700">
-                                  {sancion.reason}
-                                </p>
-                                <p className="mt-1 text-sm font-bold text-red-600">
-                                  {sancion.games} partido(s) · {sancion.status}
-                                </p>
-                              </div>
-
-                              <button
-                                onClick={() =>
-                                  eliminarFila("suspensions", sancion.id)
-                                }
-                                className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white"
-                              >
-                                Eliminar
-                              </button>
-                            </div>
-
-                            <div className="mt-3 grid grid-cols-2 gap-2">
-                              <button
-                                onClick={() =>
-                                  cambiarEstadoSancion(sancion, "Pendiente")
-                                }
-                                className="rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-900 shadow"
-                              >
-                                Pendiente
-                              </button>
-
-                              <button
-                                onClick={() =>
-                                  cambiarEstadoSancion(sancion, "Cumplida")
-                                }
-                                className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black text-white shadow"
-                              >
-                                Cumplida
-                              </button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
+                  <button
+                    onClick={guardarFichaCompleta}
+                    disabled={saving}
+                    className="w-full rounded-2xl bg-red-600 py-4 text-lg font-black text-white shadow-2xl disabled:opacity-60"
+                  >
+                    {saving ? "Guardando ficha..." : "Guardar ficha y resultado"}
+                  </button>
 
                   {mensaje && (
                     <div

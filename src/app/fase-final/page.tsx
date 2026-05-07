@@ -25,9 +25,18 @@ type FinalMatch = {
 
 type Vote = {
   id: string;
-  match_id: string;
+  match_id: string | null;
+  final_match_id: string | null;
   user_id: string;
 };
+
+const ORDEN_FASES = [
+  "Octavos",
+  "Cuartos",
+  "Semifinales",
+  "Tercer puesto",
+  "Final",
+];
 
 function getUserId() {
   let userId = localStorage.getItem("torneo_user_id");
@@ -63,6 +72,25 @@ function normalizarFase(fase: string) {
   return fase;
 }
 
+function ordenarFases(matches: FinalMatch[]) {
+  const fasesReales = Array.from(
+    new Set(
+      matches.map((match) => normalizarFase(match.phase)).filter(Boolean)
+    )
+  );
+
+  return fasesReales.sort((a, b) => {
+    const indexA = ORDEN_FASES.indexOf(a);
+    const indexB = ORDEN_FASES.indexOf(b);
+
+    if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+    if (indexA !== -1) return -1;
+    if (indexB !== -1) return 1;
+
+    return a.localeCompare(b);
+  });
+}
+
 export default function FaseFinalPage() {
   const [matches, setMatches] = useState<FinalMatch[]>([]);
   const [votes, setVotes] = useState<Vote[]>([]);
@@ -88,10 +116,11 @@ export default function FaseFinalPage() {
 
     const { data: votesData, error: votesError } = await supabase
       .from("mvp_votes")
-      .select("id, match_id, user_id")
+      .select("id, match_id, final_match_id, user_id")
       .eq("user_id", usuario);
 
     if (error || votesError) {
+      console.error("Error cargando fase final:", error || votesError);
       setErrorCarga("No se ha podido cargar la fase final.");
       setLoading(false);
       return;
@@ -105,36 +134,12 @@ export default function FaseFinalPage() {
     setLoading(false);
   }
 
-  const fases = useMemo(() => {
-    const ordenPreferido = [
-      "Octavos",
-      "Cuartos",
-      "Semifinales",
-      "Tercer puesto",
-      "Final",
-    ];
+  const fases = useMemo(() => ordenarFases(matches), [matches]);
 
-    const fasesReales = Array.from(
-      new Set(
-        matches.map((match) => normalizarFase(match.phase)).filter(Boolean)
-      )
-    );
-
-    return fasesReales.sort((a, b) => {
-      const indexA = ordenPreferido.indexOf(a);
-      const indexB = ordenPreferido.indexOf(b);
-
-      if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-      if (indexA !== -1) return -1;
-      if (indexB !== -1) return 1;
-
-      return a.localeCompare(b);
-    });
-  }, [matches]);
-
-  function votosUsuarioEnPartido(matchId: string) {
+  function votosUsuarioEnPartido(finalMatchId: string) {
     return votes.filter(
-      (vote) => vote.match_id === matchId && vote.user_id === userId
+      (vote) =>
+        vote.final_match_id === finalMatchId && vote.user_id === userId
     ).length;
   }
 
@@ -143,18 +148,10 @@ export default function FaseFinalPage() {
 
     const votosEmitidos = votosUsuarioEnPartido(match.id);
 
-    if (votosEmitidos >= 2) {
+    if (votosEmitidos > 0) {
       return (
         <div className="mt-3 rounded-xl bg-emerald-100 px-3 py-2 text-center text-sm font-black text-emerald-800">
           ✅ Voto emitido
-        </div>
-      );
-    }
-
-    if (votosEmitidos === 1) {
-      return (
-        <div className="mt-3 rounded-xl bg-emerald-100 px-3 py-2 text-center text-sm font-black text-emerald-800">
-          ✅ Voto iniciado
         </div>
       );
     }
@@ -193,10 +190,22 @@ export default function FaseFinalPage() {
           <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
             Torneo Fútbol 7 Astrabudua
           </p>
+
           <h1 className="mt-2 text-center text-3xl font-black">
             Eliminatorias
           </h1>
+
+          <p className="mt-2 text-center text-sm font-bold text-emerald-100">
+            Octavos, cuartos, semifinales y final
+          </p>
         </div>
+
+        <Link
+          href="/inicio"
+          className="mt-4 block rounded-2xl bg-white/95 p-4 text-center font-black text-slate-900 shadow"
+        >
+          Volver al inicio
+        </Link>
 
         {loading ? (
           <div className="mt-6 rounded-2xl bg-white/95 p-5 font-bold shadow">
@@ -226,7 +235,7 @@ export default function FaseFinalPage() {
                   className={`overflow-hidden rounded-3xl shadow-2xl backdrop-blur ${
                     esFinal
                       ? "bg-amber-100/95 ring-2 ring-amber-300"
-                      : "bg-emerald-50/95 ring-1 ring-emerald-200"
+                      : "bg-white/95 ring-1 ring-slate-200"
                   }`}
                 >
                   <button
@@ -234,12 +243,20 @@ export default function FaseFinalPage() {
                     className={`flex w-full items-center justify-between gap-3 px-5 py-4 text-left ${
                       esFinal
                         ? "bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 text-slate-950"
-                        : "bg-emerald-50 text-slate-950"
+                        : "bg-red-600 text-white"
                     }`}
                   >
                     <div className="min-w-0">
                       <p className="break-words text-xl font-black leading-tight">
-                        {esFinal ? "🏆 Final " : fase}
+                        {esFinal ? "🏆 Final" : fase}
+                      </p>
+
+                      <p
+                        className={`mt-1 text-xs font-black uppercase tracking-widest ${
+                          esFinal ? "text-slate-700" : "text-red-100"
+                        }`}
+                      >
+                        {cruces.length} partido{cruces.length === 1 ? "" : "s"}
                       </p>
                     </div>
 
@@ -274,7 +291,7 @@ export default function FaseFinalPage() {
                               className={`rounded-2xl p-3 shadow ${
                                 esFinal
                                   ? "bg-amber-50 ring-1 ring-amber-200"
-                                  : "bg-emerald-50 ring-1 ring-emerald-200"
+                                  : "bg-slate-50 ring-1 ring-slate-200"
                               }`}
                             >
                               <div className="flex items-center justify-between gap-3">
@@ -282,7 +299,7 @@ export default function FaseFinalPage() {
                                   className={`break-words text-xs font-black uppercase tracking-wide ${
                                     esFinal
                                       ? "text-amber-700"
-                                      : "text-slate-900"
+                                      : "text-red-600"
                                   }`}
                                 >
                                   {match.title}

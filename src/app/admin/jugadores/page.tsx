@@ -1,8 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import AdminGuard from "@/components/AdminGuard";
 import { supabase } from "@/lib/supabase";
+
+type PlayerType = "M" | "F";
 
 type Team = {
   id: string;
@@ -15,6 +18,7 @@ type Player = {
   team_id: string;
   name: string;
   number: number;
+  player_type: PlayerType | null;
 };
 
 export default function AdminJugadoresPage() {
@@ -26,6 +30,7 @@ export default function AdminJugadoresPage() {
 
   const [nombre, setNombre] = useState("");
   const [dorsal, setDorsal] = useState("");
+  const [tipoJugador, setTipoJugador] = useState<PlayerType>("M");
 
   const [mensaje, setMensaje] = useState("");
   const [loading, setLoading] = useState(true);
@@ -36,14 +41,13 @@ export default function AdminJugadoresPage() {
     cargarDatos();
   }, []);
 
-  async function cargarDatos() {
+  async function cargarDatos(mantenerTeamId?: string) {
     setLoading(true);
     setMensaje("");
 
     const { data: teamsData, error: teamsError } = await supabase
       .from("teams")
       .select("id, name, group_name")
-      .order("group_name", { ascending: true })
       .order("name", { ascending: true });
 
     if (teamsError) {
@@ -62,7 +66,7 @@ export default function AdminJugadoresPage() {
       return;
     }
 
-    const equipoSeleccionado = teamId || equipos[0].id;
+    const equipoSeleccionado = mantenerTeamId || teamId || equipos[0].id;
     setTeamId(equipoSeleccionado);
 
     await cargarJugadores(equipoSeleccionado);
@@ -73,7 +77,7 @@ export default function AdminJugadoresPage() {
   async function cargarJugadores(idEquipo: string) {
     const { data, error } = await supabase
       .from("players")
-      .select("id, team_id, name, number")
+      .select("id, team_id, name, number, player_type")
       .eq("team_id", idEquipo)
       .order("number", { ascending: true })
       .order("name", { ascending: true });
@@ -91,6 +95,7 @@ export default function AdminJugadoresPage() {
     setPlayerId("");
     setNombre("");
     setDorsal("");
+    setTipoJugador("M");
     setMensaje("");
 
     if (id) {
@@ -104,6 +109,7 @@ export default function AdminJugadoresPage() {
     setPlayerId(player.id);
     setNombre(player.name);
     setDorsal(player.number.toString());
+    setTipoJugador(player.player_type === "F" ? "F" : "M");
     setMensaje("");
   }
 
@@ -111,6 +117,7 @@ export default function AdminJugadoresPage() {
     setPlayerId("");
     setNombre("");
     setDorsal("");
+    setTipoJugador("M");
     setMensaje("");
   }
 
@@ -130,19 +137,53 @@ export default function AdminJugadoresPage() {
     });
   }
 
-  async function jugadorTieneVotos(idJugador: string) {
-    const { data, error } = await supabase
+  async function jugadorTieneDatosAsociados(idJugador: string) {
+    const { data: votos, error: votosError } = await supabase
       .from("mvp_votes")
       .select("id")
       .eq("player_id", idJugador)
       .limit(1);
 
-    if (error) {
+    if (votosError) {
       setMensaje("No se ha podido comprobar si el jugador tiene votos.");
       return true;
     }
 
-    return (data ?? []).length > 0;
+    if ((votos ?? []).length > 0) return true;
+
+    const { data: partidosJugados } = await supabase
+      .from("match_players")
+      .select("id")
+      .eq("player_id", idJugador)
+      .limit(1);
+
+    if ((partidosJugados ?? []).length > 0) return true;
+
+    const { data: goles } = await supabase
+      .from("match_goals")
+      .select("id")
+      .eq("player_id", idJugador)
+      .limit(1);
+
+    if ((goles ?? []).length > 0) return true;
+
+    const { data: tarjetas } = await supabase
+      .from("match_cards")
+      .select("id")
+      .eq("player_id", idJugador)
+      .limit(1);
+
+    if ((tarjetas ?? []).length > 0) return true;
+
+    const { data: sanciones } = await supabase
+      .from("suspensions")
+      .select("id")
+      .eq("player_id", idJugador)
+      .limit(1);
+
+    if ((sanciones ?? []).length > 0) return true;
+
+    return false;
   }
 
   async function guardarJugador() {
@@ -179,6 +220,7 @@ export default function AdminJugadoresPage() {
       team_id: teamId,
       name: nombreLimpio,
       number: numero,
+      player_type: tipoJugador,
     };
 
     const { error } = playerId
@@ -205,11 +247,11 @@ export default function AdminJugadoresPage() {
       return;
     }
 
-    const tieneVotos = await jugadorTieneVotos(playerId);
+    const tieneDatos = await jugadorTieneDatosAsociados(playerId);
 
-    if (tieneVotos) {
+    if (tieneDatos) {
       setMensaje(
-        "No se puede eliminar este jugador porque ya tiene votos MVP asociados."
+        "No se puede eliminar este jugador porque ya tiene votos, ficha de partido, goles, tarjetas o sanciones asociadas."
       );
       return;
     }
@@ -232,6 +274,10 @@ export default function AdminJugadoresPage() {
     await cargarJugadores(teamId);
   }
 
+  function textoTipo(tipo: PlayerType | null) {
+    return tipo === "F" ? "Federado" : "Municipio";
+  }
+
   const mensajeCorrecto =
     mensaje.includes("correctamente") || mensaje.includes("eliminado");
 
@@ -249,13 +295,22 @@ export default function AdminJugadoresPage() {
             <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
               Torneo Fútbol 7 Astrabudua
             </p>
+
             <h1 className="mt-2 text-center text-3xl font-black">
               Jugadores
             </h1>
+
             <p className="mt-2 text-center text-sm font-bold text-emerald-100">
               Gestión de plantillas
             </p>
           </div>
+
+          <Link
+            href="/admin"
+            className="mt-4 block rounded-2xl bg-white/95 p-4 text-center font-black text-slate-900 shadow"
+          >
+            Volver al panel admin
+          </Link>
 
           <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
             {loading ? (
@@ -277,7 +332,7 @@ export default function AdminJugadoresPage() {
                 >
                   {teams.map((team) => (
                     <option key={team.id} value={team.id}>
-                      {team.name} · {team.group_name ?? "Sin grupo"}
+                      {team.name}
                     </option>
                   ))}
                 </select>
@@ -286,6 +341,7 @@ export default function AdminJugadoresPage() {
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <h2 className="text-lg font-black">Plantilla</h2>
+
                       <p className="text-xs font-bold text-slate-500">
                         {jugadoresEquipo.length} jugador
                         {jugadoresEquipo.length === 1 ? "" : "es"}
@@ -326,9 +382,22 @@ export default function AdminJugadoresPage() {
                             {player.number}
                           </div>
 
-                          <p className="break-words font-black leading-tight">
-                            {player.name}
-                          </p>
+                          <div className="min-w-0 flex-1">
+                            <p className="break-words font-black leading-tight">
+                              {player.name}
+                            </p>
+
+                            <p
+                              className={`mt-1 text-xs font-bold ${
+                                playerId === player.id
+                                  ? "text-red-100"
+                                  : "text-slate-500"
+                              }`}
+                            >
+                              {player.player_type === "F" ? "F" : "M"} ·{" "}
+                              {textoTipo(player.player_type)}
+                            </p>
+                          </div>
                         </button>
                       ))}
                     </div>
@@ -347,6 +416,7 @@ export default function AdminJugadoresPage() {
               <label className="text-sm font-black uppercase text-slate-500">
                 Nombre
               </label>
+
               <input
                 value={nombre}
                 onChange={(event) => setNombre(event.target.value)}
@@ -359,6 +429,7 @@ export default function AdminJugadoresPage() {
               <label className="text-sm font-black uppercase text-slate-500">
                 Dorsal
               </label>
+
               <input
                 type="number"
                 min="0"
@@ -367,6 +438,23 @@ export default function AdminJugadoresPage() {
                 className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
                 placeholder="0"
               />
+            </div>
+
+            <div className="mt-4">
+              <label className="text-sm font-black uppercase text-slate-500">
+                Tipo
+              </label>
+
+              <select
+                value={tipoJugador}
+                onChange={(event) =>
+                  setTipoJugador(event.target.value as PlayerType)
+                }
+                className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
+              >
+                <option value="M">M · Municipio</option>
+                <option value="F">F · Federado</option>
+              </select>
             </div>
 
             <button

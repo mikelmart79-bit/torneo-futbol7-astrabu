@@ -51,22 +51,25 @@ export default function AdminEquiposPage() {
       : null;
 
     if (equipoMantener) {
-      seleccionarEquipo(equipoMantener);
+      seleccionarEquipo(equipoMantener, false);
     } else if (equipos.length > 0 && !equipoId) {
-      seleccionarEquipo(equipos[0]);
+      seleccionarEquipo(equipos[0], false);
     } else if (equipos.length === 0) {
-      nuevoEquipo();
+      nuevoEquipo(false);
     }
 
     setLoading(false);
   }
 
-  function seleccionarEquipo(team: Team) {
+  function seleccionarEquipo(team: Team, limpiarMensaje = true) {
     setEquipoId(team.id);
     setNombre(team.name);
     setColorLocal(team.home_color || "#047857");
     setColorVisitante(team.away_color || "#dc2626");
-    setMensaje("");
+
+    if (limpiarMensaje) {
+      setMensaje("");
+    }
   }
 
   function cambiarEquipo(id: string) {
@@ -82,12 +85,15 @@ export default function AdminEquiposPage() {
     }
   }
 
-  function nuevoEquipo() {
+  function nuevoEquipo(limpiarMensaje = true) {
     setEquipoId("");
     setNombre("");
     setColorLocal("#047857");
     setColorVisitante("#dc2626");
-    setMensaje("");
+
+    if (limpiarMensaje) {
+      setMensaje("");
+    }
   }
 
   function existeEquipoDuplicado(nombreEquipo: string) {
@@ -279,7 +285,7 @@ export default function AdminEquiposPage() {
 
   return (
     <AdminGuard>
-      <main className="relative min-h-screen overflow-hidden bg-black text-slate-900">
+      <main className="relative min-h-screen overflow-x-hidden bg-black text-slate-900">
         <img
           src="/torneo-verano.png"
           alt="Fondo torneo"
@@ -332,7 +338,7 @@ export default function AdminEquiposPage() {
                 </select>
 
                 <button
-                  onClick={nuevoEquipo}
+                  onClick={() => nuevoEquipo()}
                   className="mt-3 w-full rounded-xl bg-slate-900 py-3 font-black text-white shadow"
                 >
                   Crear nuevo equipo
@@ -351,16 +357,6 @@ export default function AdminEquiposPage() {
                     className="mt-2 w-full rounded-xl border border-slate-300 p-3 font-bold"
                     placeholder="Nombre del equipo"
                   />
-                </div>
-
-                <div className="mt-4 rounded-2xl bg-slate-100 p-4">
-                  <p className="text-xs font-black uppercase text-slate-500">
-                    Fase
-                  </p>
-
-                  <p className="mt-1 text-lg font-black text-slate-950">
-                    Clasificación
-                  </p>
                 </div>
 
                 <div className="mt-4 grid grid-cols-2 gap-3">
@@ -449,16 +445,6 @@ export default function AdminEquiposPage() {
                       >
                         <p className="break-words text-lg font-black leading-tight">
                           {team.name}
-                        </p>
-
-                        <p
-                          className={`mt-1 text-xs font-bold ${
-                            equipoId === team.id
-                              ? "text-red-100"
-                              : "text-slate-500"
-                          }`}
-                        >
-                          Clasificación
                         </p>
                       </button>
                     ))}

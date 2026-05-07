@@ -547,13 +547,15 @@ export default function CalendarioPage() {
                           </div>
 
                           {match.mvp_open && (
-                            <Link
-                              href="/mvp"
-                              className="mt-3 block rounded-xl bg-red-600 py-3 text-center text-sm font-black text-white shadow"
-                            >
-                              Votar MVP
-                            </Link>
-                          )}
+  			    <Link
+   			      href={`/votar-mvp?match=${match.id}&type=${
+    				match.tipo === "final" ? "final" : "grupo"
+    			      }`}
+    			      className="mt-3 block rounded-xl bg-red-600 py-3 text-center text-sm font-black text-white shadow"
+  			    >
+    			      Votar MVP
+ 		            </Link>
+			)}
                         </div>
                       </div>
                     ))}

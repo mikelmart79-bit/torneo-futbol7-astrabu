@@ -161,7 +161,7 @@ export default function FaseFinalPage() {
 
     return (
       <Link
-        href={`/votar-mvp?match=${match.id}`}
+        href={`/votar-mvp?match=${match.id}&type=final`}
         className="mt-3 block rounded-xl bg-red-600 px-3 py-2 text-center text-sm font-black text-white shadow"
       >
         Votar MVP de este partido

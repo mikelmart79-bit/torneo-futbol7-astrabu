@@ -159,6 +159,11 @@ function mismoMes(fecha: string, month: CalendarMonth) {
   return parts.year === month.year && parts.monthIndex === month.monthIndex;
 }
 
+function tituloPartido(match: CalendarMatch) {
+  if (match.tipo === "clasificacion") return "Clasificación";
+  return match.title || match.phase || "Eliminatoria";
+}
+
 export default function CalendarioPage() {
   const [matches, setMatches] = useState<CalendarMatch[]>([]);
   const [selectedDate, setSelectedDate] = useState("");
@@ -546,20 +551,14 @@ export default function CalendarioPage() {
                                   : "bg-red-600"
                               }`}
                             >
-                              <div className="flex items-center justify-between gap-3">
-                                <div className="min-w-0">
-                                  <p className="text-xs font-black uppercase tracking-widest opacity-80">
-                                    {match.tipo === "final"
-                                      ? match.phase
-                                      : "Clasificación"}
-                                  </p>
+                              <div className="grid grid-cols-[72px_1fr_72px] items-center gap-2">
+                                <div />
 
-                                  <p className="break-words text-sm font-black leading-tight">
-                                    {match.title}
-                                  </p>
-                                </div>
+                                <p className="text-center text-base font-black text-white">
+                                  {tituloPartido(match)}
+                                </p>
 
-                                <p className="shrink-0 rounded-full bg-white/20 px-3 py-1 text-xs font-black">
+                                <p className="justify-self-end rounded-full bg-white/20 px-3 py-1 text-xs font-black">
                                   {match.status ?? "Pendiente"}
                                 </p>
                               </div>
@@ -567,7 +566,7 @@ export default function CalendarioPage() {
 
                             <div className="p-4">
                               <div className="grid grid-cols-[minmax(0,1fr)_46px_minmax(0,1fr)] items-center gap-2">
-                                <p className="min-w-0 break-words text-center text-xs font-black leading-tight text-slate-950">
+                                <p className="min-w-0 break-words text-center text-sm font-black leading-tight text-slate-950">
                                   {match.home_name}
                                 </p>
 
@@ -583,7 +582,7 @@ export default function CalendarioPage() {
                                   </p>
                                 </div>
 
-                                <p className="min-w-0 break-words text-center text-xs font-black leading-tight text-slate-950">
+                                <p className="min-w-0 break-words text-center text-sm font-black leading-tight text-slate-950">
                                   {match.away_name}
                                 </p>
                               </div>

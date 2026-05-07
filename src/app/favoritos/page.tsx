@@ -1,17 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { formatearFecha } from "@/lib/formatDate";
-
-type Group = {
-  id: string;
-  name: string;
-  sort_order: number;
-  qualified_count: number;
-};
 
 type Team = {
   id: string;
@@ -19,32 +11,34 @@ type Team = {
   group_name: string | null;
 };
 
-type Match = {
+type TeamRef = {
   id: string;
-  tipo: "grupo" | "final";
-  title?: string | null;
-  phase?: string | null;
+  name: string;
+};
+
+type GroupMatch = {
+  id: string;
+  tipo: "grupo";
+  group_name: string | null;
   match_date: string | null;
   match_time: string | null;
   field: string | null;
-  group_name: string | null;
   home_score: number | null;
   away_score: number | null;
-  home_penalties?: number | null;
-  away_penalties?: number | null;
   status: string | null;
   mvp_open: boolean | null;
-  home_team: { id: string | null; name: string } | null;
-  away_team: { id: string | null; name: string } | null;
+  home_team: TeamRef | null;
+  away_team: TeamRef | null;
 };
 
-type RawMatch = Omit<Match, "tipo" | "home_team" | "away_team"> & {
-  home_team: { id: string; name: string }[] | { id: string; name: string } | null;
-  away_team: { id: string; name: string }[] | { id: string; name: string } | null;
+type RawGroupMatch = Omit<GroupMatch, "tipo" | "home_team" | "away_team"> & {
+  home_team: TeamRef[] | TeamRef | null;
+  away_team: TeamRef[] | TeamRef | null;
 };
 
 type FinalMatch = {
   id: string;
+  tipo: "final";
   phase: string;
   title: string;
   home_ref: string;
@@ -57,43 +51,43 @@ type FinalMatch = {
   home_penalties: number | null;
   away_penalties: number | null;
   status: string | null;
-  mvp_open: boolean | null;
   sort_order: number;
+  mvp_open: boolean | null;
+};
+
+type DisplayMatch = {
+  id: string;
+  tipo: "grupo" | "final";
+  phase: string;
+  title: string;
+  match_date: string | null;
+  match_time: string | null;
+  field: string | null;
+  home_name: string;
+  away_name: string;
+  home_score: number | null;
+  away_score: number | null;
+  home_penalties: number | null;
+  away_penalties: number | null;
+  status: string | null;
+  mvp_open: boolean | null;
 };
 
 type Vote = {
   id: string;
-  match_id: string;
+  match_id: string | null;
+  final_match_id: string | null;
   user_id: string;
-  player_id: string;
-  team_id: string | null;
 };
 
-type Row = {
-  teamId: string;
-  team: string;
-  pj: number;
-  g: number;
-  e: number;
-  p: number;
-  gf: number;
-  gc: number;
-  dg: number;
-  pts: number;
-};
-
-type Seccion = "calendario" | "clasificacion";
-
-function normalizarEquipo(
-  equipo: RawMatch["home_team"]
-): { id: string; name: string } | null {
+function normalizarEquipo(equipo: RawGroupMatch["home_team"]): TeamRef | null {
   if (!equipo) return null;
   if (Array.isArray(equipo)) return equipo[0] ?? null;
   return equipo;
 }
 
-function normalizarNombre(nombre: string | null | undefined) {
-  return (nombre ?? "").trim().toLowerCase();
+function normalizarTexto(texto: string | null | undefined) {
+  return (texto ?? "").trim().toLowerCase();
 }
 
 function getUserId() {
@@ -112,7 +106,7 @@ function formatearFechaSegura(fecha: string | null) {
   return formatearFecha(fecha);
 }
 
-function ordenarPartidos(partidos: Match[]) {
+function ordenarPartidos(partidos: DisplayMatch[]) {
   return [...partidos].sort((a, b) => {
     const fechaA = a.match_date ?? "9999-12-31";
     const fechaB = b.match_date ?? "9999-12-31";
@@ -122,273 +116,229 @@ function ordenarPartidos(partidos: Match[]) {
     const horaA = a.match_time ?? "99:99";
     const horaB = b.match_time ?? "99:99";
 
-    return horaA.localeCompare(horaB);
+    if (horaA !== horaB) return horaA.localeCompare(horaB);
+
+    return a.title.localeCompare(b.title);
   });
+}
+
+function estadoBonito(status: string | null) {
+  if (!status) return "Pendiente";
+
+  if (status === "pending") return "Pendiente";
+  if (status === "live") return "En juego";
+  if (status === "finished") return "Finalizado";
+  if (status === "closed") return "Cerrado";
+
+  return status;
 }
 
 export default function FavoritosPage() {
   const [favoritos, setFavoritos] = useState<string[]>([]);
-  const [groups, setGroups] = useState<Group[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
-  const [matches, setMatches] = useState<Match[]>([]);
+  const [matches, setMatches] = useState<GroupMatch[]>([]);
+  const [finalMatches, setFinalMatches] = useState<FinalMatch[]>([]);
   const [votes, setVotes] = useState<Vote[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [errorCarga, setErrorCarga] = useState("");
+  const [userId, setUserId] = useState("");
   const [equipoAbierto, setEquipoAbierto] = useState("");
-  const [seccionesAbiertas, setSeccionesAbiertas] = useState<
-    Record<string, boolean>
-  >({});
+  const [loading, setLoading] = useState(true);
+  const [mensaje, setMensaje] = useState("");
 
   useEffect(() => {
+    const usuario = getUserId();
+    setUserId(usuario);
+
     const guardados = localStorage.getItem("equiposFavoritos");
-    const userId = getUserId();
+    const ids = guardados ? JSON.parse(guardados) : [];
+    setFavoritos(ids);
 
-    if (guardados) {
-      try {
-        setFavoritos(JSON.parse(guardados));
-      } catch {
-        localStorage.removeItem("equiposFavoritos");
-        setFavoritos([]);
-      }
-    }
-
-    async function cargarDatos() {
-      setLoading(true);
-      setErrorCarga("");
-
-      const { data: groupsData, error: groupsError } = await supabase
-        .from("groups")
-        .select("id, name, sort_order, qualified_count")
-        .order("sort_order", { ascending: true });
-
-      const { data: teamsData, error: teamsError } = await supabase
-        .from("teams")
-        .select("id, name, group_name")
-        .order("group_name", { ascending: true })
-        .order("name", { ascending: true });
-
-      const { data: matchesData, error: matchesError } = await supabase
-        .from("matches")
-        .select(`
-          id,
-          match_date,
-          match_time,
-          field,
-          group_name,
-          home_score,
-          away_score,
-          status,
-          mvp_open,
-          home_team:teams!matches_home_team_id_fkey(id, name),
-          away_team:teams!matches_away_team_id_fkey(id, name)
-        `)
-        .order("match_date", { ascending: true })
-        .order("match_time", { ascending: true });
-
-      const { data: finalData, error: finalError } = await supabase
-        .from("final_matches")
-        .select(`
-          id,
-          phase,
-          title,
-          home_ref,
-          away_ref,
-          match_date,
-          match_time,
-          field,
-          home_score,
-          away_score,
-          home_penalties,
-          away_penalties,
-          status,
-          mvp_open,
-          sort_order
-        `)
-        .order("sort_order", { ascending: true });
-
-      const { data: votesData, error: votesError } = await supabase
-        .from("mvp_votes")
-        .select("id, match_id, user_id, player_id, team_id")
-        .eq("user_id", userId);
-
-      if (groupsError || teamsError || matchesError || finalError || votesError) {
-        setErrorCarga("No se han podido cargar tus favoritos.");
-        setLoading(false);
-        return;
-      }
-
-      const partidosGrupo: Match[] = (
-        (matchesData as unknown as RawMatch[]) || []
-      ).map((match) => ({
-        ...match,
-        tipo: "grupo",
-        home_team: normalizarEquipo(match.home_team),
-        away_team: normalizarEquipo(match.away_team),
-      }));
-
-      const partidosFinales: Match[] = ((finalData ?? []) as FinalMatch[]).map(
-        (match) => ({
-          id: match.id,
-          tipo: "final",
-          title: match.title,
-          phase: match.phase,
-          match_date: match.match_date,
-          match_time: match.match_time,
-          field: match.field,
-          group_name: null,
-          home_score: match.home_score,
-          away_score: match.away_score,
-          home_penalties: match.home_penalties,
-          away_penalties: match.away_penalties,
-          status: match.status,
-          mvp_open: match.mvp_open,
-          home_team: match.home_ref
-            ? { id: null, name: match.home_ref }
-            : null,
-          away_team: match.away_ref
-            ? { id: null, name: match.away_ref }
-            : null,
-        })
-      );
-
-      setGroups((groupsData ?? []) as Group[]);
-      setTeams((teamsData ?? []) as Team[]);
-      setMatches(ordenarPartidos([...partidosGrupo, ...partidosFinales]));
-      setVotes((votesData ?? []) as Vote[]);
-      setLoading(false);
-    }
-
-    cargarDatos();
+    cargarDatos(usuario);
   }, []);
+
+  async function cargarDatos(usuario: string) {
+    setLoading(true);
+    setMensaje("");
+
+    const { data: teamsData, error: teamsError } = await supabase
+      .from("teams")
+      .select("id, name, group_name")
+      .order("name", { ascending: true });
+
+    if (teamsError) {
+      console.error("Error cargando equipos:", teamsError);
+      setMensaje("No se han podido cargar los equipos favoritos.");
+      setLoading(false);
+      return;
+    }
+
+    const { data: matchesData, error: matchesError } = await supabase
+      .from("matches")
+      .select(
+        `
+        id,
+        group_name,
+        match_date,
+        match_time,
+        field,
+        home_score,
+        away_score,
+        status,
+        mvp_open,
+        home_team:teams!matches_home_team_id_fkey(id, name),
+        away_team:teams!matches_away_team_id_fkey(id, name)
+      `
+      )
+      .order("match_date", { ascending: true })
+      .order("match_time", { ascending: true });
+
+    if (matchesError) {
+      console.error("Error cargando partidos:", matchesError);
+      setMensaje("No se han podido cargar los partidos.");
+      setLoading(false);
+      return;
+    }
+
+    const { data: finalData, error: finalError } = await supabase
+      .from("final_matches")
+      .select(
+        `
+        id,
+        phase,
+        title,
+        home_ref,
+        away_ref,
+        match_date,
+        match_time,
+        field,
+        home_score,
+        away_score,
+        home_penalties,
+        away_penalties,
+        status,
+        sort_order,
+        mvp_open
+      `
+      )
+      .order("sort_order", { ascending: true });
+
+    if (finalError) {
+      console.error("Error cargando eliminatorias:", finalError);
+      setMensaje("No se han podido cargar las eliminatorias.");
+      setLoading(false);
+      return;
+    }
+
+    const { data: votesData, error: votesError } = await supabase
+      .from("mvp_votes")
+      .select("id, match_id, final_match_id, user_id")
+      .eq("user_id", usuario);
+
+    if (votesError) {
+      console.error("Error cargando votos:", votesError);
+      setMensaje("No se han podido cargar tus votos MVP.");
+      setLoading(false);
+      return;
+    }
+
+    const partidosNormalizados: GroupMatch[] = (
+      (matchesData as unknown as RawGroupMatch[]) || []
+    ).map((match) => ({
+      ...match,
+      tipo: "grupo" as const,
+      home_team: normalizarEquipo(match.home_team),
+      away_team: normalizarEquipo(match.away_team),
+    }));
+
+    setTeams((teamsData ?? []) as Team[]);
+    setMatches(partidosNormalizados);
+    setFinalMatches(((finalData ?? []) as FinalMatch[]).map((match) => ({
+      ...match,
+      tipo: "final" as const,
+    })));
+    setVotes((votesData ?? []) as Vote[]);
+    setLoading(false);
+  }
 
   const equiposFavoritos = teams.filter((team) => favoritos.includes(team.id));
 
-  function keySeccion(teamId: string, seccion: Seccion) {
-    return `${teamId}-${seccion}`;
-  }
-
-  function seccionEstaAbierta(teamId: string, seccion: Seccion) {
-    return Boolean(seccionesAbiertas[keySeccion(teamId, seccion)]);
-  }
-
-  function toggleSeccion(teamId: string, seccion: Seccion) {
-    const key = keySeccion(teamId, seccion);
-
-    setSeccionesAbiertas((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
-  }
-
-  function equiposQuePasanGrupo(groupName: string | null) {
-    if (!groupName) return 2;
-
-    const group = groups.find((item) => item.name === groupName);
-
-    return group?.qualified_count ?? 2;
-  }
-
-  function partidoPerteneceAlEquipo(match: Match, team: Team) {
-    if (match.tipo === "grupo") {
-      return match.home_team?.id === team.id || match.away_team?.id === team.id;
-    }
-
-    const nombreEquipo = normalizarNombre(team.name);
-
-    return (
-      normalizarNombre(match.home_team?.name) === nombreEquipo ||
-      normalizarNombre(match.away_team?.name) === nombreEquipo
-    );
-  }
-
   function partidosDelEquipo(team: Team) {
-    return matches.filter((match) => partidoPerteneceAlEquipo(match, team));
+    const partidosGrupo: DisplayMatch[] = matches
+      .filter(
+        (match) =>
+          match.home_team?.id === team.id || match.away_team?.id === team.id
+      )
+      .map((match) => ({
+        id: match.id,
+        tipo: "grupo" as const,
+        phase: "Clasificación",
+        title: match.group_name ?? "Clasificación",
+        match_date: match.match_date,
+        match_time: match.match_time,
+        field: match.field,
+        home_name: match.home_team?.name ?? "Local",
+        away_name: match.away_team?.name ?? "Visitante",
+        home_score: match.home_score,
+        away_score: match.away_score,
+        home_penalties: null,
+        away_penalties: null,
+        status: match.status,
+        mvp_open: match.mvp_open,
+      }));
+
+    const eliminatorias: DisplayMatch[] = finalMatches
+      .filter(
+        (match) =>
+          normalizarTexto(match.home_ref) === normalizarTexto(team.name) ||
+          normalizarTexto(match.away_ref) === normalizarTexto(team.name)
+      )
+      .map((match) => ({
+        id: match.id,
+        tipo: "final" as const,
+        phase: match.phase,
+        title: match.title,
+        match_date: match.match_date,
+        match_time: match.match_time,
+        field: match.field,
+        home_name: match.home_ref,
+        away_name: match.away_ref,
+        home_score: match.home_score,
+        away_score: match.away_score,
+        home_penalties: match.home_penalties,
+        away_penalties: match.away_penalties,
+        status: match.status,
+        mvp_open: match.mvp_open,
+      }));
+
+    return ordenarPartidos([...partidosGrupo, ...eliminatorias]);
   }
 
-  function calendarioDelEquipo(team: Team) {
-    return ordenarPartidos(partidosDelEquipo(team));
-  }
-
-  function clasificacionGrupo(groupName: string | null) {
-    if (!groupName) return [];
-
-    const equiposGrupo = teams.filter((team) => team.group_name === groupName);
-    const partidosGrupo = matches.filter(
-      (match) => match.tipo === "grupo" && match.group_name === groupName
+  function proximosDelEquipo(team: Team) {
+    return partidosDelEquipo(team).filter(
+      (match) => match.home_score === null || match.away_score === null
     );
+  }
 
-    const tabla: Row[] = equiposGrupo.map((team) => ({
-      teamId: team.id,
-      team: team.name,
-      pj: 0,
-      g: 0,
-      e: 0,
-      p: 0,
-      gf: 0,
-      gc: 0,
-      dg: 0,
-      pts: 0,
-    }));
+  function resultadosDelEquipo(team: Team) {
+    return partidosDelEquipo(team).filter(
+      (match) => match.home_score !== null && match.away_score !== null
+    );
+  }
 
-    partidosGrupo.forEach((match) => {
-      if (
-        match.home_score === null ||
-        match.away_score === null ||
-        !match.home_team ||
-        !match.away_team
-      ) {
-        return;
+  function votoEmitido(match: DisplayMatch) {
+    return votes.some((vote) => {
+      if (vote.user_id !== userId) return false;
+
+      if (match.tipo === "final") {
+        return vote.final_match_id === match.id;
       }
 
-      const local = tabla.find((row) => row.teamId === match.home_team?.id);
-      const visitante = tabla.find((row) => row.teamId === match.away_team?.id);
-
-      if (!local || !visitante) return;
-
-      local.pj += 1;
-      visitante.pj += 1;
-
-      local.gf += match.home_score;
-      local.gc += match.away_score;
-
-      visitante.gf += match.away_score;
-      visitante.gc += match.home_score;
-
-      if (match.home_score > match.away_score) {
-        local.g += 1;
-        visitante.p += 1;
-        local.pts += 3;
-      } else if (match.home_score < match.away_score) {
-        visitante.g += 1;
-        local.p += 1;
-        visitante.pts += 3;
-      } else {
-        local.e += 1;
-        visitante.e += 1;
-        local.pts += 1;
-        visitante.pts += 1;
-      }
-
-      local.dg = local.gf - local.gc;
-      visitante.dg = visitante.gf - visitante.gc;
+      return vote.match_id === match.id;
     });
-
-    return tabla.sort((a, b) => {
-      if (b.pts !== a.pts) return b.pts - a.pts;
-      if (b.dg !== a.dg) return b.dg - a.dg;
-      if (b.gf !== a.gf) return b.gf - a.gf;
-      return a.team.localeCompare(b.team);
-    });
-  }
-
-  function votoEmitido(matchId: string, teamId: string) {
-    return votes.some(
-      (vote) => vote.match_id === matchId && vote.team_id === teamId
-    );
   }
 
   function quitarFavorito(teamId: string) {
     const nuevosFavoritos = favoritos.filter((id) => id !== teamId);
+
     setFavoritos(nuevosFavoritos);
     localStorage.setItem("equiposFavoritos", JSON.stringify(nuevosFavoritos));
 
@@ -397,10 +347,10 @@ export default function FavoritosPage() {
     }
   }
 
-  function renderEstadoMvp(match: Match, teamId: string) {
-    const yaVotado = votoEmitido(match.id, teamId);
+  function renderMvp(match: DisplayMatch) {
+    if (!match.mvp_open) return null;
 
-    if (yaVotado) {
+    if (votoEmitido(match)) {
       return (
         <div className="mt-3 rounded-xl bg-emerald-100 px-3 py-2 text-center text-sm font-black text-emerald-800">
           ✅ Voto emitido
@@ -408,224 +358,95 @@ export default function FavoritosPage() {
       );
     }
 
-    if (match.mvp_open) {
+    return (
+      <Link
+        href={`/votar-mvp?match=${match.id}&type=${
+          match.tipo === "final" ? "final" : "grupo"
+        }`}
+        className="mt-3 block rounded-xl bg-red-600 px-3 py-2 text-center text-sm font-black text-white shadow"
+      >
+        Votar MVP
+      </Link>
+    );
+  }
+
+  function renderMarcador(match: DisplayMatch) {
+    if (match.home_score === null || match.away_score === null) {
       return (
-        <Link
-          href={`/votar-mvp?match=${match.id}`}
-          className="mt-3 block rounded-xl bg-red-600 px-3 py-2 text-center text-sm font-black text-white shadow"
-        >
-          Votar MVP
-        </Link>
+        <>
+          <p className="text-lg font-black text-red-400">
+            {match.match_time ?? "--:--"}
+          </p>
+
+          <p className="text-xs font-bold text-slate-300">
+            {match.field ?? "Campo"}
+          </p>
+        </>
       );
     }
 
-    return null;
-  }
-
-  function marcadorResultado(match: Match) {
-    const marcador = `${match.home_score ?? "-"} - ${match.away_score ?? "-"}`;
-
-    const hayPenaltis =
-      match.home_penalties !== null &&
-      match.home_penalties !== undefined &&
-      match.away_penalties !== null &&
-      match.away_penalties !== undefined;
-
-    if (
-      match.home_score !== null &&
-      match.home_score !== undefined &&
-      match.away_score !== null &&
-      match.away_score !== undefined &&
-      match.home_score === match.away_score &&
-      hayPenaltis
-    ) {
-      return `${marcador} · Pen. ${match.home_penalties}-${match.away_penalties}`;
-    }
-
-    return marcador;
-  }
-
-  function renderPartido(match: Match, teamId: string) {
-    const finalizado =
-      match.home_score !== null && match.away_score !== null;
-
     return (
-      <div key={match.id} className="rounded-2xl bg-slate-50 p-4 shadow-sm">
-        {match.tipo === "grupo" && (
-          <div className="mb-3 rounded-xl bg-emerald-50 px-3 py-2 text-slate-950 ring-1 ring-emerald-200">
-            <p className="text-xs font-black uppercase tracking-widest text-emerald-800">
-              Fase de grupos
-            </p>
-            <p className="mt-1 text-sm font-bold">
-              {match.group_name ?? "Grupo"}
-            </p>
-          </div>
-        )}
+      <>
+        <p className="text-2xl font-black">
+          {match.home_score} - {match.away_score}
+        </p>
 
-        {match.tipo === "final" && (
-          <div className="mb-3 rounded-xl bg-slate-900 px-3 py-2 text-white">
-            <p className="text-xs font-black uppercase tracking-widest">
-              Eliminatorias
+        {match.tipo === "final" &&
+          match.home_penalties !== null &&
+          match.away_penalties !== null && (
+            <p className="text-xs font-bold text-amber-300">
+              Pen. {match.home_penalties}-{match.away_penalties}
             </p>
-            <p className="mt-1 text-sm font-bold text-slate-200">
-              {match.phase} · {match.title}
-            </p>
-          </div>
-        )}
+          )}
 
+        <p className="text-xs font-bold text-slate-300">
+          {match.field ?? "Campo"}
+        </p>
+      </>
+    );
+  }
+
+  function renderPartido(match: DisplayMatch) {
+    return (
+      <div
+        key={`${match.tipo}-${match.id}`}
+        className="rounded-2xl bg-slate-50 p-4 shadow-sm"
+      >
         <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="break-words text-base font-black leading-tight">
-              {match.home_team?.name ?? "Local"}
+          <div className="flex-1">
+            <p className="text-xs font-black uppercase text-red-600">
+              {match.tipo === "final"
+                ? `${match.phase} · ${match.title}`
+                : match.title}
             </p>
+
+            <p className="mt-2 text-base font-black leading-tight">
+              {match.home_name}
+            </p>
+
             <p className="text-xs font-black uppercase text-slate-400">vs</p>
-            <p className="break-words text-base font-black leading-tight">
-              {match.away_team?.name ?? "Visitante"}
+
+            <p className="text-base font-black leading-tight">
+              {match.away_name}
             </p>
           </div>
 
-          <div className="flex min-h-[64px] min-w-[92px] shrink-0 items-center justify-center rounded-2xl bg-slate-950 px-3 py-2 text-center text-white shadow">
-            {finalizado ? (
-              <p className="whitespace-nowrap text-lg font-black">
-                {marcadorResultado(match)}
-              </p>
-            ) : (
-              <p className="text-lg font-black text-red-400">
-                {match.match_time ?? "--:--"}
-              </p>
-            )}
+          <div className="rounded-2xl bg-slate-950 px-3 py-2 text-center text-white shadow">
+            {renderMarcador(match)}
           </div>
         </div>
 
-        <p className="mt-3 text-sm font-bold text-slate-500">
-          {formatearFechaSegura(match.match_date)} ·{" "}
-          {match.match_time ?? "Hora pendiente"} ·{" "}
-          {match.field ?? "Campo pendiente"}
-        </p>
-
-        {renderEstadoMvp(match, teamId)}
-      </div>
-    );
-  }
-
-  function renderClasificacion(team: Team) {
-    const tabla = clasificacionGrupo(team.group_name);
-    const equiposQuePasan = equiposQuePasanGrupo(team.group_name);
-
-    return (
-      <div className="space-y-2">
-        {tabla.length === 0 ? (
-          <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">
-            No hay clasificación disponible para este grupo.
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <p className="text-sm font-bold text-slate-500">
+            {formatearFechaSegura(match.match_date)}
           </p>
-        ) : (
-          <>
-            <div className="grid grid-cols-[1fr_36px_42px_46px] gap-2 border-b border-slate-200 px-2 pb-2 text-xs font-black uppercase text-slate-500">
-              <span>Equipo</span>
-              <span className="text-center">PJ</span>
-              <span className="text-center">DG</span>
-              <span className="text-center">PTS</span>
-            </div>
 
-            {tabla.map((row, index) => {
-              const clasificado = index < equiposQuePasan;
-              const esEquipoFavorito = row.teamId === team.id;
-
-              return (
-                <div
-                  key={row.teamId}
-                  className={`grid grid-cols-[1fr_36px_42px_46px] items-center gap-2 rounded-2xl px-2 py-3 ${
-                    esEquipoFavorito
-                      ? "bg-red-50 ring-1 ring-red-200"
-                      : clasificado
-                        ? "bg-emerald-50 ring-1 ring-emerald-200"
-                        : "bg-slate-50"
-                  }`}
-                >
-                  <div className="flex min-w-0 items-start gap-2">
-                    <span
-                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black ${
-                        esEquipoFavorito
-                          ? "bg-red-600 text-white"
-                          : clasificado
-                            ? "bg-emerald-600 text-white"
-                            : "bg-slate-200 text-slate-600"
-                      }`}
-                    >
-                      {index + 1}
-                    </span>
-
-                    <div className="min-w-0">
-                      <p className="break-words text-sm font-black leading-tight">
-                        {row.team}
-                      </p>
-                      <p className="mt-1 text-[11px] font-bold text-slate-500">
-                        G {row.g} · E {row.e} · P {row.p} · GF {row.gf} · GC{" "}
-                        {row.gc}
-                      </p>
-                    </div>
-                  </div>
-
-                  <span className="text-center text-sm font-black">{row.pj}</span>
-
-                  <span
-                    className={`text-center text-sm font-black ${
-                      row.dg > 0
-                        ? "text-emerald-700"
-                        : row.dg < 0
-                          ? "text-red-600"
-                          : "text-slate-600"
-                    }`}
-                  >
-                    {row.dg > 0 ? `+${row.dg}` : row.dg}
-                  </span>
-
-                  <span className="text-center text-lg font-black text-red-600">
-                    {row.pts}
-                  </span>
-                </div>
-              );
-            })}
-          </>
-        )}
-      </div>
-    );
-  }
-
-  function renderBloqueInterno({
-    teamId,
-    seccion,
-    titulo,
-    color,
-    children,
-  }: {
-    teamId: string;
-    seccion: Seccion;
-    titulo: string;
-    color: "rojo" | "negro" | "verde";
-    children: ReactNode;
-  }) {
-    const abierta = seccionEstaAbierta(teamId, seccion);
-
-    return (
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
-        <button
-          onClick={() => toggleSeccion(teamId, seccion)}
-          className={`flex w-full items-center justify-between px-4 py-3 text-left ${
-            color === "rojo"
-              ? "bg-red-600 text-white"
-              : color === "verde"
-                ? "bg-emerald-50 text-slate-950 ring-1 ring-emerald-200"
-                : "bg-slate-950 text-white"
-          }`}
-        >
-          <p className="text-sm font-black uppercase tracking-widest">
-            {titulo}
+          <p className="rounded-full bg-slate-200 px-3 py-1 text-xs font-black text-slate-600">
+            {estadoBonito(match.status)}
           </p>
-          <span className="text-2xl font-black">{abierta ? "−" : "+"}</span>
-        </button>
+        </div>
 
-        {abierta && <div className="space-y-3 p-4">{children}</div>}
+        {renderMvp(match)}
       </div>
     );
   }
@@ -643,16 +464,28 @@ export default function FavoritosPage() {
           <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
             Torneo Fútbol 7 Astrabudua
           </p>
+
           <h1 className="mt-2 text-center text-3xl font-black">Favoritos</h1>
+
+          <p className="mt-2 text-center text-sm font-bold text-emerald-100">
+            Tus equipos, partidos y votaciones MVP
+          </p>
         </div>
 
+        <Link
+          href="/inicio"
+          className="mt-4 block rounded-2xl bg-white/95 p-4 text-center font-black text-slate-900 shadow"
+        >
+          Volver al inicio
+        </Link>
+
         {loading ? (
-          <div className="mt-6 rounded-3xl bg-white/95 p-5 font-bold text-slate-500 shadow-2xl">
+          <div className="mt-6 rounded-3xl bg-white/95 p-5 font-bold shadow-2xl">
             Cargando favoritos...
           </div>
-        ) : errorCarga ? (
-          <div className="mt-6 rounded-3xl bg-red-100 p-5 font-bold text-red-700 shadow-2xl">
-            {errorCarga}
+        ) : mensaje ? (
+          <div className="mt-6 rounded-3xl bg-red-100 p-5 text-sm font-bold text-red-700 shadow-2xl">
+            {mensaje}
           </div>
         ) : equiposFavoritos.length === 0 ? (
           <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl">
@@ -665,7 +498,8 @@ export default function FavoritosPage() {
           <div className="mt-6 space-y-4">
             {equiposFavoritos.map((team) => {
               const abierto = equipoAbierto === team.id;
-              const calendario = calendarioDelEquipo(team);
+              const proximos = proximosDelEquipo(team);
+              const resultados = resultadosDelEquipo(team);
 
               return (
                 <div
@@ -680,26 +514,25 @@ export default function FavoritosPage() {
                         : "bg-white/95 text-slate-900"
                     }`}
                   >
-                    <div className="min-w-0">
-                      <p className="break-words text-lg font-black leading-tight">
-                        {team.name}
-                      </p>
+                    <div>
+                      <p className="text-lg font-black">{team.name}</p>
+
                       <p
-                        className={`mt-1 text-sm font-bold ${
+                        className={`text-sm font-bold ${
                           abierto ? "text-red-100" : "text-slate-500"
                         }`}
                       >
-                        {team.group_name ?? "Sin grupo"}
+                        {team.group_name ?? "Clasificación"}
                       </p>
                     </div>
 
-                    <span className="ml-3 shrink-0 text-2xl font-black">
+                    <span className="text-2xl font-black">
                       {abierto ? "−" : "+"}
                     </span>
                   </button>
 
                   {abierto && (
-                    <div className="space-y-4 p-4">
+                    <div className="space-y-5 p-4">
                       <button
                         onClick={() => quitarFavorito(team.id)}
                         className="w-full rounded-xl bg-slate-900 py-3 text-sm font-black text-white shadow"
@@ -707,30 +540,41 @@ export default function FavoritosPage() {
                         Quitar de favoritos
                       </button>
 
-                      {renderBloqueInterno({
-                        teamId: team.id,
-                        seccion: "calendario",
-                        titulo: "Calendario",
-                        color: "verde",
-                        children:
-                          calendario.length === 0 ? (
+                      <div>
+                        <div className="mb-3 rounded-xl bg-slate-950 px-4 py-3 text-white">
+                          <p className="text-sm font-black uppercase tracking-widest">
+                            Próximos partidos
+                          </p>
+                        </div>
+
+                        <div className="space-y-3">
+                          {proximos.length === 0 ? (
                             <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">
-                              No hay partidos de este equipo.
+                              No hay próximos partidos de este equipo.
                             </p>
                           ) : (
-                            calendario.map((match) =>
-                              renderPartido(match, team.id)
-                            )
-                          ),
-                      })}
+                            proximos.map((match) => renderPartido(match))
+                          )}
+                        </div>
+                      </div>
 
-                      {renderBloqueInterno({
-                        teamId: team.id,
-                        seccion: "clasificacion",
-                        titulo: "Clasificación",
-                        color: "rojo",
-                        children: renderClasificacion(team),
-                      })}
+                      <div>
+                        <div className="mb-3 rounded-xl bg-red-600 px-4 py-3 text-white">
+                          <p className="text-sm font-black uppercase tracking-widest">
+                            Resultados
+                          </p>
+                        </div>
+
+                        <div className="space-y-3">
+                          {resultados.length === 0 ? (
+                            <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">
+                              Todavía no hay resultados de este equipo.
+                            </p>
+                          ) : (
+                            resultados.map((match) => renderPartido(match))
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

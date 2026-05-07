@@ -475,8 +475,8 @@ export default function CalendarioPage() {
               ref={detalleRef}
               className="scroll-mt-6 overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur"
             >
-              <div className="bg-slate-950 px-5 py-5 text-center text-white">
-                <h2 className="text-3xl font-black">
+              <div className="bg-slate-950 px-5 py-4 text-center text-white">
+                <h2 className="text-2xl font-black">
                   {selectedDate ? formatearFecha(selectedDate) : "Sin fecha"}
                 </h2>
               </div>
@@ -525,24 +525,24 @@ export default function CalendarioPage() {
                             </div>
 
                             <div className="p-4">
-                              <div className="grid grid-cols-[minmax(0,1fr)_72px_minmax(0,1fr)] items-center gap-2">
-                                <p className="min-w-0 break-words text-center text-sm font-black leading-tight">
+                              <div className="grid grid-cols-[minmax(0,1fr)_46px_minmax(0,1fr)] items-center gap-2">
+                                <p className="min-w-0 break-words text-center text-xs font-black leading-tight text-slate-950">
                                   {match.home_name}
                                 </p>
 
-                                <div className="rounded-2xl bg-slate-950 px-2 py-3 text-center text-white shadow">
+                                <div className="rounded-xl bg-slate-950 px-1 py-2 text-center text-white shadow">
                                   <p
-                                    className={`font-black ${
+                                    className={`font-black leading-none ${
                                       hayResultado
-                                        ? "text-lg"
-                                        : "text-2xl uppercase"
+                                        ? "text-base"
+                                        : "text-sm uppercase"
                                     }`}
                                   >
                                     {marcadorTexto(match)}
                                   </p>
                                 </div>
 
-                                <p className="min-w-0 break-words text-center text-sm font-black leading-tight">
+                                <p className="min-w-0 break-words text-center text-xs font-black leading-tight text-slate-950">
                                   {match.away_name}
                                 </p>
                               </div>

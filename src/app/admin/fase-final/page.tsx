@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import AdminGuard from "@/components/AdminGuard";
 import { supabase } from "@/lib/supabase";
 
-type SourceType = "group_position" | "winner" | "loser" | "manual";
+type SourceType = "manual" | "winner" | "loser" | "group_position";
 
 type FinalMatch = {
   id: string;
@@ -23,6 +24,12 @@ type FinalMatch = {
   match_date: string | null;
   match_time: string | null;
   field: string | null;
+  home_score: number | null;
+  away_score: number | null;
+  home_penalties: number | null;
+  away_penalties: number | null;
+  status: string | null;
+  mvp_open: boolean | null;
   sort_order: number;
 };
 
@@ -32,28 +39,99 @@ type Team = {
   group_name: string | null;
 };
 
+type GroupMatch = {
+  id: string;
+  home_team_id: string;
+  away_team_id: string;
+  home_score: number | null;
+  away_score: number | null;
+};
+
+type TableRow = {
+  teamId: string;
+  teamName: string;
+  pj: number;
+  g: number;
+  e: number;
+  p: number;
+  gf: number;
+  gc: number;
+  dg: number;
+  pts: number;
+};
+
+type NewFinalMatch = {
+  phase: string;
+  title: string;
+  home_ref: string;
+  away_ref: string;
+  home_position: number | null;
+  home_group: string | null;
+  away_position: number | null;
+  away_group: string | null;
+  home_source_type: SourceType;
+  home_source_match_title: string | null;
+  away_source_type: SourceType;
+  away_source_match_title: string | null;
+  match_date: string | null;
+  match_time: string | null;
+  field: string | null;
+  home_score: number | null;
+  away_score: number | null;
+  home_penalties: number | null;
+  away_penalties: number | null;
+  status: string;
+  mvp_open: boolean;
+  sort_order: number;
+};
+
+const OCTAVOS_PAIRS = [
+  [1, 16],
+  [8, 9],
+  [5, 12],
+  [4, 13],
+  [3, 14],
+  [6, 11],
+  [7, 10],
+  [2, 15],
+];
+
+const OCTAVOS_DATES = [
+  "2026-07-20",
+  "2026-07-21",
+  "2026-07-22",
+  "2026-07-22",
+  "2026-07-23",
+  "2026-07-23",
+  "2026-07-24",
+  "2026-07-24",
+];
+
+const CUARTOS_DATES = [
+  "2026-07-27",
+  "2026-07-28",
+  "2026-07-29",
+  "2026-07-30",
+];
+
+const SEMIS_DATES = ["2026-08-03", "2026-08-04"];
+
 export default function AdminFaseFinalPage() {
   const [matches, setMatches] = useState<FinalMatch[]>([]);
-  const [teams, setTeams] = useState<Team[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [mensaje, setMensaje] = useState("");
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
 
-  const [phase, setPhase] = useState("Cuartos");
+  const [phase, setPhase] = useState("Octavos");
   const [title, setTitle] = useState("");
 
-  const [homeSourceType, setHomeSourceType] =
-    useState<SourceType>("group_position");
+  const [homeSourceType, setHomeSourceType] = useState<SourceType>("manual");
   const [homeRef, setHomeRef] = useState("");
-  const [homePosition, setHomePosition] = useState("1");
-  const [homeGroup, setHomeGroup] = useState("");
   const [homeSourceMatchTitle, setHomeSourceMatchTitle] = useState("");
 
-  const [awaySourceType, setAwaySourceType] =
-    useState<SourceType>("group_position");
+  const [awaySourceType, setAwaySourceType] = useState<SourceType>("manual");
   const [awayRef, setAwayRef] = useState("");
-  const [awayPosition, setAwayPosition] = useState("2");
-  const [awayGroup, setAwayGroup] = useState("");
   const [awaySourceMatchTitle, setAwaySourceMatchTitle] = useState("");
 
   const [date, setDate] = useState("");
@@ -62,57 +140,36 @@ export default function AdminFaseFinalPage() {
   const [sortOrder, setSortOrder] = useState("1");
 
   useEffect(() => {
-    cargarDatos();
+    cargarCruces(true);
   }, []);
 
-  const grupos = useMemo(() => {
-    return Array.from(
-      new Set(
-        teams
-          .map((team) => team.group_name)
-          .filter((group): group is string => Boolean(group))
-      )
-    ).sort((a, b) => a.localeCompare(b));
-  }, [teams]);
-
-  async function cargarDatos() {
+  async function cargarCruces(cargarPrimero = false) {
     setLoading(true);
-    await Promise.all([cargarCruces(), cargarEquipos()]);
-    setLoading(false);
-  }
 
-  async function cargarCruces() {
     const { data, error } = await supabase
       .from("final_matches")
       .select("*")
       .order("sort_order", { ascending: true });
 
     if (error) {
+      console.error("Error cargando cruces:", error);
       setMensaje("No se han podido cargar los cruces.");
+      setLoading(false);
       return;
     }
 
     const rows = (data ?? []) as FinalMatch[];
     setMatches(rows);
 
-    if (rows.length > 0 && !selectedId) {
+    if (rows.length > 0 && (cargarPrimero || !selectedId)) {
       cargarEnFormulario(rows[0]);
     }
-  }
 
-  async function cargarEquipos() {
-    const { data, error } = await supabase
-      .from("teams")
-      .select("id, name, group_name")
-      .order("group_name", { ascending: true })
-      .order("name", { ascending: true });
-
-    if (error) {
-      setMensaje("No se han podido cargar los equipos.");
-      return;
+    if (rows.length === 0) {
+      nuevoCruce(1);
     }
 
-    setTeams((data ?? []) as Team[]);
+    setLoading(false);
   }
 
   function cargarEnFormulario(match: FinalMatch) {
@@ -122,14 +179,10 @@ export default function AdminFaseFinalPage() {
 
     setHomeSourceType(match.home_source_type ?? "manual");
     setHomeRef(match.home_ref ?? "");
-    setHomePosition(match.home_position?.toString() ?? "1");
-    setHomeGroup(match.home_group ?? "");
     setHomeSourceMatchTitle(match.home_source_match_title ?? "");
 
     setAwaySourceType(match.away_source_type ?? "manual");
     setAwayRef(match.away_ref ?? "");
-    setAwayPosition(match.away_position?.toString() ?? "2");
-    setAwayGroup(match.away_group ?? "");
     setAwaySourceMatchTitle(match.away_source_match_title ?? "");
 
     setDate(match.match_date ?? "");
@@ -139,63 +192,42 @@ export default function AdminFaseFinalPage() {
     setMensaje("");
   }
 
-  function nuevoCruce() {
+  function nuevoCruce(orden?: number) {
     setSelectedId("");
-    setPhase("Cuartos");
+    setPhase("Octavos");
     setTitle("");
-
-    setHomeSourceType("group_position");
+    setHomeSourceType("manual");
     setHomeRef("");
-    setHomePosition("1");
-    setHomeGroup(grupos[0] ?? "");
     setHomeSourceMatchTitle("");
-
-    setAwaySourceType("group_position");
+    setAwaySourceType("manual");
     setAwayRef("");
-    setAwayPosition("2");
-    setAwayGroup(grupos[1] ?? grupos[0] ?? "");
     setAwaySourceMatchTitle("");
-
     setDate("");
     setTime("");
     setField("");
-    setSortOrder((matches.length + 1).toString());
+    setSortOrder((orden ?? matches.length + 1).toString());
     setMensaje("");
-  }
-
-  function labelPosicion(posicion: string | number | null, grupo: string | null) {
-    if (!posicion || !grupo) return "";
-    return `${posicion}º ${grupo}`;
   }
 
   function referenciaPreviaLado(
     tipo: SourceType,
-    posicion: string,
-    grupo: string,
     sourceMatchTitle: string,
     manualRef: string
   ) {
-    if (tipo === "group_position") return labelPosicion(posicion, grupo);
-    if (tipo === "winner")
+    if (tipo === "winner") {
       return sourceMatchTitle ? `Ganador ${sourceMatchTitle}` : "";
-    if (tipo === "loser")
+    }
+
+    if (tipo === "loser") {
       return sourceMatchTitle ? `Perdedor ${sourceMatchTitle}` : "";
-    return manualRef;
+    }
+
+    return manualRef.trim();
   }
 
   function validarCruce() {
     if (!title.trim()) {
       setMensaje("Debes indicar el nombre del cruce.");
-      return false;
-    }
-
-    if (homeSourceType === "group_position" && !homeGroup) {
-      setMensaje("Debes elegir el grupo del equipo local.");
-      return false;
-    }
-
-    if (awaySourceType === "group_position" && !awayGroup) {
-      setMensaje("Debes elegir el grupo del equipo visitante.");
       return false;
     }
 
@@ -236,24 +268,18 @@ export default function AdminFaseFinalPage() {
       title: title.trim(),
       home_ref: referenciaPreviaLado(
         homeSourceType,
-        homePosition,
-        homeGroup,
         homeSourceMatchTitle,
         homeRef
       ),
       away_ref: referenciaPreviaLado(
         awaySourceType,
-        awayPosition,
-        awayGroup,
         awaySourceMatchTitle,
         awayRef
       ),
-      home_position:
-        homeSourceType === "group_position" ? Number(homePosition) : null,
-      home_group: homeSourceType === "group_position" ? homeGroup || null : null,
-      away_position:
-        awaySourceType === "group_position" ? Number(awayPosition) : null,
-      away_group: awaySourceType === "group_position" ? awayGroup || null : null,
+      home_position: null,
+      home_group: null,
+      away_position: null,
+      away_group: null,
       home_source_type: homeSourceType,
       home_source_match_title:
         homeSourceType === "winner" || homeSourceType === "loser"
@@ -286,7 +312,7 @@ export default function AdminFaseFinalPage() {
         });
 
     if (error) {
-      console.error(error);
+      console.error("Error guardando cruce:", error);
       setMensaje("No se ha podido guardar el cruce.");
       return;
     }
@@ -307,16 +333,300 @@ export default function AdminFaseFinalPage() {
       .eq("id", selectedId);
 
     if (error) {
+      console.error("Error eliminando cruce:", error);
       setMensaje("No se ha podido eliminar el cruce.");
       return;
     }
 
     setMensaje("Cruce eliminado.");
     setSelectedId("");
-    await cargarCruces();
+    await cargarCruces(true);
+  }
+
+  function calcularClasificacionGeneral(teams: Team[], groupMatches: GroupMatch[]) {
+    const tabla: TableRow[] = teams.map((team) => ({
+      teamId: team.id,
+      teamName: team.name,
+      pj: 0,
+      g: 0,
+      e: 0,
+      p: 0,
+      gf: 0,
+      gc: 0,
+      dg: 0,
+      pts: 0,
+    }));
+
+    groupMatches.forEach((match) => {
+      if (match.home_score === null || match.away_score === null) return;
+
+      const local = tabla.find((row) => row.teamId === match.home_team_id);
+      const visitante = tabla.find((row) => row.teamId === match.away_team_id);
+
+      if (!local || !visitante) return;
+
+      local.pj += 1;
+      visitante.pj += 1;
+
+      local.gf += match.home_score;
+      local.gc += match.away_score;
+
+      visitante.gf += match.away_score;
+      visitante.gc += match.home_score;
+
+      if (match.home_score > match.away_score) {
+        local.g += 1;
+        visitante.p += 1;
+        local.pts += 3;
+      } else if (match.home_score < match.away_score) {
+        visitante.g += 1;
+        local.p += 1;
+        visitante.pts += 3;
+      } else {
+        local.e += 1;
+        visitante.e += 1;
+        local.pts += 1;
+        visitante.pts += 1;
+      }
+
+      local.dg = local.gf - local.gc;
+      visitante.dg = visitante.gf - visitante.gc;
+    });
+
+    return tabla.sort((a, b) => {
+      if (b.pts !== a.pts) return b.pts - a.pts;
+      if (b.dg !== a.dg) return b.dg - a.dg;
+      if (b.gf !== a.gf) return b.gf - a.gf;
+      if (a.gc !== b.gc) return a.gc - b.gc;
+      return a.teamName.localeCompare(b.teamName);
+    });
+  }
+
+  function cruceBase(
+    phaseName: string,
+    titleName: string,
+    homeRefName: string,
+    awayRefName: string,
+    order: number,
+    matchDate: string | null,
+    homeType: SourceType,
+    awayType: SourceType,
+    homeSourceTitle: string | null = null,
+    awaySourceTitle: string | null = null
+  ): NewFinalMatch {
+    return {
+      phase: phaseName,
+      title: titleName,
+      home_ref: homeRefName,
+      away_ref: awayRefName,
+      home_position: null,
+      home_group: null,
+      away_position: null,
+      away_group: null,
+      home_source_type: homeType,
+      home_source_match_title: homeSourceTitle,
+      away_source_type: awayType,
+      away_source_match_title: awaySourceTitle,
+      match_date: matchDate,
+      match_time: null,
+      field: null,
+      home_score: null,
+      away_score: null,
+      home_penalties: null,
+      away_penalties: null,
+      status: "Pendiente",
+      mvp_open: false,
+      sort_order: order,
+    };
+  }
+
+  async function generarEliminatoriasAutomaticas() {
+    const confirmar = window.confirm(
+      "Esto borrará los cruces actuales y generará octavos, cuartos, semifinales, tercer puesto y final con los 16 primeros de la clasificación general.\n\n¿Continuar?"
+    );
+
+    if (!confirmar) return;
+
+    setGenerating(true);
+    setMensaje("");
+
+    const { data: teamsData, error: teamsError } = await supabase
+      .from("teams")
+      .select("id, name, group_name")
+      .order("name", { ascending: true });
+
+    if (teamsError) {
+      console.error("Error cargando equipos:", teamsError);
+      setMensaje("No se han podido cargar los equipos.");
+      setGenerating(false);
+      return;
+    }
+
+    const { data: matchesData, error: matchesError } = await supabase
+      .from("matches")
+      .select("id, home_team_id, away_team_id, home_score, away_score");
+
+    if (matchesError) {
+      console.error("Error cargando partidos:", matchesError);
+      setMensaje("No se han podido cargar los partidos.");
+      setGenerating(false);
+      return;
+    }
+
+    const teams = (teamsData ?? []) as Team[];
+    const groupMatches = (matchesData ?? []) as GroupMatch[];
+
+    const clasificacion = calcularClasificacionGeneral(teams, groupMatches);
+
+    if (clasificacion.length < 16) {
+      setMensaje(
+        `Solo hay ${clasificacion.length} equipos en la clasificación. Necesitas al menos 16 para generar octavos.`
+      );
+      setGenerating(false);
+      return;
+    }
+
+    const clasificados = clasificacion.slice(0, 16);
+
+    const nuevosCruces: NewFinalMatch[] = [];
+
+    OCTAVOS_PAIRS.forEach(([homePosition, awayPosition], index) => {
+      const homeTeam = clasificados[homePosition - 1];
+      const awayTeam = clasificados[awayPosition - 1];
+      const titleName = `Octavo ${index + 1}`;
+
+      nuevosCruces.push(
+        cruceBase(
+          "Octavos",
+          titleName,
+          homeTeam.teamName,
+          awayTeam.teamName,
+          nuevosCruces.length + 1,
+          OCTAVOS_DATES[index] ?? null,
+          "manual",
+          "manual"
+        )
+      );
+    });
+
+    for (let i = 1; i <= 4; i++) {
+      const octavoA = `Octavo ${i * 2 - 1}`;
+      const octavoB = `Octavo ${i * 2}`;
+      const titleName = `Cuarto ${i}`;
+
+      nuevosCruces.push(
+        cruceBase(
+          "Cuartos",
+          titleName,
+          `Ganador ${octavoA}`,
+          `Ganador ${octavoB}`,
+          nuevosCruces.length + 1,
+          CUARTOS_DATES[i - 1] ?? null,
+          "winner",
+          "winner",
+          octavoA,
+          octavoB
+        )
+      );
+    }
+
+    nuevosCruces.push(
+      cruceBase(
+        "Semifinales",
+        "Semifinal 1",
+        "Ganador Cuarto 1",
+        "Ganador Cuarto 2",
+        nuevosCruces.length + 1,
+        SEMIS_DATES[0],
+        "winner",
+        "winner",
+        "Cuarto 1",
+        "Cuarto 2"
+      )
+    );
+
+    nuevosCruces.push(
+      cruceBase(
+        "Semifinales",
+        "Semifinal 2",
+        "Ganador Cuarto 3",
+        "Ganador Cuarto 4",
+        nuevosCruces.length + 1,
+        SEMIS_DATES[1],
+        "winner",
+        "winner",
+        "Cuarto 3",
+        "Cuarto 4"
+      )
+    );
+
+    nuevosCruces.push(
+      cruceBase(
+        "Tercer puesto",
+        "Tercer y cuarto puesto",
+        "Perdedor Semifinal 1",
+        "Perdedor Semifinal 2",
+        nuevosCruces.length + 1,
+        "2026-08-07",
+        "loser",
+        "loser",
+        "Semifinal 1",
+        "Semifinal 2"
+      )
+    );
+
+    nuevosCruces.push(
+      cruceBase(
+        "Final",
+        "Final",
+        "Ganador Semifinal 1",
+        "Ganador Semifinal 2",
+        nuevosCruces.length + 1,
+        "2026-08-07",
+        "winner",
+        "winner",
+        "Semifinal 1",
+        "Semifinal 2"
+      )
+    );
+
+    const { error: deleteError } = await supabase
+      .from("final_matches")
+      .delete()
+      .neq("id", "00000000-0000-0000-0000-000000000000");
+
+    if (deleteError) {
+      console.error("Error borrando cruces:", deleteError);
+      setMensaje("No se han podido borrar los cruces anteriores.");
+      setGenerating(false);
+      return;
+    }
+
+    const { error: insertError } = await supabase
+      .from("final_matches")
+      .insert(nuevosCruces);
+
+    if (insertError) {
+      console.error("Error generando eliminatorias:", insertError);
+      setMensaje("No se han podido generar las eliminatorias.");
+      setGenerating(false);
+      return;
+    }
+
+    setMensaje(
+      "Eliminatorias generadas correctamente desde los 16 primeros clasificados."
+    );
+    setSelectedId("");
+    await cargarCruces(true);
+    setGenerating(false);
   }
 
   const opcionesCrucesFuente = matches.filter((match) => match.id !== selectedId);
+
+  const mensajeCorrecto =
+    mensaje.includes("correctamente") ||
+    mensaje.includes("eliminado") ||
+    mensaje.includes("generadas");
 
   return (
     <AdminGuard>
@@ -332,8 +642,34 @@ export default function AdminFaseFinalPage() {
             <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
               Torneo Fútbol 7 Astrabudua
             </p>
-            <h1 className="mt-2 text-center text-3xl font-black">Fase final</h1>
+
+            <h1 className="mt-2 text-center text-3xl font-black">
+              Fase final
+            </h1>
+
+            <p className="mt-2 text-center text-sm font-bold text-emerald-100">
+              Octavos desde los 16 primeros clasificados
+            </p>
           </div>
+
+          <Link
+            href="/admin"
+            className="mt-4 block rounded-2xl bg-white/95 p-4 text-center font-black text-slate-900 shadow"
+          >
+            Volver al panel admin
+          </Link>
+
+          {mensaje && (
+            <div
+              className={`mt-4 rounded-2xl p-4 text-sm font-bold shadow ${
+                mensajeCorrecto
+                  ? "bg-emerald-100 text-emerald-800"
+                  : "bg-red-100 text-red-700"
+              }`}
+            >
+              {mensaje}
+            </div>
+          )}
 
           {loading ? (
             <div className="mt-6 rounded-3xl bg-white/95 p-5 font-bold shadow-2xl">
@@ -341,6 +677,28 @@ export default function AdminFaseFinalPage() {
             </div>
           ) : (
             <>
+              <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
+                <p className="text-sm font-black uppercase tracking-widest text-red-600">
+                  Generación automática
+                </p>
+
+                <p className="mt-2 text-sm font-bold text-slate-600">
+                  Crea los cruces desde la clasificación general: 1º vs 16º, 8º
+                  vs 9º, 5º vs 12º, 4º vs 13º, 3º vs 14º, 6º vs 11º, 7º vs
+                  10º y 2º vs 15º.
+                </p>
+
+                <button
+                  onClick={generarEliminatoriasAutomaticas}
+                  disabled={generating}
+                  className="mt-4 w-full rounded-xl bg-red-600 py-3 font-black text-white shadow disabled:opacity-60"
+                >
+                  {generating
+                    ? "Generando eliminatorias..."
+                    : "Generar eliminatorias desde clasificación"}
+                </button>
+              </div>
+
               <div className="mt-5 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
                 <label className="text-sm font-black uppercase text-slate-500">
                   Cruce existente
@@ -348,10 +706,13 @@ export default function AdminFaseFinalPage() {
 
                 <select
                   value={selectedId}
-                  onChange={(e) => {
-                    const match = matches.find((m) => m.id === e.target.value);
+                  onChange={(event) => {
+                    const match = matches.find(
+                      (item) => item.id === event.target.value
+                    );
+
                     if (match) cargarEnFormulario(match);
-                    if (!e.target.value) nuevoCruce();
+                    if (!event.target.value) nuevoCruce();
                   }}
                   className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
                 >
@@ -364,7 +725,7 @@ export default function AdminFaseFinalPage() {
                 </select>
 
                 <button
-                  onClick={nuevoCruce}
+                  onClick={() => nuevoCruce()}
                   className="mt-3 w-full rounded-xl bg-slate-900 py-3 font-black text-white shadow"
                 >
                   Crear nuevo cruce
@@ -377,9 +738,10 @@ export default function AdminFaseFinalPage() {
                     <label className="text-xs font-black uppercase text-slate-500">
                       Fase
                     </label>
+
                     <select
                       value={phase}
-                      onChange={(e) => setPhase(e.target.value)}
+                      onChange={(event) => setPhase(event.target.value)}
                       className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
                     >
                       <option>Octavos</option>
@@ -394,10 +756,11 @@ export default function AdminFaseFinalPage() {
                     <label className="text-xs font-black uppercase text-slate-500">
                       Orden
                     </label>
+
                     <input
                       type="number"
                       value={sortOrder}
-                      onChange={(e) => setSortOrder(e.target.value)}
+                      onChange={(event) => setSortOrder(event.target.value)}
                       className="mt-2 w-full rounded-xl border border-slate-300 p-3 font-bold"
                     />
                   </div>
@@ -407,9 +770,10 @@ export default function AdminFaseFinalPage() {
                   <label className="text-xs font-black uppercase text-slate-500">
                     Nombre del cruce
                   </label>
+
                   <input
                     value={title}
-                    onChange={(e) => setTitle(e.target.value)}
+                    onChange={(event) => setTitle(event.target.value)}
                     placeholder="Octavo 1, Cuarto 1, Semifinal 1, Final..."
                     className="mt-2 w-full rounded-xl border border-slate-300 p-3 font-bold"
                   />
@@ -423,54 +787,26 @@ export default function AdminFaseFinalPage() {
                   <label className="mt-3 block text-xs font-black uppercase text-slate-500">
                     Origen
                   </label>
+
                   <select
                     value={homeSourceType}
-                    onChange={(e) =>
-                      setHomeSourceType(e.target.value as SourceType)
+                    onChange={(event) =>
+                      setHomeSourceType(event.target.value as SourceType)
                     }
                     className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
                   >
-                    <option value="group_position">Clasificación grupo</option>
+                    <option value="manual">Manual</option>
                     <option value="winner">Ganador de cruce</option>
                     <option value="loser">Perdedor de cruce</option>
-                    <option value="manual">Manual</option>
                   </select>
-
-                  {homeSourceType === "group_position" && (
-                    <div className="mt-3 grid grid-cols-2 gap-3">
-                      <select
-                        value={homePosition}
-                        onChange={(e) => setHomePosition(e.target.value)}
-                        className="rounded-xl border border-slate-300 bg-white p-3 font-bold"
-                      >
-                        <option value="1">1º</option>
-                        <option value="2">2º</option>
-                        <option value="3">3º</option>
-                        <option value="4">4º</option>
-                        <option value="5">5º</option>
-                        <option value="6">6º</option>
-                      </select>
-
-                      <select
-                        value={homeGroup}
-                        onChange={(e) => setHomeGroup(e.target.value)}
-                        className="rounded-xl border border-slate-300 bg-white p-3 font-bold"
-                      >
-                        <option value="">Grupo</option>
-                        {grupos.map((grupo) => (
-                          <option key={grupo} value={grupo}>
-                            {grupo}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
 
                   {(homeSourceType === "winner" ||
                     homeSourceType === "loser") && (
                     <select
                       value={homeSourceMatchTitle}
-                      onChange={(e) => setHomeSourceMatchTitle(e.target.value)}
+                      onChange={(event) =>
+                        setHomeSourceMatchTitle(event.target.value)
+                      }
                       className="mt-3 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
                     >
                       <option value="">Elegir cruce</option>
@@ -485,7 +821,7 @@ export default function AdminFaseFinalPage() {
                   {homeSourceType === "manual" && (
                     <input
                       value={homeRef}
-                      onChange={(e) => setHomeRef(e.target.value)}
+                      onChange={(event) => setHomeRef(event.target.value)}
                       placeholder="Equipo local"
                       className="mt-3 w-full rounded-xl border border-slate-300 p-3 font-bold"
                     />
@@ -500,54 +836,26 @@ export default function AdminFaseFinalPage() {
                   <label className="mt-3 block text-xs font-black uppercase text-slate-500">
                     Origen
                   </label>
+
                   <select
                     value={awaySourceType}
-                    onChange={(e) =>
-                      setAwaySourceType(e.target.value as SourceType)
+                    onChange={(event) =>
+                      setAwaySourceType(event.target.value as SourceType)
                     }
                     className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
                   >
-                    <option value="group_position">Clasificación grupo</option>
+                    <option value="manual">Manual</option>
                     <option value="winner">Ganador de cruce</option>
                     <option value="loser">Perdedor de cruce</option>
-                    <option value="manual">Manual</option>
                   </select>
-
-                  {awaySourceType === "group_position" && (
-                    <div className="mt-3 grid grid-cols-2 gap-3">
-                      <select
-                        value={awayPosition}
-                        onChange={(e) => setAwayPosition(e.target.value)}
-                        className="rounded-xl border border-slate-300 bg-white p-3 font-bold"
-                      >
-                        <option value="1">1º</option>
-                        <option value="2">2º</option>
-                        <option value="3">3º</option>
-                        <option value="4">4º</option>
-                        <option value="5">5º</option>
-                        <option value="6">6º</option>
-                      </select>
-
-                      <select
-                        value={awayGroup}
-                        onChange={(e) => setAwayGroup(e.target.value)}
-                        className="rounded-xl border border-slate-300 bg-white p-3 font-bold"
-                      >
-                        <option value="">Grupo</option>
-                        {grupos.map((grupo) => (
-                          <option key={grupo} value={grupo}>
-                            {grupo}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
 
                   {(awaySourceType === "winner" ||
                     awaySourceType === "loser") && (
                     <select
                       value={awaySourceMatchTitle}
-                      onChange={(e) => setAwaySourceMatchTitle(e.target.value)}
+                      onChange={(event) =>
+                        setAwaySourceMatchTitle(event.target.value)
+                      }
                       className="mt-3 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
                     >
                       <option value="">Elegir cruce</option>
@@ -562,7 +870,7 @@ export default function AdminFaseFinalPage() {
                   {awaySourceType === "manual" && (
                     <input
                       value={awayRef}
-                      onChange={(e) => setAwayRef(e.target.value)}
+                      onChange={(event) => setAwayRef(event.target.value)}
                       placeholder="Equipo visitante"
                       className="mt-3 w-full rounded-xl border border-slate-300 p-3 font-bold"
                     />
@@ -570,27 +878,45 @@ export default function AdminFaseFinalPage() {
                 </div>
 
                 <div className="mt-4 grid grid-cols-2 gap-3">
-                  <input
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="rounded-xl border border-slate-300 p-3 font-bold"
-                  />
+                  <div>
+                    <label className="text-xs font-black uppercase text-slate-500">
+                      Fecha
+                    </label>
 
-                  <input
-                    type="time"
-                    value={time}
-                    onChange={(e) => setTime(e.target.value)}
-                    className="rounded-xl border border-slate-300 p-3 font-bold"
-                  />
+                    <input
+                      type="date"
+                      value={date}
+                      onChange={(event) => setDate(event.target.value)}
+                      className="mt-2 w-full rounded-xl border border-slate-300 p-3 font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-black uppercase text-slate-500">
+                      Hora
+                    </label>
+
+                    <input
+                      type="time"
+                      value={time}
+                      onChange={(event) => setTime(event.target.value)}
+                      className="mt-2 w-full rounded-xl border border-slate-300 p-3 font-bold"
+                    />
+                  </div>
                 </div>
 
-                <input
-                  value={field}
-                  onChange={(e) => setField(e.target.value)}
-                  placeholder="Campo"
-                  className="mt-4 w-full rounded-xl border border-slate-300 p-3 font-bold"
-                />
+                <div className="mt-4">
+                  <label className="text-xs font-black uppercase text-slate-500">
+                    Campo
+                  </label>
+
+                  <input
+                    value={field}
+                    onChange={(event) => setField(event.target.value)}
+                    placeholder="Campo"
+                    className="mt-2 w-full rounded-xl border border-slate-300 p-3 font-bold"
+                  />
+                </div>
 
                 <button
                   onClick={guardarCruce}
@@ -606,19 +932,6 @@ export default function AdminFaseFinalPage() {
                   >
                     Eliminar cruce
                   </button>
-                )}
-
-                {mensaje && (
-                  <div
-                    className={`mt-4 rounded-xl p-3 text-sm font-bold ${
-                      mensaje.includes("correctamente") ||
-                      mensaje.includes("eliminado")
-                        ? "bg-emerald-100 text-emerald-800"
-                        : "bg-red-100 text-red-700"
-                    }`}
-                  >
-                    {mensaje}
-                  </div>
                 )}
               </div>
             </>

@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { formatearFecha } from "@/lib/formatDate";
 
+type MatchType = "grupo" | "final";
+
 type Team = {
   id: string;
   name: string;
@@ -19,7 +21,8 @@ type Player = {
 
 type Vote = {
   id: string;
-  match_id: string;
+  match_id: string | null;
+  final_match_id: string | null;
   player_id: string;
   user_id: string;
   team_id: string | null;
@@ -72,7 +75,7 @@ type FinalMatch = {
 
 type OpenMatch = {
   id: string;
-  tipo: "grupo" | "final";
+  tipo: MatchType;
   group_name: string | null;
   phase?: string;
   title?: string;
@@ -110,6 +113,11 @@ function buscarEquipoPorNombre(nombre: string, equipos: Team[]) {
   return equipos.find((team) => team.name.trim().toLowerCase() === limpio);
 }
 
+function formatearFechaSegura(fecha: string | null) {
+  if (!fecha) return "Fecha pendiente";
+  return formatearFecha(fecha);
+}
+
 export default function MvpPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -142,11 +150,12 @@ export default function MvpPage() {
 
       const { data: votesData, error: votesError } = await supabase
         .from("mvp_votes")
-        .select("id, match_id, player_id, user_id, team_id");
+        .select("id, match_id, final_match_id, player_id, user_id, team_id");
 
       const { data: matchesData, error: matchesError } = await supabase
         .from("matches")
-        .select(`
+        .select(
+          `
           id,
           group_name,
           match_date,
@@ -159,7 +168,8 @@ export default function MvpPage() {
           mvp_open,
           home_team:teams!matches_home_team_id_fkey(id, name),
           away_team:teams!matches_away_team_id_fkey(id, name)
-        `)
+        `
+        )
         .eq("mvp_open", true)
         .order("match_date", { ascending: true })
         .order("match_time", { ascending: true });
@@ -179,6 +189,10 @@ export default function MvpPage() {
         matchesError ||
         finalError
       ) {
+        console.error(
+          "Error cargando MVP:",
+          playersError || teamsError || votesError || matchesError || finalError
+        );
         setErrorCarga("No se han podido cargar los datos MVP.");
         setLoading(false);
         return;
@@ -191,7 +205,7 @@ export default function MvpPage() {
       ).map((match) => ({
         id: match.id,
         tipo: "grupo" as const,
-        group_name: match.group_name,
+        group_name: match.group_name ?? "Clasificación",
         match_date: match.match_date,
         match_time: match.match_time,
         field: match.field,
@@ -272,31 +286,23 @@ export default function MvpPage() {
   const restoJugadores = rankingConVotos.slice(7);
 
   function votosUsuarioDelPartido(match: OpenMatch) {
-    return votes.filter(
-      (vote) => vote.match_id === match.id && vote.user_id === userId
-    );
+    return votes.filter((vote) => {
+      if (vote.user_id !== userId) return false;
+
+      if (match.tipo === "final") {
+        return vote.final_match_id === match.id;
+      }
+
+      return vote.match_id === match.id;
+    });
   }
 
-  function votoCompleto(match: OpenMatch) {
-    const votosUsuario = votosUsuarioDelPartido(match);
-
-    const votoLocal = votosUsuario.some(
-      (vote) => vote.team_id === match.home_team_id
-    );
-
-    const votoVisitante = votosUsuario.some(
-      (vote) => vote.team_id === match.away_team_id
-    );
-
-    return votoLocal && votoVisitante;
-  }
-
-  function votoIniciado(match: OpenMatch) {
+  function votoEmitido(match: OpenMatch) {
     return votosUsuarioDelPartido(match).length > 0;
   }
 
   function renderEstadoVoto(match: OpenMatch) {
-    if (votoCompleto(match)) {
+    if (votoEmitido(match)) {
       return (
         <div className="mt-3 rounded-xl bg-emerald-100 px-3 py-2 text-center text-sm font-black text-emerald-800">
           ✅ Voto emitido
@@ -304,17 +310,9 @@ export default function MvpPage() {
       );
     }
 
-    if (votoIniciado(match)) {
-      return (
-        <div className="mt-3 rounded-xl bg-emerald-100 px-3 py-2 text-center text-sm font-black text-emerald-800">
-          ✅ Voto iniciado
-        </div>
-      );
-    }
-
     return (
       <Link
-        href={`/votar-mvp?match=${match.id}`}
+        href={`/votar-mvp?match=${match.id}&type=${match.tipo}`}
         className="mt-3 block rounded-xl bg-red-600 px-3 py-2 text-center text-sm font-black text-white shadow"
       >
         Votar MVP
@@ -335,6 +333,7 @@ export default function MvpPage() {
               <p className="break-words font-black leading-tight">
                 {player.name}
               </p>
+
               <p className="text-xs font-bold text-slate-500">
                 #{player.number ?? "-"} · {player.team_name}
               </p>
@@ -343,6 +342,7 @@ export default function MvpPage() {
 
           <div className="shrink-0 text-right">
             <p className="text-2xl font-black text-red-600">{player.votes}</p>
+
             <p className="text-xs font-bold text-slate-500">
               {player.percentage}%
             </p>
@@ -361,7 +361,10 @@ export default function MvpPage() {
 
   function renderPartidoAbierto(match: OpenMatch) {
     return (
-      <div key={match.id} className="rounded-2xl bg-slate-50 p-4 shadow-sm">
+      <div
+        key={`${match.tipo}-${match.id}`}
+        className="rounded-2xl bg-slate-50 p-4 shadow-sm"
+      >
         <p className="text-xs font-black uppercase text-red-600">
           {match.tipo === "final"
             ? `${match.phase} · ${match.title}`
@@ -373,7 +376,9 @@ export default function MvpPage() {
             <p className="break-words text-base font-black leading-tight">
               {match.home_team?.name}
             </p>
+
             <p className="text-xs font-black uppercase text-slate-400">vs</p>
+
             <p className="break-words text-base font-black leading-tight">
               {match.away_team?.name}
             </p>
@@ -383,6 +388,7 @@ export default function MvpPage() {
             <p className="text-lg font-black text-red-400">
               {match.match_time ?? "--:--"}
             </p>
+
             <p className="text-xs font-bold text-slate-300">
               {match.field ?? "Campo"}
             </p>
@@ -390,7 +396,7 @@ export default function MvpPage() {
         </div>
 
         <p className="mt-3 text-sm font-bold text-slate-500">
-          {formatearFecha(match.match_date)}
+          {formatearFechaSegura(match.match_date)}
         </p>
 
         {renderEstadoVoto(match)}
@@ -411,12 +417,24 @@ export default function MvpPage() {
           <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
             Torneo Fútbol 7 Astrabudua
           </p>
+
           <h1 className="mt-2 text-center text-3xl font-black">MVP</h1>
+
+          <p className="mt-2 text-center text-sm font-bold text-emerald-100">
+            Votaciones y equipo ideal provisional
+          </p>
         </div>
 
         <Link
+          href="/inicio"
+          className="mt-4 block rounded-2xl bg-white/95 p-4 text-center font-black text-slate-900 shadow"
+        >
+          Volver al inicio
+        </Link>
+
+        <Link
           href="/votar-mvp"
-          className="mt-6 block w-full rounded-2xl bg-red-600 py-4 text-center text-lg font-black text-white shadow-2xl"
+          className="mt-4 block w-full rounded-2xl bg-red-600 py-4 text-center text-lg font-black text-white shadow-2xl"
         >
           Votar MVP
         </Link>
@@ -435,6 +453,7 @@ export default function MvpPage() {
               <p className="text-sm font-black uppercase text-slate-500">
                 Votos totales
               </p>
+
               <p className="mt-1 text-4xl font-black text-red-600">
                 {totalVotes}
               </p>
@@ -448,6 +467,7 @@ export default function MvpPage() {
                 >
                   <div>
                     <p className="text-lg font-black">Votaciones abiertas</p>
+
                     <p className="text-sm font-bold opacity-80">
                       Partidos disponibles para votar
                     </p>
@@ -477,7 +497,10 @@ export default function MvpPage() {
                   className="flex w-full items-center justify-between bg-red-600 px-5 py-4 text-left text-white"
                 >
                   <div>
-                    <p className="text-lg font-black">Equipo ideal provisional</p>
+                    <p className="text-lg font-black">
+                      Equipo ideal provisional
+                    </p>
+
                     <p className="text-sm font-bold opacity-90">
                       Los 7 jugadores más votados
                     </p>
@@ -510,6 +533,7 @@ export default function MvpPage() {
                 >
                   <div>
                     <p className="text-lg font-black">Resto de jugadores</p>
+
                     <p className="text-sm font-bold opacity-80">
                       Ordenados por votos
                     </p>

@@ -101,7 +101,7 @@ function ordenarPartidos(partidos: Match[]) {
 }
 
 function nombreFaseBonito(partido: Match) {
-  if (partido.tipo === "grupo") return partido.group_name ?? "Clasificación";
+  if (partido.tipo === "grupo") return "Clasificación";
 
   if (partido.phase === "Final") return partido.title ?? "Gran Final";
 
@@ -240,14 +240,14 @@ export default function InicioPage() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-black text-slate-900">
+    <main className="relative min-h-screen overflow-x-hidden bg-black text-slate-900">
       <img
         src="/torneo-verano.png"
         alt="Fondo torneo"
         className="fixed inset-0 h-screen w-screen object-cover opacity-35 blur-sm"
       />
 
-      <section className="relative z-10 mx-auto flex min-h-screen max-w-md flex-col px-4 py-3 pb-4">
+      <section className="relative z-10 mx-auto flex min-h-screen max-w-md flex-col px-4 py-3 pb-8">
         <div className="rounded-3xl bg-black/60 px-4 py-4 text-white shadow-2xl backdrop-blur">
           <h1
             onClick={accesoAdminOculto}
@@ -267,14 +267,8 @@ export default function InicioPage() {
           {partido ? (
             <div className="p-4">
               <div className="rounded-3xl bg-slate-50 p-3 shadow-inner">
-                <div className="mb-3 rounded-2xl bg-slate-950 px-4 py-2 text-center text-white shadow">
-                  <p className="text-[11px] font-black uppercase tracking-widest text-red-300">
-                    {partido.tipo === "grupo"
-                      ? "Clasificación"
-                      : "Eliminatorias"}
-                  </p>
-
-                  <p className="mt-1 text-sm font-black">
+                <div className="mb-3 rounded-2xl bg-slate-950 px-4 py-2.5 text-center text-white shadow">
+                  <p className="text-sm font-black text-white">
                     {nombreFaseBonito(partido)}
                   </p>
                 </div>
@@ -337,50 +331,29 @@ export default function InicioPage() {
 
         <div className="mt-4 grid grid-cols-2 gap-2">
           <a
-            href="/calendario"
-            className="col-span-2 flex min-h-[58px] items-center justify-center rounded-2xl bg-red-600 px-4 py-3 text-center text-lg font-black leading-tight text-white shadow"
-          >
-            Calendario
-          </a>
-
-          <a
             href="/equipos"
-            className="flex min-h-[52px] items-center justify-center rounded-2xl bg-white/95 px-4 py-2.5 text-center text-base font-black leading-tight shadow"
+            className="flex min-h-[58px] items-center justify-center rounded-2xl bg-white/95 px-4 py-3 text-center text-lg font-black leading-tight shadow"
           >
             Equipos
           </a>
 
           <a
-            href="/favoritos"
-            className="flex min-h-[52px] items-center justify-center rounded-2xl bg-white/95 px-4 py-2.5 text-center text-base font-black leading-tight shadow"
-          >
-            Favoritos
-          </a>
-
-          <a
             href="/mvp"
-            className="flex min-h-[52px] items-center justify-center rounded-2xl bg-white/95 px-4 py-2.5 text-center text-base font-black leading-tight shadow"
+            className="flex min-h-[58px] items-center justify-center rounded-2xl bg-white/95 px-4 py-3 text-center text-lg font-black leading-tight shadow"
           >
             MVP
           </a>
 
           <a
-            href="/normativa"
-            className="flex min-h-[52px] items-center justify-center rounded-2xl bg-white/95 px-4 py-2.5 text-center text-base font-black leading-tight shadow"
-          >
-            Normativa
-          </a>
-
-          <a
             href="/bota-oro"
-            className="flex min-h-[56px] items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-center text-lg font-black leading-tight text-white shadow"
+            className="flex min-h-[58px] items-center justify-center rounded-2xl bg-white/95 px-4 py-3 text-center text-lg font-black leading-tight shadow"
           >
             Bota de Oro
           </a>
 
           <a
             href="/sancionados"
-            className="flex min-h-[56px] items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-center text-lg font-black leading-tight text-white shadow"
+            className="flex min-h-[58px] items-center justify-center rounded-2xl bg-white/95 px-4 py-3 text-center text-lg font-black leading-tight shadow"
           >
             Sancionados
           </a>

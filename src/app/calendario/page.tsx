@@ -66,8 +66,8 @@ type CalendarMonth = {
 };
 
 const DEFAULT_MONTHS: CalendarMonth[] = [
-  { year: 2026, monthIndex: 6 },
-  { year: 2026, monthIndex: 7 },
+  { year: 2026, monthIndex: 6 }, // julio
+  { year: 2026, monthIndex: 7 }, // agosto
 ];
 
 const WEEK_DAYS = ["L", "M", "X", "J", "V", "S", "D"];
@@ -95,11 +95,12 @@ function fechaDesdeParts(year: number, monthIndex: number, day: number) {
   return `${year}-${month}-${dayText}`;
 }
 
-function nombreMes(year: number, monthIndex: number) {
-  return new Intl.DateTimeFormat("es-ES", {
+function nombreMesCorto(year: number, monthIndex: number) {
+  const mes = new Intl.DateTimeFormat("es-ES", {
     month: "long",
-    year: "numeric",
   }).format(new Date(year, monthIndex, 1));
+
+  return `${mes} ${String(year).slice(2)}`;
 }
 
 function labelFase(partidos: CalendarMatch[]) {
@@ -152,9 +153,16 @@ function marcadorTexto(partido: CalendarMatch) {
   return marcador;
 }
 
+function mismoMes(fecha: string, month: CalendarMonth) {
+  const parts = fechaToParts(fecha);
+
+  return parts.year === month.year && parts.monthIndex === month.monthIndex;
+}
+
 export default function CalendarioPage() {
   const [matches, setMatches] = useState<CalendarMatch[]>([]);
   const [selectedDate, setSelectedDate] = useState("");
+  const [activeMonthPosition, setActiveMonthPosition] = useState(0);
   const [loading, setLoading] = useState(true);
   const [mensaje, setMensaje] = useState("");
 
@@ -284,6 +292,7 @@ export default function CalendarioPage() {
       setSelectedDate("");
     }
 
+    setActiveMonthPosition(0);
     setLoading(false);
   }
 
@@ -305,6 +314,10 @@ export default function CalendarioPage() {
   const months = useMemo(() => {
     const uniqueMonths = new Map<string, CalendarMonth>();
 
+    DEFAULT_MONTHS.forEach((month) => {
+      uniqueMonths.set(`${month.year}-${month.monthIndex}`, month);
+    });
+
     matches.forEach((match) => {
       const { year, monthIndex } = fechaToParts(match.match_date);
       const key = `${year}-${monthIndex}`;
@@ -312,13 +325,13 @@ export default function CalendarioPage() {
       uniqueMonths.set(key, { year, monthIndex });
     });
 
-    const result = Array.from(uniqueMonths.values()).sort((a, b) => {
+    return Array.from(uniqueMonths.values()).sort((a, b) => {
       if (a.year !== b.year) return a.year - b.year;
       return a.monthIndex - b.monthIndex;
     });
-
-    return result.length > 0 ? result : DEFAULT_MONTHS;
   }, [matches]);
+
+  const activeMonth = months[activeMonthPosition] ?? months[0];
 
   const selectedMatches = selectedDate ? matchesByDate[selectedDate] ?? [] : [];
 
@@ -331,6 +344,19 @@ export default function CalendarioPage() {
         block: "start",
       });
     }, 120);
+  }
+
+  function cambiarMes(newPosition: number) {
+    const nuevaPosicion = Math.max(0, Math.min(newPosition, months.length - 1));
+    const nuevoMes = months[nuevaPosicion];
+
+    setActiveMonthPosition(nuevaPosicion);
+
+    const primerPartidoMes = matches.find((match) =>
+      mismoMes(match.match_date, nuevoMes)
+    );
+
+    setSelectedDate(primerPartidoMes?.match_date ?? "");
   }
 
   function renderMonth(month: CalendarMonth) {
@@ -353,14 +379,29 @@ export default function CalendarioPage() {
     }
 
     return (
-      <div
-        key={`${month.year}-${month.monthIndex}`}
-        className="overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur"
-      >
-        <div className="bg-red-600 px-5 py-4 text-white">
-          <p className="text-lg font-black capitalize">
-            {nombreMes(month.year, month.monthIndex)}
-          </p>
+      <div className="overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
+        <div className="bg-red-600 px-4 py-4 text-white">
+          <div className="flex items-center justify-between gap-3">
+            <button
+              onClick={() => cambiarMes(activeMonthPosition - 1)}
+              disabled={activeMonthPosition === 0}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-2xl font-black disabled:opacity-30"
+            >
+              ‹
+            </button>
+
+            <p className="text-center text-xl font-black capitalize">
+              {nombreMesCorto(month.year, month.monthIndex)}
+            </p>
+
+            <button
+              onClick={() => cambiarMes(activeMonthPosition + 1)}
+              disabled={activeMonthPosition === months.length - 1}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-2xl font-black disabled:opacity-30"
+            >
+              ›
+            </button>
+          </div>
         </div>
 
         <div className="p-3">
@@ -469,7 +510,7 @@ export default function CalendarioPage() {
           </div>
         ) : (
           <div className="mt-6 space-y-5">
-            {months.map((month) => renderMonth(month))}
+            {activeMonth && renderMonth(activeMonth)}
 
             <div
               ref={detalleRef}

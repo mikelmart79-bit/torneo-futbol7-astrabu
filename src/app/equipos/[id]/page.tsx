@@ -187,7 +187,7 @@ export default function EquipoDetalle() {
           </h1>
 
           <p className="mt-2 text-center text-sm font-bold text-emerald-100">
-            {equipo.group_name ?? "Sin grupo"}
+            Equipo participante
           </p>
         </div>
 
@@ -210,6 +210,7 @@ export default function EquipoDetalle() {
               <div className="flex justify-center">
                 <ShirtIcon color={colorLocal} />
               </div>
+
               <p className="mt-2 text-sm font-black text-slate-700">Local</p>
             </div>
 
@@ -217,6 +218,7 @@ export default function EquipoDetalle() {
               <div className="flex justify-center">
                 <ShirtIcon color={colorVisitante} />
               </div>
+
               <p className="mt-2 text-sm font-black text-slate-700">
                 Visitante
               </p>
@@ -225,7 +227,13 @@ export default function EquipoDetalle() {
         </div>
 
         <div className="mt-5 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
-          <h2 className="text-xl font-black">Plantilla</h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-xl font-black">Plantilla</h2>
+
+            <p className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-500">
+              {jugadores.length}
+            </p>
+          </div>
 
           {jugadores.length === 0 ? (
             <p className="mt-4 rounded-2xl bg-slate-50 p-4 font-bold text-slate-500">

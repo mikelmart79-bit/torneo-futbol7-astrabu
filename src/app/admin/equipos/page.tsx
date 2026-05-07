@@ -1,8 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import AdminGuard from "@/components/AdminGuard";
 import { supabase } from "@/lib/supabase";
+
+const CLASIFICACION = "Clasificación";
 
 type Team = {
   id: string;
@@ -12,19 +15,11 @@ type Team = {
   away_color: string | null;
 };
 
-type Group = {
-  id: string;
-  name: string;
-  sort_order: number;
-};
-
 export default function AdminEquiposPage() {
   const [teams, setTeams] = useState<Team[]>([]);
-  const [groups, setGroups] = useState<Group[]>([]);
 
   const [equipoId, setEquipoId] = useState("");
   const [nombre, setNombre] = useState("");
-  const [grupo, setGrupo] = useState("");
   const [colorLocal, setColorLocal] = useState("#047857");
   const [colorVisitante, setColorVisitante] = useState("#dc2626");
   const [mensaje, setMensaje] = useState("");
@@ -34,27 +29,12 @@ export default function AdminEquiposPage() {
     cargarDatos();
   }, []);
 
-  async function cargarDatos() {
+  async function cargarDatos(mantenerId?: string) {
     setLoading(true);
-
-    const { data: groupsData, error: groupsError } = await supabase
-      .from("groups")
-      .select("id, name, sort_order")
-      .order("sort_order", { ascending: true });
-
-    if (groupsError) {
-      setMensaje("No se han podido cargar los grupos.");
-      setLoading(false);
-      return;
-    }
-
-    const grupos = (groupsData ?? []) as Group[];
-    setGroups(grupos);
 
     const { data: teamsData, error: teamsError } = await supabase
       .from("teams")
       .select("id, name, group_name, home_color, away_color")
-      .order("group_name", { ascending: true })
       .order("name", { ascending: true });
 
     if (teamsError) {
@@ -66,10 +46,16 @@ export default function AdminEquiposPage() {
     const equipos = (teamsData ?? []) as Team[];
     setTeams(equipos);
 
-    if (equipos.length > 0 && !equipoId) {
+    const equipoMantener = mantenerId
+      ? equipos.find((team) => team.id === mantenerId)
+      : null;
+
+    if (equipoMantener) {
+      seleccionarEquipo(equipoMantener);
+    } else if (equipos.length > 0 && !equipoId) {
       seleccionarEquipo(equipos[0]);
     } else if (equipos.length === 0) {
-      setGrupo(grupos[0]?.name ?? "");
+      nuevoEquipo();
     }
 
     setLoading(false);
@@ -78,7 +64,6 @@ export default function AdminEquiposPage() {
   function seleccionarEquipo(team: Team) {
     setEquipoId(team.id);
     setNombre(team.name);
-    setGrupo(team.group_name ?? "");
     setColorLocal(team.home_color || "#047857");
     setColorVisitante(team.away_color || "#dc2626");
     setMensaje("");
@@ -100,23 +85,18 @@ export default function AdminEquiposPage() {
   function nuevoEquipo() {
     setEquipoId("");
     setNombre("");
-    setGrupo(groups[0]?.name ?? "");
     setColorLocal("#047857");
     setColorVisitante("#dc2626");
     setMensaje("");
   }
 
-  function existeEquipoDuplicado(nombreEquipo: string, grupoEquipo: string) {
+  function existeEquipoDuplicado(nombreEquipo: string) {
     const nombreLimpio = nombreEquipo.trim().toLowerCase();
-    const grupoLimpio = grupoEquipo.trim().toLowerCase();
 
     return teams.some((team) => {
       if (team.id === equipoId) return false;
 
-      return (
-        team.name.trim().toLowerCase() === nombreLimpio &&
-        (team.group_name ?? "").trim().toLowerCase() === grupoLimpio
-      );
+      return team.name.trim().toLowerCase() === nombreLimpio;
     });
   }
 
@@ -124,7 +104,9 @@ export default function AdminEquiposPage() {
     nombreAnterior: string,
     nombreNuevo: string
   ) {
-    if (!nombreAnterior || !nombreNuevo || nombreAnterior === nombreNuevo) return;
+    if (!nombreAnterior || !nombreNuevo || nombreAnterior === nombreNuevo) {
+      return;
+    }
 
     const { error: homeError } = await supabase
       .from("final_matches")
@@ -132,7 +114,9 @@ export default function AdminEquiposPage() {
       .eq("home_ref", nombreAnterior);
 
     if (homeError) {
-      throw new Error("Equipo guardado, pero no se pudo actualizar la fase final.");
+      throw new Error(
+        "Equipo guardado, pero no se pudo actualizar la fase final."
+      );
     }
 
     const { error: awayError } = await supabase
@@ -141,7 +125,9 @@ export default function AdminEquiposPage() {
       .eq("away_ref", nombreAnterior);
 
     if (awayError) {
-      throw new Error("Equipo guardado, pero no se pudo actualizar la fase final.");
+      throw new Error(
+        "Equipo guardado, pero no se pudo actualizar la fase final."
+      );
     }
   }
 
@@ -153,13 +139,8 @@ export default function AdminEquiposPage() {
       return;
     }
 
-    if (!grupo) {
-      setMensaje("Crea o selecciona un grupo antes de guardar el equipo.");
-      return;
-    }
-
-    if (existeEquipoDuplicado(nombreLimpio, grupo)) {
-      setMensaje("Ya existe un equipo con ese nombre en ese grupo.");
+    if (existeEquipoDuplicado(nombreLimpio)) {
+      setMensaje("Ya existe un equipo con ese nombre.");
       return;
     }
 
@@ -168,14 +149,19 @@ export default function AdminEquiposPage() {
 
     const payload = {
       name: nombreLimpio,
-      group_name: grupo,
+      group_name: CLASIFICACION,
       home_color: colorLocal,
       away_color: colorVisitante,
     };
 
-    const { error } = equipoId
-      ? await supabase.from("teams").update(payload).eq("id", equipoId)
-      : await supabase.from("teams").insert(payload);
+    const { data, error } = equipoId
+      ? await supabase
+          .from("teams")
+          .update(payload)
+          .eq("id", equipoId)
+          .select("id")
+          .single()
+      : await supabase.from("teams").insert(payload).select("id").single();
 
     if (error) {
       setMensaje(`Error guardando equipo: ${error.message}`);
@@ -188,7 +174,7 @@ export default function AdminEquiposPage() {
       }
 
       setMensaje("Equipo guardado correctamente.");
-      await cargarDatos();
+      await cargarDatos(data?.id ?? equipoId);
     } catch (err) {
       const texto =
         err instanceof Error
@@ -196,7 +182,7 @@ export default function AdminEquiposPage() {
           : "Equipo guardado, pero hubo un problema actualizando referencias.";
 
       setMensaje(texto);
-      await cargarDatos();
+      await cargarDatos(data?.id ?? equipoId);
     }
   }
 
@@ -261,7 +247,7 @@ export default function AdminEquiposPage() {
 
     if (tieneDatos) {
       setMensaje(
-        "No se puede eliminar este equipo porque tiene jugadores, partidos o cruces asociados. Borra primero esos datos."
+        "No se puede eliminar este equipo porque tiene jugadores, partidos o eliminatorias asociadas. Borra primero esos datos."
       );
       return;
     }
@@ -282,7 +268,6 @@ export default function AdminEquiposPage() {
     setMensaje("Equipo eliminado.");
     setEquipoId("");
     setNombre("");
-    setGrupo(groups[0]?.name ?? "");
     setColorLocal("#047857");
     setColorVisitante("#dc2626");
 
@@ -306,11 +291,20 @@ export default function AdminEquiposPage() {
             <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
               Torneo Fútbol 7 Astrabudua
             </p>
+
             <h1 className="mt-2 text-center text-3xl font-black">Equipos</h1>
+
             <p className="mt-2 text-center text-sm font-bold text-emerald-100">
               Gestión de equipos del torneo
             </p>
           </div>
+
+          <Link
+            href="/admin"
+            className="mt-4 block rounded-2xl bg-white/95 p-4 text-center font-black text-slate-900 shadow"
+          >
+            Volver al panel admin
+          </Link>
 
           {loading ? (
             <div className="mt-6 rounded-3xl bg-white/95 p-5 font-bold shadow-2xl">
@@ -329,9 +323,10 @@ export default function AdminEquiposPage() {
                   className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
                 >
                   <option value="">Nuevo equipo</option>
+
                   {teams.map((team) => (
                     <option key={team.id} value={team.id}>
-                      {team.name} · {team.group_name ?? "Sin grupo"}
+                      {team.name}
                     </option>
                   ))}
                 </select>
@@ -349,6 +344,7 @@ export default function AdminEquiposPage() {
                   <label className="text-sm font-black uppercase text-slate-500">
                     Nombre
                   </label>
+
                   <input
                     value={nombre}
                     onChange={(event) => setNombre(event.target.value)}
@@ -357,26 +353,14 @@ export default function AdminEquiposPage() {
                   />
                 </div>
 
-                <div className="mt-4">
-                  <label className="text-sm font-black uppercase text-slate-500">
-                    Grupo
-                  </label>
+                <div className="mt-4 rounded-2xl bg-slate-100 p-4">
+                  <p className="text-xs font-black uppercase text-slate-500">
+                    Fase
+                  </p>
 
-                  <select
-                    value={grupo}
-                    onChange={(event) => setGrupo(event.target.value)}
-                    className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
-                  >
-                    {groups.length === 0 ? (
-                      <option value="">No hay grupos creados</option>
-                    ) : (
-                      groups.map((group) => (
-                        <option key={group.id} value={group.name}>
-                          {group.name}
-                        </option>
-                      ))
-                    )}
-                  </select>
+                  <p className="mt-1 text-lg font-black text-slate-950">
+                    Clasificación
+                  </p>
                 </div>
 
                 <div className="mt-4 grid grid-cols-2 gap-3">
@@ -384,6 +368,7 @@ export default function AdminEquiposPage() {
                     <label className="text-xs font-black uppercase text-slate-500">
                       Color local
                     </label>
+
                     <input
                       type="color"
                       value={colorLocal}
@@ -396,6 +381,7 @@ export default function AdminEquiposPage() {
                     <label className="text-xs font-black uppercase text-slate-500">
                       Color visitante
                     </label>
+
                     <input
                       type="color"
                       value={colorVisitante}
@@ -435,9 +421,15 @@ export default function AdminEquiposPage() {
               </div>
 
               <div className="mt-5 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
-                <p className="text-sm font-black uppercase text-slate-500">
-                  Equipos actuales
-                </p>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-black uppercase text-slate-500">
+                    Equipos actuales
+                  </p>
+
+                  <p className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-500">
+                    {teams.length}
+                  </p>
+                </div>
 
                 {teams.length === 0 ? (
                   <p className="mt-3 rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">
@@ -458,6 +450,7 @@ export default function AdminEquiposPage() {
                         <p className="break-words text-lg font-black leading-tight">
                           {team.name}
                         </p>
+
                         <p
                           className={`mt-1 text-xs font-bold ${
                             equipoId === team.id
@@ -465,7 +458,7 @@ export default function AdminEquiposPage() {
                               : "text-slate-500"
                           }`}
                         >
-                          {team.group_name ?? "Sin grupo"}
+                          Clasificación
                         </p>
                       </button>
                     ))}

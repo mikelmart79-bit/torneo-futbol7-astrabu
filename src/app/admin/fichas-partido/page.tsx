@@ -15,31 +15,26 @@ const principales: AdminLink[] = [
   {
     href: "/admin/partidos",
     title: "Resultados",
-    description: "Meter resultados y activar votación MVP.",
+    description: "Meter resultados y activar votación MVP",
     variant: "primary",
   },
   {
-    href: "/admin/fichas-partido",
-    title: "Fichas de partido",
-    description: "Jugadores, goles, tarjetas y sanciones.",
-  },
-  {
     href: "/admin/gestionar-partidos",
-    title: "Configurar partidos",
-    description: "Crear, editar o eliminar partidos del grupo único.",
+    title: "Configurar fase de grupos",
+    description: "Crear, editar o eliminar partidos.",
   },
   {
     href: "/admin/fase-final",
     title: "Configurar eliminatorias",
-    description: "Crear y editar octavos, cuartos, semis, tercer puesto y final.",
+    description: "Crear, editar Cruces, semis, tercer puesto y final",
   },
 ];
 
 const datos: AdminLink[] = [
   {
     href: "/admin/grupos",
-    title: "Gestionar grupo",
-    description: "Configurar el grupo único de clasificación.",
+    title: "Gestionar grupos",
+    description: "Crear y ordenar grupos.",
   },
   {
     href: "/admin/equipos",
@@ -73,7 +68,9 @@ function AdminCard({ item }: { item: AdminLink }) {
     <Link
       href={item.href}
       className={`block rounded-2xl p-5 shadow ${
-        principal ? "bg-red-600 text-white" : "bg-white/95 text-slate-900"
+        principal
+          ? "bg-red-600 text-white"
+          : "bg-white/95 text-slate-900"
       }`}
     >
       <p className="text-lg font-black leading-tight">{item.title}</p>
@@ -91,7 +88,7 @@ function AdminCard({ item }: { item: AdminLink }) {
 export default function AdminPage() {
   async function borrarDatosTorneo() {
     const confirmar1 = window.confirm(
-      "⚠️ Esto borrará TODOS los datos del torneo:\n\n- grupo\n- equipos\n- jugadores\n- partidos\n- fichas de partido\n- goles\n- tarjetas\n- sanciones\n- eliminatorias\n- votos MVP\n\n¿Quieres continuar?"
+      "⚠️ Esto borrará TODOS los datos del torneo:\n\n- grupos\n- equipos\n- jugadores\n- partidos\n- eliminatorias\n- votos MVP\n\n¿Quieres continuar?"
     );
 
     if (!confirmar1) return;
@@ -128,11 +125,9 @@ export default function AdminPage() {
             <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
               Torneo Fútbol 7 Astrabudua
             </p>
-
             <h1 className="mt-2 text-center text-3xl font-black">
               Panel admin
             </h1>
-
             <p className="mt-2 text-center text-sm font-bold text-emerald-100">
               Gestión del torneo
             </p>
@@ -186,8 +181,8 @@ export default function AdminPage() {
             </p>
 
             <p className="mt-2 text-xs font-bold text-red-700">
-              Se eliminarán grupo, equipos, jugadores, partidos, fichas, goles,
-              tarjetas, sanciones, eliminatorias y votos MVP.
+              Se eliminarán grupos, equipos, jugadores, partidos,
+              eliminatorias y votos MVP.
             </p>
 
             <button

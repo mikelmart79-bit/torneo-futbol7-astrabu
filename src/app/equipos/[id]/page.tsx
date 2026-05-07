@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
+type PlayerType = "M" | "F";
+
 type Team = {
   id: string;
   name: string;
@@ -18,6 +20,7 @@ type Player = {
   team_id: string;
   name: string;
   number: number | null;
+  player_type: PlayerType | null;
 };
 
 function ShirtIcon({ color }: { color: string }) {
@@ -37,6 +40,10 @@ function ShirtIcon({ color }: { color: string }) {
       />
     </div>
   );
+}
+
+function textoTipoJugador(tipo: PlayerType | null) {
+  return tipo === "F" ? "Federado" : "Municipio";
 }
 
 export default function EquipoDetalle() {
@@ -63,6 +70,13 @@ export default function EquipoDetalle() {
     }
 
     async function cargarEquipo() {
+      if (!id) {
+        setEquipo(null);
+        setErrorCarga("Equipo no encontrado.");
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setErrorCarga("");
 
@@ -83,7 +97,7 @@ export default function EquipoDetalle() {
 
       const { data: playersData, error: playersError } = await supabase
         .from("players")
-        .select("id, team_id, name, number")
+        .select("id, team_id, name, number, player_type")
         .eq("team_id", id)
         .order("number", { ascending: true })
         .order("name", { ascending: true });
@@ -241,20 +255,41 @@ export default function EquipoDetalle() {
             </p>
           ) : (
             <div className="mt-5 space-y-3">
-              {jugadores.map((player) => (
-                <div
-                  key={player.id}
-                  className="flex items-center gap-4 rounded-2xl bg-slate-50 p-4 shadow-sm"
-                >
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-600 text-xl font-black text-white">
-                    {player.number ?? "-"}
-                  </div>
+              {jugadores.map((player) => {
+                const tipo = player.player_type === "F" ? "F" : "M";
 
-                  <p className="break-words text-lg font-black leading-tight">
-                    {player.name}
-                  </p>
-                </div>
-              ))}
+                return (
+                  <div
+                    key={player.id}
+                    className="flex items-center gap-4 rounded-2xl bg-slate-50 p-4 shadow-sm"
+                  >
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-600 text-xl font-black text-white">
+                      {player.number ?? "-"}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="break-words text-lg font-black leading-tight">
+                        {player.name}
+                      </p>
+
+                      <p className="mt-1 text-xs font-bold uppercase text-slate-500">
+                        {textoTipoJugador(tipo)}
+                      </p>
+                    </div>
+
+                    <div
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-black shadow ${
+                        tipo === "F"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-slate-200 text-slate-700"
+                      }`}
+                      title={textoTipoJugador(tipo)}
+                    >
+                      {tipo}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

@@ -130,14 +130,14 @@ export default function ClasificacionPage() {
   }, [teams, matches]);
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-black text-slate-900">
+    <main className="relative min-h-screen overflow-x-hidden bg-black text-slate-900">
       <img
         src="/torneo-verano.png"
         alt="Fondo torneo"
         className="fixed inset-0 h-screen w-screen object-cover opacity-35 blur-sm"
       />
 
-      <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-24">
+      <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-36">
         <div className="rounded-3xl bg-black/60 px-4 py-5 text-white shadow-2xl backdrop-blur">
           <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
             Torneo Fútbol 7 Astrabudua
@@ -172,8 +172,8 @@ export default function ClasificacionPage() {
             Todavía no hay equipos en la clasificación.
           </div>
         ) : (
-          <div className="mt-6 rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
-            <div className="rounded-t-3xl bg-red-600 px-5 py-5 text-white">
+          <div className="mt-6 overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
+            <div className="bg-red-600 px-5 py-5 text-white">
               <h2 className="text-2xl font-black">Clasificación general</h2>
 
               <p className="text-sm font-bold text-red-100">
@@ -181,113 +181,110 @@ export default function ClasificacionPage() {
               </p>
             </div>
 
-            <div className="px-4 pb-5 pt-4">
-              <div className="grid grid-cols-[38px_1fr_44px_44px_44px] items-center gap-2 px-3 pb-3 text-xs font-black uppercase text-slate-400">
-                <p>#</p>
-                <p>Equipo</p>
-                <p className="text-center">PJ</p>
-                <p className="text-center">DG</p>
-                <p className="text-center">PTS</p>
-              </div>
+            <div className="space-y-3 p-4">
+              {clasificacion.map((team, index) => {
+                const entraOctavos = index < 16;
 
-              <div className="space-y-3">
-                {clasificacion.map((team, index) => {
-                  const entraOctavos = index < 16;
+                return (
+                  <div
+                    key={team.teamId}
+                    className={`rounded-3xl border p-4 shadow-sm ${
+                      entraOctavos
+                        ? "border-red-200 bg-red-50"
+                        : "border-slate-200 bg-slate-50"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-xl font-black text-red-600 shadow-sm">
+                        {index + 1}
+                      </div>
 
-                  return (
-                    <div
-                      key={team.teamId}
-                      className={`rounded-[28px] border p-3 shadow-sm ${
-                        entraOctavos
-                          ? "border-red-200 bg-red-50"
-                          : "border-slate-200 bg-slate-50"
-                      }`}
-                    >
-                      <div className="grid grid-cols-[38px_1fr_44px_44px_44px] items-center gap-2">
-                        <div className="text-center text-2xl font-black text-red-600">
-                          {index + 1}
-                        </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="break-words text-xl font-black leading-tight text-slate-950">
+                          {team.teamName}
+                        </p>
+                      </div>
 
-                        <div className="min-w-0">
-                          <p className="break-words text-xl font-black leading-tight text-slate-900">
-                            {team.teamName}
-                          </p>
-                        </div>
-
-                        <p className="text-center text-2xl font-black text-slate-900">
-                          {team.pj}
+                      <div className="shrink-0 rounded-2xl bg-slate-950 px-4 py-2 text-center text-white shadow">
+                        <p className="text-[10px] font-black uppercase text-slate-300">
+                          PTS
                         </p>
 
-                        <p className="text-center text-2xl font-black text-slate-900">
-                          {team.dg}
-                        </p>
-
-                        <p className="text-center text-3xl font-black text-slate-950">
+                        <p className="text-2xl font-black leading-none">
                           {team.pts}
                         </p>
                       </div>
+                    </div>
 
-                      <div className="mt-4 rounded-2xl bg-white/80 px-4 py-3">
-                        <div className="grid grid-cols-6 gap-2 text-center">
-                          <div>
-                            <p className="text-xs font-black uppercase text-slate-400">
-                              G
-                            </p>
-                            <p className="text-lg font-black text-slate-700">
-                              {team.g}
-                            </p>
-                          </div>
+                    <div className="mt-4 rounded-2xl bg-white/85 px-3 py-3 shadow-sm">
+                      <div className="grid grid-cols-7 gap-1 text-center">
+                        <div>
+                          <p className="text-[10px] font-black uppercase text-slate-400">
+                            PJ
+                          </p>
+                          <p className="text-base font-black text-slate-800">
+                            {team.pj}
+                          </p>
+                        </div>
 
-                          <div>
-                            <p className="text-xs font-black uppercase text-slate-400">
-                              E
-                            </p>
-                            <p className="text-lg font-black text-slate-700">
-                              {team.e}
-                            </p>
-                          </div>
+                        <div>
+                          <p className="text-[10px] font-black uppercase text-slate-400">
+                            G
+                          </p>
+                          <p className="text-base font-black text-slate-800">
+                            {team.g}
+                          </p>
+                        </div>
 
-                          <div>
-                            <p className="text-xs font-black uppercase text-slate-400">
-                              P
-                            </p>
-                            <p className="text-lg font-black text-slate-700">
-                              {team.p}
-                            </p>
-                          </div>
+                        <div>
+                          <p className="text-[10px] font-black uppercase text-slate-400">
+                            E
+                          </p>
+                          <p className="text-base font-black text-slate-800">
+                            {team.e}
+                          </p>
+                        </div>
 
-                          <div>
-                            <p className="text-xs font-black uppercase text-slate-400">
-                              GF
-                            </p>
-                            <p className="text-lg font-black text-slate-700">
-                              {team.gf}
-                            </p>
-                          </div>
+                        <div>
+                          <p className="text-[10px] font-black uppercase text-slate-400">
+                            P
+                          </p>
+                          <p className="text-base font-black text-slate-800">
+                            {team.p}
+                          </p>
+                        </div>
 
-                          <div>
-                            <p className="text-xs font-black uppercase text-slate-400">
-                              GC
-                            </p>
-                            <p className="text-lg font-black text-slate-700">
-                              {team.gc}
-                            </p>
-                          </div>
+                        <div>
+                          <p className="text-[10px] font-black uppercase text-slate-400">
+                            GF
+                          </p>
+                          <p className="text-base font-black text-slate-800">
+                            {team.gf}
+                          </p>
+                        </div>
 
-                          <div>
-                            <p className="text-xs font-black uppercase text-slate-400">
-                              DG
-                            </p>
-                            <p className="text-lg font-black text-slate-700">
-                              {team.dg}
-                            </p>
-                          </div>
+                        <div>
+                          <p className="text-[10px] font-black uppercase text-slate-400">
+                            GC
+                          </p>
+                          <p className="text-base font-black text-slate-800">
+                            {team.gc}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-[10px] font-black uppercase text-slate-400">
+                            DG
+                          </p>
+                          <p className="text-base font-black text-slate-800">
+                            {team.dg}
+                          </p>
                         </div>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

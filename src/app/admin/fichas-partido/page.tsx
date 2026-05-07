@@ -143,6 +143,9 @@ export default function AdminFichasPartidoPage() {
   const [estado, setEstado] = useState("Pendiente");
   const [mvpOpen, setMvpOpen] = useState(false);
 
+  const [homeScore, setHomeScore] = useState("");
+  const [awayScore, setAwayScore] = useState("");
+
   const [homePenalties, setHomePenalties] = useState("");
   const [awayPenalties, setAwayPenalties] = useState("");
 
@@ -169,12 +172,10 @@ export default function AdminFichasPartidoPage() {
     return teams.find((team) => team.id === teamId)?.name ?? "Equipo";
   }
 
-  function nombreEquipoDesde(equipos: Team[], teamId: string) {
-    return equipos.find((team) => team.id === teamId)?.name ?? "Equipo";
-  }
-
   function jugadorNombre(player: Player) {
-    return player.number !== null ? `${player.number} · ${player.name}` : player.name;
+    return player.number !== null
+      ? `${player.number} · ${player.name}`
+      : player.name;
   }
 
   function limpiarFicha() {
@@ -186,6 +187,8 @@ export default function AdminFichasPartidoPage() {
     setRows([]);
     setEstado("Pendiente");
     setMvpOpen(false);
+    setHomeScore("");
+    setAwayScore("");
     setHomePenalties("");
     setAwayPenalties("");
   }
@@ -233,18 +236,20 @@ export default function AdminFichasPartidoPage() {
 
     if (matchesError) {
       console.error("Error cargando partidos:", matchesError);
-      setMensaje(`No se han podido cargar los partidos: ${matchesError.message}`);
+      setMensaje(
+        `No se han podido cargar los partidos: ${matchesError.message}`
+      );
       setLoading(false);
       return;
     }
 
-    const partidos: GroupMatch[] = ((matchesData as unknown as RawGroupMatch[]) || []).map(
-      (match) => ({
-        ...match,
-        home_team: normalizarEquipo(match.home_team),
-        away_team: normalizarEquipo(match.away_team),
-      })
-    );
+    const partidos: GroupMatch[] = (
+      (matchesData as unknown as RawGroupMatch[]) || []
+    ).map((match) => ({
+      ...match,
+      home_team: normalizarEquipo(match.home_team),
+      away_team: normalizarEquipo(match.away_team),
+    }));
 
     setGroupMatches(partidos);
 
@@ -293,7 +298,9 @@ export default function AdminFichasPartidoPage() {
 
     const idInicial =
       opciones?.idMantener ??
-      (tipoInicial === "grupo" ? partidos[0]?.id ?? "" : eliminatorias[0]?.id ?? "");
+      (tipoInicial === "grupo"
+        ? partidos[0]?.id ?? ""
+        : eliminatorias[0]?.id ?? "");
 
     setMatchType(tipoInicial);
     setSelectedId(idInicial);
@@ -326,6 +333,8 @@ export default function AdminFichasPartidoPage() {
           visitante: null as TeamRef | null,
           estadoFicha: "Pendiente",
           mvpFicha: false,
+          scoreLocal: "",
+          scoreVisitante: "",
           penLocal: "",
           penVisitante: "",
         };
@@ -343,6 +352,8 @@ export default function AdminFichasPartidoPage() {
         visitante: partido.away_team,
         estadoFicha: partido.status ?? "Pendiente",
         mvpFicha: Boolean(partido.mvp_open),
+        scoreLocal: partido.home_score?.toString() ?? "",
+        scoreVisitante: partido.away_score?.toString() ?? "",
         penLocal: "",
         penVisitante: "",
       };
@@ -359,17 +370,21 @@ export default function AdminFichasPartidoPage() {
         visitante: null as TeamRef | null,
         estadoFicha: "Pendiente",
         mvpFicha: false,
+        scoreLocal: "",
+        scoreVisitante: "",
         penLocal: "",
         penVisitante: "",
       };
     }
 
     const local = equipos.find(
-      (team) => normalizarTexto(team.name) === normalizarTexto(eliminatoria.home_ref)
+      (team) =>
+        normalizarTexto(team.name) === normalizarTexto(eliminatoria.home_ref)
     );
 
     const visitante = equipos.find(
-      (team) => normalizarTexto(team.name) === normalizarTexto(eliminatoria.away_ref)
+      (team) =>
+        normalizarTexto(team.name) === normalizarTexto(eliminatoria.away_ref)
     );
 
     const aviso =
@@ -389,6 +404,8 @@ export default function AdminFichasPartidoPage() {
       visitante: visitante ? { id: visitante.id, name: visitante.name } : null,
       estadoFicha: eliminatoria.status ?? "Pendiente",
       mvpFicha: Boolean(eliminatoria.mvp_open),
+      scoreLocal: eliminatoria.home_score?.toString() ?? "",
+      scoreVisitante: eliminatoria.away_score?.toString() ?? "",
       penLocal: eliminatoria.home_penalties?.toString() ?? "",
       penVisitante: eliminatoria.away_penalties?.toString() ?? "",
     };
@@ -407,7 +424,6 @@ export default function AdminFichasPartidoPage() {
     }
 
     setLoadingFicha(true);
-    setMensaje("");
 
     const contexto = obtenerContextoFicha(
       tipo,
@@ -424,6 +440,8 @@ export default function AdminFichasPartidoPage() {
     setAwayTeam(contexto.visitante);
     setEstado(contexto.estadoFicha);
     setMvpOpen(contexto.mvpFicha);
+    setHomeScore(contexto.scoreLocal);
+    setAwayScore(contexto.scoreVisitante);
     setHomePenalties(contexto.penLocal);
     setAwayPenalties(contexto.penVisitante);
 
@@ -446,7 +464,9 @@ export default function AdminFichasPartidoPage() {
 
     if (playersError) {
       console.error("Error cargando jugadores:", playersError);
-      setMensaje(`No se han podido cargar los jugadores: ${playersError.message}`);
+      setMensaje(
+        `No se han podido cargar los jugadores: ${playersError.message}`
+      );
       setLoadingFicha(false);
       return;
     }
@@ -504,7 +524,9 @@ export default function AdminFichasPartidoPage() {
 
     if (cardsError) {
       console.error("Error cargando tarjetas:", cardsError);
-      setMensaje(`No se han podido cargar las tarjetas: ${cardsError.message}`);
+      setMensaje(
+        `No se han podido cargar las tarjetas: ${cardsError.message}`
+      );
       setLoadingFicha(false);
       return;
     }
@@ -540,6 +562,7 @@ export default function AdminFichasPartidoPage() {
 
     setMatchType(tipo);
     setSelectedId(nuevoId);
+    setMensaje("");
 
     if (nuevoId) {
       await cargarFicha(tipo, nuevoId);
@@ -550,6 +573,7 @@ export default function AdminFichasPartidoPage() {
 
   async function cambiarPartido(id: string) {
     setSelectedId(id);
+    setMensaje("");
     await cargarFicha(matchType, id);
   }
 
@@ -607,8 +631,8 @@ export default function AdminFichasPartidoPage() {
     }, 0);
   }
 
-  const homeScoreCalculado = golesEquipo(homeTeam?.id);
-  const awayScoreCalculado = golesEquipo(awayTeam?.id);
+  const golesFichaLocal = golesEquipo(homeTeam?.id);
+  const golesFichaVisitante = golesEquipo(awayTeam?.id);
 
   async function actualizarArrastresFinales() {
     const { data, error } = await supabase
@@ -709,19 +733,55 @@ export default function AdminFichasPartidoPage() {
       return;
     }
 
+    const marcadorLocal = numeroDesdeInput(homeScore);
+    const marcadorVisitante = numeroDesdeInput(awayScore);
+
+    if (
+      (marcadorLocal === null && marcadorVisitante !== null) ||
+      (marcadorLocal !== null && marcadorVisitante === null)
+    ) {
+      setMensaje("Indica los goles de los dos equipos o deja ambos vacíos.");
+      return;
+    }
+
+    if (marcadorLocal !== null && marcadorLocal < 0) {
+      setMensaje("Los goles del equipo local no pueden ser negativos.");
+      return;
+    }
+
+    if (marcadorVisitante !== null && marcadorVisitante < 0) {
+      setMensaje("Los goles del equipo visitante no pueden ser negativos.");
+      return;
+    }
+
     const penLocal = numeroDesdeInput(homePenalties);
     const penVisitante = numeroDesdeInput(awayPenalties);
 
     if (matchType === "final") {
-      if ((penLocal === null && penVisitante !== null) || (penLocal !== null && penVisitante === null)) {
-        setMensaje("Si indicas penaltis, debes poner los penaltis de los dos equipos.");
+      if (
+        (penLocal === null && penVisitante !== null) ||
+        (penLocal !== null && penVisitante === null)
+      ) {
+        setMensaje(
+          "Si indicas penaltis, debes poner los penaltis de los dos equipos."
+        );
+        return;
+      }
+
+      if (
+        (marcadorLocal === null || marcadorVisitante === null) &&
+        (penLocal !== null || penVisitante !== null)
+      ) {
+        setMensaje("Solo puedes indicar penaltis cuando hay marcador.");
         return;
       }
 
       if (
         penLocal !== null &&
         penVisitante !== null &&
-        homeScoreCalculado !== awayScoreCalculado
+        marcadorLocal !== null &&
+        marcadorVisitante !== null &&
+        marcadorLocal !== marcadorVisitante
       ) {
         setMensaje("Solo debe haber penaltis si el partido acaba empatado.");
         return;
@@ -730,7 +790,9 @@ export default function AdminFichasPartidoPage() {
       if (
         penLocal !== null &&
         penVisitante !== null &&
-        homeScoreCalculado === awayScoreCalculado &&
+        marcadorLocal !== null &&
+        marcadorVisitante !== null &&
+        marcadorLocal === marcadorVisitante &&
         penLocal === penVisitante
       ) {
         setMensaje("Los penaltis no pueden quedar empatados.");
@@ -764,7 +826,9 @@ export default function AdminFichasPartidoPage() {
 
     if (deleteGoals.error) {
       console.error("Error borrando goles:", deleteGoals.error);
-      setMensaje(`No se han podido actualizar los goles: ${deleteGoals.error.message}`);
+      setMensaje(
+        `No se han podido actualizar los goles: ${deleteGoals.error.message}`
+      );
       setSaving(false);
       return;
     }
@@ -790,7 +854,10 @@ export default function AdminFichasPartidoPage() {
       .eq("reason", "Tarjeta roja");
 
     if (deleteAutoSuspensions.error) {
-      console.error("Error borrando sanciones automáticas:", deleteAutoSuspensions.error);
+      console.error(
+        "Error borrando sanciones automáticas:",
+        deleteAutoSuspensions.error
+      );
       setMensaje(
         `No se han podido actualizar las sanciones: ${deleteAutoSuspensions.error.message}`
       );
@@ -810,7 +877,9 @@ export default function AdminFichasPartidoPage() {
       }));
 
     if (filasJugadores.length > 0) {
-      const { error } = await supabase.from("match_players").insert(filasJugadores);
+      const { error } = await supabase
+        .from("match_players")
+        .insert(filasJugadores);
 
       if (error) {
         console.error("Error insertando jugadores:", error);
@@ -882,7 +951,9 @@ export default function AdminFichasPartidoPage() {
     });
 
     if (filasTarjetas.length > 0) {
-      const { error } = await supabase.from("match_cards").insert(filasTarjetas);
+      const { error } = await supabase
+        .from("match_cards")
+        .insert(filasTarjetas);
 
       if (error) {
         console.error("Error insertando tarjetas:", error);
@@ -905,7 +976,9 @@ export default function AdminFichasPartidoPage() {
       }));
 
     if (filasSanciones.length > 0) {
-      const { error } = await supabase.from("suspensions").insert(filasSanciones);
+      const { error } = await supabase
+        .from("suspensions")
+        .insert(filasSanciones);
 
       if (error) {
         console.error("Error insertando sanciones:", error);
@@ -916,8 +989,8 @@ export default function AdminFichasPartidoPage() {
     }
 
     const updatePayload: Record<string, string | number | boolean | null> = {
-      home_score: homeScoreCalculado,
-      away_score: awayScoreCalculado,
+      home_score: marcadorLocal,
+      away_score: marcadorVisitante,
       status: estado,
       mvp_open: mvpOpen,
     };
@@ -936,7 +1009,9 @@ export default function AdminFichasPartidoPage() {
 
     if (updateError) {
       console.error("Error actualizando resultado:", updateError);
-      setMensaje(`La ficha se guardó, pero no se actualizó el resultado: ${updateError.message}`);
+      setMensaje(
+        `La ficha se guardó, pero no se actualizó el resultado: ${updateError.message}`
+      );
       setSaving(false);
       return;
     }
@@ -950,7 +1025,9 @@ export default function AdminFichasPartidoPage() {
       idMantener: selectedId,
     });
 
-    setMensaje("Ficha, resultado, tarjetas y sanciones guardados correctamente.");
+    setMensaje(
+      "Ficha, marcador, tarjetas y sanciones guardados correctamente."
+    );
     setSaving(false);
   }
 
@@ -981,7 +1058,7 @@ export default function AdminFichasPartidoPage() {
             </h1>
 
             <p className="mt-2 text-center text-sm font-bold text-emerald-100">
-              Resultado, jugadores, goles, tarjetas y sanciones
+              Marcador, jugadores, goles, tarjetas y sanciones
             </p>
           </div>
 
@@ -991,6 +1068,18 @@ export default function AdminFichasPartidoPage() {
           >
             Volver al panel admin
           </Link>
+
+          {mensaje && (
+            <div
+              className={`mt-4 rounded-2xl p-4 text-sm font-bold shadow ${
+                mensajeCorrecto
+                  ? "bg-emerald-100 text-emerald-800"
+                  : "bg-red-100 text-red-700"
+              }`}
+            >
+              {mensaje}
+            </div>
+          )}
 
           {loading ? (
             <div className="mt-6 rounded-3xl bg-white/95 p-5 font-bold shadow-2xl">
@@ -1082,7 +1171,8 @@ export default function AdminFichasPartidoPage() {
 
                         <div className="rounded-2xl bg-slate-950 px-5 py-3 text-center text-white shadow">
                           <p className="text-4xl font-black">
-                            {homeScoreCalculado} - {awayScoreCalculado}
+                            {homeScore.trim() === "" ? "-" : homeScore} -{" "}
+                            {awayScore.trim() === "" ? "-" : awayScore}
                           </p>
                         </div>
 
@@ -1091,6 +1181,42 @@ export default function AdminFichasPartidoPage() {
                             {awayTeam?.name ?? "Visitante"}
                           </p>
                         </div>
+                      </div>
+
+                      <div className="mt-5 rounded-2xl bg-slate-100 p-4">
+                        <p className="text-sm font-black uppercase text-slate-500">
+                          Marcador manual
+                        </p>
+
+                        <div className="mt-3 grid grid-cols-2 gap-3">
+                          <input
+                            type="number"
+                            min="0"
+                            value={homeScore}
+                            onChange={(event) =>
+                              setHomeScore(event.target.value)
+                            }
+                            placeholder="Goles local"
+                            className="rounded-xl border border-slate-300 p-3 text-center text-2xl font-black"
+                          />
+
+                          <input
+                            type="number"
+                            min="0"
+                            value={awayScore}
+                            onChange={(event) =>
+                              setAwayScore(event.target.value)
+                            }
+                            placeholder="Goles visitante"
+                            className="rounded-xl border border-slate-300 p-3 text-center text-2xl font-black"
+                          />
+                        </div>
+
+                        <p className="mt-3 text-xs font-bold text-slate-500">
+                          Goles apuntados a jugadores: {golesFichaLocal} -{" "}
+                          {golesFichaVisitante}. Este dato sirve para la Bota de
+                          Oro, pero el resultado oficial es el marcador manual.
+                        </p>
                       </div>
 
                       <div className="mt-5">
@@ -1156,15 +1282,13 @@ export default function AdminFichasPartidoPage() {
                   </div>
 
                   <div className="rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-black uppercase tracking-widest text-slate-500">
-                          Ficha rápida
-                        </p>
-                        <p className="mt-1 text-sm font-bold text-slate-500">
-                          Marca quién juega y apunta goles, amarillas y rojas.
-                        </p>
-                      </div>
+                    <div>
+                      <p className="text-sm font-black uppercase tracking-widest text-slate-500">
+                        Ficha rápida
+                      </p>
+                      <p className="mt-1 text-sm font-bold text-slate-500">
+                        Marca quién juega y apunta goles, amarillas y rojas.
+                      </p>
                     </div>
 
                     <div className="mt-4 grid grid-cols-2 gap-3">
@@ -1304,20 +1428,8 @@ export default function AdminFichasPartidoPage() {
                     disabled={saving}
                     className="w-full rounded-2xl bg-red-600 py-4 text-lg font-black text-white shadow-2xl disabled:opacity-60"
                   >
-                    {saving ? "Guardando ficha..." : "Guardar ficha y resultado"}
+                    {saving ? "Guardando ficha..." : "Guardar ficha y marcador"}
                   </button>
-
-                  {mensaje && (
-                    <div
-                      className={`rounded-2xl p-4 text-sm font-bold shadow ${
-                        mensajeCorrecto
-                          ? "bg-emerald-100 text-emerald-800"
-                          : "bg-red-100 text-red-700"
-                      }`}
-                    >
-                      {mensaje}
-                    </div>
-                  )}
                 </>
               ) : (
                 <div className="rounded-3xl bg-white/95 p-5 font-bold text-slate-500 shadow-2xl">

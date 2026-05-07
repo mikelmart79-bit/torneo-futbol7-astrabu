@@ -331,6 +331,13 @@ export default function InicioPage() {
 
         <div className="mt-4 grid grid-cols-2 gap-2">
           <a
+            href="/calendario"
+            className="col-span-2 flex min-h-[58px] items-center justify-center rounded-2xl bg-red-600 px-4 py-3 text-center text-lg font-black leading-tight text-white shadow"
+          >
+            Calendario
+          </a>
+
+          <a
             href="/equipos"
             className="flex min-h-[58px] items-center justify-center rounded-2xl bg-white/95 px-4 py-3 text-center text-lg font-black leading-tight shadow"
           >

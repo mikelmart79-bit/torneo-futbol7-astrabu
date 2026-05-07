@@ -32,11 +32,6 @@ const principales: AdminLink[] = [
 
 const datos: AdminLink[] = [
   {
-    href: "/admin/grupos",
-    title: "Gestionar clasificación",
-    description: "Configurar la fase de clasificación.",
-  },
-  {
     href: "/admin/equipos",
     title: "Gestionar equipos",
     description: "Añadir, editar o eliminar equipos.",
@@ -72,6 +67,7 @@ function AdminCard({ item }: { item: AdminLink }) {
       }`}
     >
       <p className="text-lg font-black leading-tight">{item.title}</p>
+
       <p
         className={`mt-1 text-sm font-bold ${
           principal ? "text-red-100" : "text-slate-500"
@@ -86,7 +82,7 @@ function AdminCard({ item }: { item: AdminLink }) {
 export default function AdminPage() {
   async function borrarDatosTorneo() {
     const confirmar1 = window.confirm(
-      "⚠️ Esto borrará TODOS los datos del torneo:\n\n- clasificación\n- equipos\n- jugadores\n- partidos\n- fichas de partido\n- goles\n- tarjetas\n- sanciones\n- eliminatorias\n- votos MVP\n\n¿Quieres continuar?"
+      "⚠️ Esto borrará TODOS los datos del torneo:\n\n- equipos\n- jugadores\n- partidos\n- fichas de partido\n- goles\n- tarjetas\n- sanciones\n- eliminatorias\n- votos MVP\n\n¿Quieres continuar?"
     );
 
     if (!confirmar1) return;
@@ -181,8 +177,8 @@ export default function AdminPage() {
             </p>
 
             <p className="mt-2 text-xs font-bold text-red-700">
-              Se eliminarán clasificación, equipos, jugadores, partidos, fichas,
-              goles, tarjetas, sanciones, eliminatorias y votos MVP.
+              Se eliminarán equipos, jugadores, partidos, fichas, goles,
+              tarjetas, sanciones, eliminatorias y votos MVP.
             </p>
 
             <button

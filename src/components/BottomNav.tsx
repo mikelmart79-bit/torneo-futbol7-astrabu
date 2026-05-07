@@ -11,8 +11,8 @@ const items = [
     icon: Home,
   },
   {
-    href: "/fase-grupos",
-    label: "Grupos",
+    href: "/clasificacion",
+    label: "Clasificación",
     icon: CalendarDays,
   },
   {

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -17,7 +17,9 @@ import {
   Medal,
   BookOpen,
   LockKeyhole,
+  LogOut,
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 type MenuItem = {
   href: string;
@@ -110,10 +112,25 @@ const menuGroups: MenuGroup[] = [
 
 export default function TopMenu() {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+
+  const enAdmin = pathname.startsWith("/admin");
 
   function closeMenu() {
     setOpen(false);
+  }
+
+  async function cerrarAdmin() {
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error("Error cerrando sesión admin:", error);
+    } finally {
+      closeMenu();
+      router.replace("/login");
+      router.refresh();
+    }
   }
 
   return (
@@ -198,6 +215,19 @@ export default function TopMenu() {
                         </Link>
                       );
                     })}
+
+                    {group.title === "Administración" && enAdmin && (
+                      <button
+                        onClick={cerrarAdmin}
+                        className="flex w-full items-center gap-3 rounded-2xl bg-red-600 px-4 py-4 text-left text-white shadow hover:bg-red-700"
+                      >
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-red-600">
+                          <LogOut size={24} strokeWidth={2.8} />
+                        </div>
+
+                        <span className="text-sm font-black">Salir admin</span>
+                      </button>
+                    )}
                   </div>
                 </section>
               ))}

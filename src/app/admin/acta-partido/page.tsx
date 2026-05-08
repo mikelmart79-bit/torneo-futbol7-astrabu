@@ -7,6 +7,7 @@ import AdminGuard from "@/components/AdminGuard";
 import { supabase } from "@/lib/supabase";
 
 type MatchType = "grupo" | "final";
+type PlayerType = "M" | "F";
 
 type TeamRef = {
   id: string;
@@ -23,8 +24,7 @@ type Player = {
   team_id: string;
   name: string;
   number: number | null;
-  municipio?: boolean | null;
-  federado?: boolean | null;
+  player_type: PlayerType | null;
 };
 
 type RawGroupMatch = {
@@ -148,12 +148,8 @@ function nombreJugador(player: Player | undefined) {
   return player.number !== null ? `${player.number} · ${player.name}` : player.name;
 }
 
-function tieneMarcaMunicipio(player: Player | undefined) {
-  return Boolean(player?.municipio);
-}
-
-function tieneMarcaFederado(player: Player | undefined) {
-  return Boolean(player?.federado);
+function tipoJugador(player: Player | undefined): PlayerType {
+  return player?.player_type === "F" ? "F" : "M";
 }
 
 function sumarPorJugador(rows: Array<{ player_id: string; team_id: string }>) {
@@ -372,7 +368,7 @@ function ActaPartidoContent() {
     ] = await Promise.all([
       supabase
         .from("players")
-        .select("id, team_id, name, number, municipio, federado")
+        .select("id, team_id, name, number, player_type")
         .order("number", { ascending: true })
         .order("name", { ascending: true }),
       supabase
@@ -525,31 +521,18 @@ function ActaPartidoContent() {
   }
 
   function renderMarcaJugador(player: Player | undefined) {
-    const esMunicipio = tieneMarcaMunicipio(player);
-    const esFederado = tieneMarcaFederado(player);
-
-    if (!esMunicipio && !esFederado) {
-      return (
-        <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-black text-slate-500">
-          -
-        </span>
-      );
-    }
+    const tipo = tipoJugador(player);
 
     return (
-      <div className="flex items-center justify-end gap-2">
-        {esMunicipio && (
-          <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-black text-blue-800">
-            M
-          </span>
-        )}
-
-        {esFederado && (
-          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-800">
-            F
-          </span>
-        )}
-      </div>
+      <span
+        className={`rounded-full px-3 py-1 text-xs font-black ${
+          tipo === "F"
+            ? "bg-emerald-100 text-emerald-800"
+            : "bg-blue-100 text-blue-800"
+        }`}
+      >
+        {tipo}
+      </span>
     );
   }
 

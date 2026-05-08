@@ -116,6 +116,7 @@ type SuspensionInfo = {
   games: number;
   served: number;
   restantes: number;
+  partidoActual: number;
 };
 
 type FichaRow = {
@@ -125,8 +126,12 @@ type FichaRow = {
   yellow: number;
   red: number;
   suspended: boolean;
+  suspensionId: string;
   suspensionReason: string;
+  suspensionGames: number;
+  suspensionServed: number;
   suspensionRestantes: number;
+  suspensionPartidoActual: number;
 };
 
 function normalizarEquipo(equipo: RawGroupMatch["home_team"]): TeamRef | null {
@@ -147,6 +152,17 @@ function estadoPendiente(status: string | null | undefined) {
     limpio !== "completada" &&
     limpio !== "served" &&
     limpio !== "completed"
+  );
+}
+
+function estadoCuentaComoCumplido(status: string | null | undefined) {
+  const limpio = normalizarTexto(status);
+
+  return (
+    limpio === "finalizado" ||
+    limpio === "cerrado" ||
+    limpio === "finished" ||
+    limpio === "closed"
   );
 }
 
@@ -674,6 +690,7 @@ export default function AdminFichasPartidoPage() {
             games: suspension.games,
             served: suspension.served,
             restantes,
+            partidoActual: Math.min(suspension.served + 1, suspension.games),
           };
         }
       }
@@ -749,8 +766,12 @@ export default function AdminFichasPartidoPage() {
           yellow: 0,
           red: 0,
           suspended: true,
+          suspensionId: sancion.id,
           suspensionReason: sancion.reason,
+          suspensionGames: sancion.games,
+          suspensionServed: sancion.served,
           suspensionRestantes: sancion.restantes,
+          suspensionPartidoActual: sancion.partidoActual,
         };
       }
 
@@ -761,8 +782,12 @@ export default function AdminFichasPartidoPage() {
         yellow,
         red,
         suspended: false,
+        suspensionId: "",
         suspensionReason: "",
+        suspensionGames: 0,
+        suspensionServed: 0,
         suspensionRestantes: 0,
+        suspensionPartidoActual: 0,
       };
     });
 
@@ -1037,6 +1062,71 @@ export default function AdminFichasPartidoPage() {
     if (error) {
       console.error("Error creando sanciones por acumulación:", error);
       return error.message;
+    }
+
+    return null;
+  }
+
+  async function registrarCumplimientoSanciones() {
+    if (!selectedId) return null;
+
+    if (!estadoCuentaComoCumplido(estado)) {
+      return null;
+    }
+
+    const sancionadosFicha = rows.filter(
+      (row) => row.suspended && row.suspensionId
+    );
+
+    if (sancionadosFicha.length === 0) return null;
+
+    const columna = columnaPartido(matchType);
+
+    for (const row of sancionadosFicha) {
+      const { data: alreadyServed, error: checkError } = await supabase
+        .from("suspension_served_matches")
+        .select("id")
+        .eq("suspension_id", row.suspensionId)
+        .eq(columna, selectedId)
+        .limit(1);
+
+      if (checkError) {
+        console.error("Error comprobando cumplimiento de sanción:", checkError);
+        return checkError.message;
+      }
+
+      if ((alreadyServed ?? []).length > 0) {
+        continue;
+      }
+
+      const { error: insertError } = await supabase
+        .from("suspension_served_matches")
+        .insert({
+          suspension_id: row.suspensionId,
+          ...payloadPartido(matchType, selectedId),
+        });
+
+      if (insertError) {
+        console.error("Error registrando partido cumplido:", insertError);
+        return insertError.message;
+      }
+
+      const nuevoServed = Math.min(row.suspensionServed + 1, row.suspensionGames);
+      const nuevoStatus =
+        nuevoServed >= row.suspensionGames ? "Cumplida" : "Activa";
+
+      const { error: updateError } = await supabase
+        .from("suspensions")
+        .update({
+          served: nuevoServed,
+          status: nuevoStatus,
+        })
+        .eq("id", row.suspensionId);
+
+      if (updateError) {
+        console.error("Error actualizando sanción cumplida:", updateError);
+        return updateError.message;
+      }
     }
 
     return null;
@@ -1390,6 +1480,16 @@ export default function AdminFichasPartidoPage() {
       await actualizarArrastresFinales();
     }
 
+    const errorCumplimiento = await registrarCumplimientoSanciones();
+
+    if (errorCumplimiento) {
+      setMensaje(
+        `La ficha se guardó, pero no se pudo actualizar el cumplimiento de sanciones: ${errorCumplimiento}`
+      );
+      setSaving(false);
+      return;
+    }
+
     await cargarDatos({
       tipoMantener: matchType,
       idMantener: selectedId,
@@ -1727,11 +1827,15 @@ export default function AdminFichasPartidoPage() {
 
                             {row.suspended && (
                               <div className="mt-3 rounded-xl bg-red-100 p-3 text-sm font-bold text-red-800">
-                                Sancionado para este partido ·{" "}
-                                {row.suspensionReason}
-                                {row.suspensionRestantes > 0
-                                  ? ` · Restan ${row.suspensionRestantes}`
-                                  : ""}
+                                <p className="font-black">
+                                  Sancionado para este partido
+                                </p>
+
+                                <p className="mt-1">
+                                  {row.suspensionReason} · Partido{" "}
+                                  {row.suspensionPartidoActual} de{" "}
+                                  {row.suspensionGames} de sanción
+                                </p>
                               </div>
                             )}
 

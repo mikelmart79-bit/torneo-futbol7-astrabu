@@ -344,6 +344,14 @@ function ordenarCalendario(partidos: AdminCalendarMatch[]) {
   });
 }
 
+function scrollToElement(elementId: string) {
+  setTimeout(() => {
+    document
+      .getElementById(elementId)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, 120);
+}
+
 export default function AdminFichasPartidoPage() {
   const [matchType, setMatchType] = useState<MatchType>("grupo");
   const [selectedId, setSelectedId] = useState("");
@@ -923,18 +931,41 @@ export default function AdminFichasPartidoPage() {
     setLoadingFicha(false);
   }
 
-  async function seleccionarPartidoJornada(match: AdminCalendarMatch) {
+  async function seleccionarPartidoJornada(
+    match: AdminCalendarMatch,
+    opciones?: { scrollTo?: "jornada" | "edicion" | "none" },
+  ) {
     setMatchType(match.tipo);
     setSelectedId(match.id);
     setMensaje("");
 
     await cargarFicha(match.tipo, match.id);
 
-    setTimeout(() => {
-      document
-        .getElementById("ficha-edicion")
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 120);
+    const destino = opciones?.scrollTo ?? "edicion";
+
+    if (destino === "jornada") {
+      scrollToElement("jornada-partidos");
+    }
+
+    if (destino === "edicion") {
+      scrollToElement("ficha-edicion");
+    }
+  }
+
+  async function seleccionarFechaCalendario(
+    date: string,
+    dayMatches: AdminCalendarMatch[],
+  ) {
+    setSelectedDate(date);
+
+    const primerPartido = dayMatches[0];
+
+    if (primerPartido) {
+      await seleccionarPartidoJornada(primerPartido, { scrollTo: "jornada" });
+      return;
+    }
+
+    scrollToElement("jornada-partidos");
   }
 
   function actualizarJugo(playerId: string, played: boolean) {
@@ -1160,7 +1191,9 @@ export default function AdminFichasPartidoPage() {
                 <button
                   key={date}
                   onClick={() => {
-                    if (hasMatches) setSelectedDate(date);
+                    if (hasMatches) {
+                      void seleccionarFechaCalendario(date, dayMatches);
+                    }
                   }}
                   disabled={!hasMatches}
                   className={`min-h-[58px] rounded-2xl p-1 text-left shadow-sm transition ${
@@ -1860,10 +1893,6 @@ export default function AdminFichasPartidoPage() {
   }
 
   const fichaBloqueada = estadoCerradoPartido(estadoGuardado);
-  const actaDisponible =
-    Boolean(selectedId) && estadoFinalizadoPartido(estadoGuardado);
-  const actaHref = `/admin/acta-partido?match=${selectedId}&type=${matchType}`;
-
   const mensajeCorrecto =
     mensaje.includes("correctamente") ||
     mensaje.includes("guardad") ||
@@ -2077,7 +2106,10 @@ export default function AdminFichasPartidoPage() {
             <div className="mt-6 space-y-5">
               {renderMonth(currentMonth)}
 
-              <div className="overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
+              <div
+                id="jornada-partidos"
+                className="overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur"
+              >
                 <div className="bg-slate-950 px-5 py-4 text-center text-white">
                   <p className="text-sm font-black uppercase tracking-widest text-red-300">
                     Jornada del
@@ -2100,6 +2132,11 @@ export default function AdminFichasPartidoPage() {
                       {selectedMatches.map((match) => {
                         const seleccionado =
                           match.tipo === matchType && match.id === selectedId;
+                        const cerrado = estadoCerradoPartido(match.status);
+                        const puedeVerActa = estadoFinalizadoPartido(
+                          match.status,
+                        );
+                        const fichaHref = `/admin/acta-partido?match=${match.id}&type=${match.tipo}`;
 
                         return (
                           <div
@@ -2130,18 +2167,81 @@ export default function AdminFichasPartidoPage() {
                               </div>
                             </div>
 
-                            <button
-                              onClick={() => seleccionarPartidoJornada(match)}
-                              className={`mt-3 w-full rounded-xl py-3 text-sm font-black shadow ${
-                                seleccionado
-                                  ? "bg-slate-950 text-white"
-                                  : "bg-red-600 text-white"
-                              }`}
-                            >
-                              {seleccionado
-                                ? "Ficha seleccionada"
-                                : "Modificar ficha"}
-                            </button>
+                            {seleccionado ? (
+                              <>
+                                <div className="mt-3 w-full rounded-xl bg-slate-950 py-3 text-center text-sm font-black text-white shadow">
+                                  Ficha seleccionada
+                                </div>
+
+                                <div className="mt-3 grid grid-cols-2 gap-3">
+                                  <button
+                                    onClick={() => scrollToElement("ficha-edicion")}
+                                    disabled={cerrado}
+                                    className={`rounded-xl py-3 text-sm font-black shadow ${
+                                      cerrado
+                                        ? "bg-slate-200 text-slate-400"
+                                        : "bg-red-600 text-white"
+                                    }`}
+                                  >
+                                    Modificar ficha
+                                  </button>
+
+                                  {puedeVerActa ? (
+                                    <Link
+                                      href={fichaHref}
+                                      className="rounded-xl bg-slate-950 py-3 text-center text-sm font-black text-white shadow"
+                                    >
+                                      Ver acta
+                                    </Link>
+                                  ) : (
+                                    <button
+                                      disabled
+                                      className="rounded-xl bg-slate-200 py-3 text-sm font-black text-slate-400 shadow"
+                                    >
+                                      Ver acta
+                                    </button>
+                                  )}
+                                </div>
+
+                                {cerrado && (
+                                  <p className="mt-3 rounded-xl bg-emerald-100 p-3 text-xs font-bold text-emerald-800">
+                                    Partido cerrado: el acta es definitiva y la
+                                    votación MVP está cerrada.
+                                  </p>
+                                )}
+                              </>
+                            ) : (
+                              <div
+                                className={`mt-3 grid gap-3 ${
+                                  puedeVerActa ? "grid-cols-2" : "grid-cols-1"
+                                }`}
+                              >
+                                <button
+                                  onClick={() =>
+                                    seleccionarPartidoJornada(match, {
+                                      scrollTo: "edicion",
+                                    })
+                                  }
+                                  disabled={cerrado}
+                                  className={`rounded-xl py-3 text-sm font-black shadow ${
+                                    cerrado
+                                      ? "bg-slate-200 text-slate-400"
+                                      : "bg-red-600 text-white"
+                                  }`}
+                                >
+                                  {cerrado ? "Acta cerrada" : "Modificar ficha"}
+                                </button>
+
+                                {puedeVerActa && (
+                                  <Link
+                                    href={fichaHref}
+                                    className="rounded-xl bg-slate-950 py-3 text-center text-sm font-black text-white shadow"
+                                  >
+                                    Ver acta
+                                  </Link>
+                                )}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -2149,15 +2249,6 @@ export default function AdminFichasPartidoPage() {
                   )}
                 </div>
               </div>
-
-              {actaDisponible && (
-                <Link
-                  href={actaHref}
-                  className="block rounded-2xl bg-slate-950 p-4 text-center text-lg font-black text-white shadow-2xl"
-                >
-                  Ver acta del partido
-                </Link>
-              )}
 
               {fichaBloqueada && (
                 <div className="rounded-3xl border-2 border-emerald-500 bg-emerald-50 p-5 text-emerald-900 shadow-2xl">

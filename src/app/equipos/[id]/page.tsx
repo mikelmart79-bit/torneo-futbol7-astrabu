@@ -50,18 +50,31 @@ export default function EquipoDetalle() {
   const [equipo, setEquipo] = useState<Team | null>(null);
   const [jugadores, setJugadores] = useState<Player[]>([]);
   const [favoritos, setFavoritos] = useState<string[]>([]);
+  const [jugadoresFavoritos, setJugadoresFavoritos] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorCarga, setErrorCarga] = useState("");
 
   useEffect(() => {
-    const guardados = localStorage.getItem("equiposFavoritos");
+    const equiposGuardados = localStorage.getItem("equiposFavoritos");
 
-    if (guardados) {
+    if (equiposGuardados) {
       try {
-        setFavoritos(JSON.parse(guardados));
+        setFavoritos(JSON.parse(equiposGuardados));
       } catch {
         localStorage.removeItem("equiposFavoritos");
         setFavoritos([]);
+      }
+    }
+
+    const jugadoresGuardados = localStorage.getItem("jugadoresFavoritos");
+
+    if (jugadoresGuardados) {
+      try {
+        const ids = JSON.parse(jugadoresGuardados);
+        setJugadoresFavoritos(Array.isArray(ids) ? ids : []);
+      } catch {
+        localStorage.removeItem("jugadoresFavoritos");
+        setJugadoresFavoritos([]);
       }
     }
 
@@ -120,6 +133,18 @@ export default function EquipoDetalle() {
 
     setFavoritos(nuevosFavoritos);
     localStorage.setItem("equiposFavoritos", JSON.stringify(nuevosFavoritos));
+  }
+
+  function toggleJugadorFavorito(playerId: string) {
+    const nuevosFavoritos = jugadoresFavoritos.includes(playerId)
+      ? jugadoresFavoritos.filter((item) => item !== playerId)
+      : [...jugadoresFavoritos, playerId];
+
+    setJugadoresFavoritos(nuevosFavoritos);
+    localStorage.setItem(
+      "jugadoresFavoritos",
+      JSON.stringify(nuevosFavoritos)
+    );
   }
 
   if (loading) {
@@ -253,11 +278,14 @@ export default function EquipoDetalle() {
             <div className="mt-5 space-y-3">
               {jugadores.map((player) => {
                 const tipo = player.player_type === "F" ? "F" : "M";
+                const esJugadorFavorito = jugadoresFavoritos.includes(
+                  player.id
+                );
 
                 return (
                   <div
                     key={player.id}
-                    className="flex items-center gap-4 rounded-2xl bg-slate-50 p-4 shadow-sm"
+                    className="flex items-center gap-3 rounded-2xl bg-slate-50 p-4 shadow-sm"
                   >
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-600 text-xl font-black text-white">
                       {player.number ?? "-"}
@@ -278,6 +306,22 @@ export default function EquipoDetalle() {
                     >
                       {tipo}
                     </div>
+
+                    <button
+                      onClick={() => toggleJugadorFavorito(player.id)}
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl font-black shadow ${
+                        esJugadorFavorito
+                          ? "bg-yellow-300 text-slate-950"
+                          : "bg-white text-slate-400"
+                      }`}
+                      aria-label={
+                        esJugadorFavorito
+                          ? "Quitar jugador de favoritos"
+                          : "Añadir jugador a favoritos"
+                      }
+                    >
+                      {esJugadorFavorito ? "★" : "☆"}
+                    </button>
                   </div>
                 );
               })}

@@ -158,7 +158,9 @@ function leerJugadoresFavoritos() {
   }
 }
 
-function partidoGrupoToSuspensionMatch(match: Match): Omit<SuspensionMatch, "sanctionGameNumber"> {
+function partidoGrupoToSuspensionMatch(
+  match: Match
+): Omit<SuspensionMatch, "sanctionGameNumber"> {
   return {
     id: match.id,
     tipo: "grupo",
@@ -203,6 +205,7 @@ export default function SancionadosPage() {
   const [rows, setRows] = useState<SuspensionRow[]>([]);
   const [jugadoresFavoritos, setJugadoresFavoritos] = useState<string[]>([]);
   const [filtro, setFiltro] = useState<"pendientes" | "todas">("pendientes");
+  const [sancionAbierta, setSancionAbierta] = useState("");
   const [loading, setLoading] = useState(true);
   const [mensaje, setMensaje] = useState("");
 
@@ -479,7 +482,10 @@ export default function SancionadosPage() {
 
         <div className="mt-4 grid grid-cols-2 gap-3">
           <button
-            onClick={() => setFiltro("pendientes")}
+            onClick={() => {
+              setFiltro("pendientes");
+              setSancionAbierta("");
+            }}
             className={`rounded-2xl px-4 py-3 text-sm font-black shadow ${
               filtro === "pendientes"
                 ? "bg-red-600 text-white"
@@ -490,7 +496,10 @@ export default function SancionadosPage() {
           </button>
 
           <button
-            onClick={() => setFiltro("todas")}
+            onClick={() => {
+              setFiltro("todas");
+              setSancionAbierta("");
+            }}
             className={`rounded-2xl px-4 py-3 text-sm font-black shadow ${
               filtro === "todas"
                 ? "bg-red-600 text-white"
@@ -521,6 +530,7 @@ export default function SancionadosPage() {
           <div className="mt-6 space-y-3">
             {rowsMostrar.map((row) => {
               const pendiente = estadoPendiente(row.status);
+              const abierto = sancionAbierta === row.id;
               const restantes = Math.max(row.games - row.served, 0);
               const tipo = row.playerType === "F" ? "F" : "M";
               const esFavorito = jugadoresFavoritos.includes(row.playerId);
@@ -528,27 +538,70 @@ export default function SancionadosPage() {
               return (
                 <div
                   key={row.id}
-                  className={`rounded-3xl p-4 shadow-2xl ${
+                  className={`overflow-hidden rounded-3xl shadow-2xl ${
                     pendiente
                       ? "bg-white/95 text-slate-900"
                       : "bg-slate-200/95 text-slate-700"
                   }`}
                 >
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-600 text-xl font-black text-white">
+                  <button
+                    onClick={() => setSancionAbierta(abierto ? "" : row.id)}
+                    className={`flex w-full items-center gap-3 p-4 text-left ${
+                      abierto && pendiente
+                        ? "bg-red-600 text-white"
+                        : abierto
+                        ? "bg-slate-700 text-white"
+                        : ""
+                    }`}
+                  >
+                    <div
+                      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-xl font-black ${
+                        abierto
+                          ? "bg-white text-red-600"
+                          : "bg-red-600 text-white"
+                      }`}
+                    >
                       {row.playerNumber ?? "-"}
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <p className="break-words text-xl font-black leading-tight">
+                      <p className="break-words text-lg font-black leading-tight">
                         {row.playerName}
                       </p>
 
-                      <p className="mt-1 text-sm font-bold text-slate-500">
+                      <p
+                        className={`mt-1 text-sm font-bold ${
+                          abierto ? "text-white/80" : "text-slate-500"
+                        }`}
+                      >
                         {row.teamName}
                       </p>
+                    </div>
 
-                      <div className="mt-3 flex items-center gap-2">
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      <span
+                        className={`rounded-full px-3 py-1 text-[11px] font-black uppercase ${
+                          pendiente
+                            ? abierto
+                              ? "bg-white text-red-600"
+                              : "bg-red-100 text-red-700"
+                            : abierto
+                            ? "bg-white text-emerald-700"
+                            : "bg-emerald-100 text-emerald-700"
+                        }`}
+                      >
+                        {pendiente ? "Activa" : "Cumplida"}
+                      </span>
+
+                      <span className="text-2xl font-black">
+                        {abierto ? "−" : "+"}
+                      </span>
+                    </div>
+                  </button>
+
+                  {abierto && (
+                    <div className="p-4">
+                      <div className="flex items-center gap-2">
                         <span
                           className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-black shadow ${
                             tipo === "F"
@@ -570,83 +623,73 @@ export default function SancionadosPage() {
                           {esFavorito ? "★" : "☆"}
                         </button>
                       </div>
-                    </div>
 
-                    <div
-                      className={`shrink-0 rounded-2xl px-3 py-2 text-center text-xs font-black uppercase ${
-                        pendiente
-                          ? "bg-red-600 text-white"
-                          : "bg-emerald-600 text-white"
-                      }`}
-                    >
-                      {pendiente ? "Activa" : "Cumplida"}
-                    </div>
-                  </div>
-
-                  <div className="mt-4 rounded-2xl bg-slate-100 p-4">
-                    <p className="text-sm font-black text-slate-900">
-                      {row.reason}
-                    </p>
-
-                    <p className="mt-2 text-sm font-bold text-slate-600">
-                      Sanción: {row.games} partido
-                      {row.games === 1 ? "" : "s"}
-                    </p>
-
-                    <p className="mt-1 text-sm font-bold text-slate-600">
-                      Cumplidos: {row.served} de {row.games} · Restan:{" "}
-                      {restantes}
-                    </p>
-                  </div>
-
-                  {pendiente && restantes > 0 && (
-                    <div className="mt-4 rounded-2xl bg-red-50 p-4">
-                      <p className="text-sm font-black uppercase tracking-widest text-red-700">
-                        No puede jugar
-                      </p>
-
-                      {row.unavailableMatches.length === 0 ? (
-                        <p className="mt-2 text-sm font-bold text-red-700">
-                          Calendario pendiente o sin próximos partidos
-                          asignados.
+                      <div className="mt-4 rounded-2xl bg-slate-100 p-4">
+                        <p className="text-sm font-black text-slate-900">
+                          {row.reason}
                         </p>
-                      ) : (
-                        <div className="mt-3 space-y-2">
-                          {row.unavailableMatches.map((match) => (
-                            <div
-                              key={`${match.tipo}-${match.id}`}
-                              className="rounded-xl bg-white p-3 shadow-sm"
-                            >
-                              <p className="text-xs font-black uppercase text-red-600">
-                                Partido {match.sanctionGameNumber} de{" "}
-                                {row.games} de sanción
-                              </p>
 
-                              <p className="mt-1 text-xs font-black uppercase text-slate-500">
-                                {match.tipo === "final"
-                                  ? `${match.phase} · ${match.title}`
-                                  : "Clasificación"}
-                              </p>
+                        <p className="mt-2 text-sm font-bold text-slate-600">
+                          Sanción: {row.games} partido
+                          {row.games === 1 ? "" : "s"}
+                        </p>
 
-                              <p className="mt-1 text-sm font-black text-slate-950">
-                                {match.home_name} vs {match.away_name}
-                              </p>
+                        <p className="mt-1 text-sm font-bold text-slate-600">
+                          Cumplidos: {row.served} de {row.games} · Restan:{" "}
+                          {restantes}
+                        </p>
+                      </div>
 
-                              <p className="mt-1 text-xs font-bold text-slate-500">
-                                {formatearFechaSegura(match.match_date)} ·{" "}
-                                {match.match_time ?? "Hora pendiente"} ·{" "}
-                                {match.field ?? "Campo pendiente"}
-                              </p>
+                      {pendiente && restantes > 0 && (
+                        <div className="mt-4 rounded-2xl bg-red-50 p-4">
+                          <p className="text-sm font-black uppercase tracking-widest text-red-700">
+                            No puede jugar
+                          </p>
+
+                          {row.unavailableMatches.length === 0 ? (
+                            <p className="mt-2 text-sm font-bold text-red-700">
+                              Calendario pendiente o sin próximos partidos
+                              asignados.
+                            </p>
+                          ) : (
+                            <div className="mt-3 space-y-2">
+                              {row.unavailableMatches.map((match) => (
+                                <div
+                                  key={`${match.tipo}-${match.id}`}
+                                  className="rounded-xl bg-white p-3 shadow-sm"
+                                >
+                                  <p className="text-xs font-black uppercase text-red-600">
+                                    Partido {match.sanctionGameNumber} de{" "}
+                                    {row.games} de sanción
+                                  </p>
+
+                                  <p className="mt-1 text-xs font-black uppercase text-slate-500">
+                                    {match.tipo === "final"
+                                      ? `${match.phase} · ${match.title}`
+                                      : "Clasificación"}
+                                  </p>
+
+                                  <p className="mt-1 text-sm font-black text-slate-950">
+                                    {match.home_name} vs {match.away_name}
+                                  </p>
+
+                                  <p className="mt-1 text-xs font-bold text-slate-500">
+                                    {formatearFechaSegura(match.match_date)} ·{" "}
+                                    {match.match_time ?? "Hora pendiente"} ·{" "}
+                                    {match.field ?? "Campo pendiente"}
+                                  </p>
+                                </div>
+                              ))}
                             </div>
-                          ))}
+                          )}
                         </div>
                       )}
+
+                      <p className="mt-3 text-xs font-bold text-slate-500">
+                        Origen: {row.origin}
+                      </p>
                     </div>
                   )}
-
-                  <p className="mt-3 text-xs font-bold text-slate-500">
-                    Origen: {row.origin}
-                  </p>
                 </div>
               );
             })}

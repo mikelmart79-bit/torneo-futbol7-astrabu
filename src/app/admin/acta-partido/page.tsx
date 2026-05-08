@@ -598,31 +598,49 @@ function ActaPartidoContent() {
                   : "Clasificación"}
               </p>
 
-              <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                <p className="break-words text-center text-xl font-black leading-tight">
-                  {acta.home_name}
-                </p>
+              <div className="mt-5 rounded-[2rem] bg-white p-4 shadow-sm print:border print:border-slate-200 print:shadow-none">
+                <div className="grid grid-cols-1 items-center gap-4 sm:grid-cols-[1fr_auto_1fr]">
+                  <div className="min-w-0 text-center sm:text-right">
+                    <p className="text-xs font-black uppercase tracking-widest text-slate-400">
+                      Local
+                    </p>
+                    <p className="mt-1 break-words text-2xl font-black leading-tight text-slate-950 sm:text-xl">
+                      {acta.home_name}
+                    </p>
+                  </div>
 
-                <div className="rounded-2xl bg-slate-950 px-5 py-4 text-center text-white print:border print:border-slate-900 print:bg-white print:text-slate-950">
-                  <p className="text-4xl font-black leading-none">
-                    {acta.home_score ?? "-"} - {acta.away_score ?? "-"}
-                  </p>
+                  <div className="mx-auto w-full max-w-[180px] rounded-3xl bg-slate-950 px-5 py-4 text-center text-white print:border print:border-slate-900 print:bg-white print:text-slate-950">
+                    <p className="text-5xl font-black leading-none">
+                      {acta.home_score ?? "-"}
+                    </p>
+                    <p className="my-1 text-3xl font-black leading-none text-red-400 print:text-slate-500">
+                      -
+                    </p>
+                    <p className="text-5xl font-black leading-none">
+                      {acta.away_score ?? "-"}
+                    </p>
 
-                  {acta.tipo === "final" &&
-                    acta.home_penalties !== null &&
-                    acta.away_penalties !== null && (
-                      <p className="mt-2 text-xs font-black uppercase">
-                        Penaltis {acta.home_penalties} - {acta.away_penalties}
-                      </p>
-                    )}
+                    {acta.tipo === "final" &&
+                      acta.home_penalties !== null &&
+                      acta.away_penalties !== null && (
+                        <p className="mt-3 rounded-full bg-white/10 px-2 py-1 text-xs font-black uppercase print:bg-slate-100">
+                          Penaltis {acta.home_penalties} - {acta.away_penalties}
+                        </p>
+                      )}
+                  </div>
+
+                  <div className="min-w-0 text-center sm:text-left">
+                    <p className="text-xs font-black uppercase tracking-widest text-slate-400">
+                      Visitante
+                    </p>
+                    <p className="mt-1 break-words text-2xl font-black leading-tight text-slate-950 sm:text-xl">
+                      {acta.away_name}
+                    </p>
+                  </div>
                 </div>
-
-                <p className="break-words text-center text-xl font-black leading-tight">
-                  {acta.away_name}
-                </p>
               </div>
 
-              <div className="mt-5 grid grid-cols-3 gap-3 text-center">
+              <div className="mt-5 grid grid-cols-1 gap-3 text-center sm:grid-cols-3">
                 <div className="rounded-2xl bg-white p-3 print:border print:border-slate-200">
                   <p className="text-xs font-black uppercase text-slate-500">
                     Fecha

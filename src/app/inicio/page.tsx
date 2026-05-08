@@ -361,11 +361,6 @@ export default function InicioPage() {
                   </p>
                 </div>
 
-                {partidos.length > 1 && (
-                  <p className="mt-3 text-center text-xs font-bold text-slate-500">
-                    {indicePartido + 1} de {partidos.length} próximos partidos
-                  </p>
-                )}
               </div>
             </div>
           ) : (

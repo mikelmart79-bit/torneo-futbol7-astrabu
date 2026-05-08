@@ -145,13 +145,13 @@ export default function EquiposPage() {
                       href={`/equipos/${team.id}`}
                       className="min-w-0 flex-1"
                     >
-                      <p className="break-words text-lg font-black leading-tight text-slate-900">
+                      <p className="break-words text-xl font-black leading-tight text-slate-900">
                         {team.name}
                       </p>
 
-                      <p className="mt-1 text-xs font-bold text-slate-500">
-                        Ver plantilla
-                      </p>
+                      <span className="mt-3 inline-flex items-center rounded-full bg-slate-950 px-4 py-2 text-xs font-black uppercase tracking-wide text-white shadow">
+                        Ver plantilla →
+                      </span>
                     </Link>
 
                     <button

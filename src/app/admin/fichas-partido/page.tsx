@@ -36,6 +36,7 @@ type GroupMatch = {
   away_score: number | null;
   status: string | null;
   mvp_open: boolean | null;
+  incidents: string | null;
   home_team: TeamRef | null;
   away_team: TeamRef | null;
 };
@@ -61,6 +62,7 @@ type FinalMatch = {
   status: string | null;
   sort_order: number;
   mvp_open: boolean | null;
+  incidents: string | null;
   home_source_type?: string | null;
   home_source_match_title?: string | null;
   away_source_type?: string | null;
@@ -376,6 +378,8 @@ export default function AdminFichasPartidoPage() {
   const [homePenalties, setHomePenalties] = useState("");
   const [awayPenalties, setAwayPenalties] = useState("");
 
+  const [incidents, setIncidents] = useState("");
+
   const [selectedDate, setSelectedDate] = useState("");
   const [monthPosition, setMonthPosition] = useState(0);
 
@@ -430,6 +434,7 @@ export default function AdminFichasPartidoPage() {
     setAwayScore("");
     setHomePenalties("");
     setAwayPenalties("");
+    setIncidents("");
   }
 
   async function cargarDatos(opciones?: {
@@ -466,6 +471,7 @@ export default function AdminFichasPartidoPage() {
         away_score,
         status,
         mvp_open,
+        incidents,
         home_team:teams!matches_home_team_id_fkey(id, name),
         away_team:teams!matches_away_team_id_fkey(id, name)
       `
@@ -511,6 +517,7 @@ export default function AdminFichasPartidoPage() {
         status,
         sort_order,
         mvp_open,
+        incidents,
         home_source_type,
         home_source_match_title,
         away_source_type,
@@ -589,6 +596,7 @@ export default function AdminFichasPartidoPage() {
           scoreVisitante: "",
           penLocal: "",
           penVisitante: "",
+          incidentsFicha: "",
         };
       }
 
@@ -608,6 +616,7 @@ export default function AdminFichasPartidoPage() {
         scoreVisitante: partido.away_score?.toString() ?? "",
         penLocal: "",
         penVisitante: "",
+        incidentsFicha: partido.incidents ?? "",
       };
     }
 
@@ -626,6 +635,7 @@ export default function AdminFichasPartidoPage() {
         scoreVisitante: "",
         penLocal: "",
         penVisitante: "",
+        incidentsFicha: "",
       };
     }
 
@@ -660,6 +670,7 @@ export default function AdminFichasPartidoPage() {
       scoreVisitante: eliminatoria.away_score?.toString() ?? "",
       penLocal: eliminatoria.home_penalties?.toString() ?? "",
       penVisitante: eliminatoria.away_penalties?.toString() ?? "",
+      incidentsFicha: eliminatoria.incidents ?? "",
     };
   }
 
@@ -697,6 +708,7 @@ export default function AdminFichasPartidoPage() {
     setAwayScore(contexto.scoreVisitante);
     setHomePenalties(contexto.penLocal);
     setAwayPenalties(contexto.penVisitante);
+    setIncidents(contexto.incidentsFicha);
 
     const teamIds = [contexto.local?.id, contexto.visitante?.id].filter(
       Boolean
@@ -1810,6 +1822,7 @@ export default function AdminFichasPartidoPage() {
       away_score: marcadorVisitante,
       status: estado,
       mvp_open: seCierraPartido ? false : mvpOpen,
+      incidents: incidents.trim() === "" ? null : incidents.trim(),
     };
 
     if (matchType === "final") {
@@ -1855,7 +1868,7 @@ export default function AdminFichasPartidoPage() {
     setMensaje(
       seCierraPartido
         ? "Partido cerrado correctamente. El acta queda como definitiva."
-        : "Ficha, marcador, tarjetas y sanciones guardados correctamente."
+        : "Ficha, marcador, incidencias, tarjetas y sanciones guardados correctamente."
     );
     setSaving(false);
   }
@@ -1888,7 +1901,7 @@ export default function AdminFichasPartidoPage() {
             </h1>
 
             <p className="mt-2 text-center text-sm font-bold text-emerald-100">
-              Marcador, jugadores, goles, tarjetas y sanciones
+              Marcador, jugadores, goles, tarjetas, incidencias y sanciones
             </p>
           </div>
 
@@ -2190,6 +2203,25 @@ export default function AdminFichasPartidoPage() {
                           </div>
                         </div>
                       )}
+
+                      <div className="mt-4 rounded-2xl bg-slate-100 p-4">
+                        <label className="text-sm font-black uppercase text-slate-500">
+                          Incidencias del partido
+                        </label>
+
+                        <textarea
+                          value={incidents}
+                          disabled={fichaBloqueada}
+                          onChange={(event) => setIncidents(event.target.value)}
+                          rows={4}
+                          placeholder="Ejemplo: retraso en el inicio, lesión, comportamiento, observaciones arbitrales..."
+                          className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm font-bold leading-relaxed text-slate-900 disabled:bg-slate-200 disabled:text-slate-500"
+                        />
+
+                        <p className="mt-2 text-xs font-bold text-slate-500">
+                          Este texto aparecerá en el acta del partido.
+                        </p>
+                      </div>
 
                       <label className="mt-4 flex items-center justify-between rounded-2xl bg-slate-100 p-4 font-black">
                         <span>Abrir votación MVP</span>

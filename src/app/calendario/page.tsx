@@ -164,6 +164,16 @@ function tituloPartido(match: CalendarMatch) {
   return match.title || match.phase || "Eliminatoria";
 }
 
+function estadoPermiteVerActa(status: string | null | undefined) {
+  const limpio = (status ?? "").trim().toLowerCase();
+
+  return limpio === "finalizado" || limpio === "cerrado";
+}
+
+function tipoActa(match: CalendarMatch) {
+  return match.tipo === "final" ? "final" : "grupo";
+}
+
 export default function CalendarioPage() {
   const [matches, setMatches] = useState<CalendarMatch[]>([]);
   const [selectedDate, setSelectedDate] = useState("");
@@ -587,7 +597,7 @@ export default function CalendarioPage() {
                                 </p>
                               </div>
 
-                              <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-white p-3">
+                              <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-2xl bg-white p-3">
                                 <div>
                                   <p className="text-xs font-black uppercase text-slate-400">
                                     Hora
@@ -597,6 +607,19 @@ export default function CalendarioPage() {
                                     {match.match_time ?? "--:--"}
                                   </p>
                                 </div>
+
+                                {estadoPermiteVerActa(match.status) ? (
+                                  <Link
+                                    href={`/admin/acta-partido?match=${
+                                      match.id
+                                    }&type=${tipoActa(match)}`}
+                                    className="rounded-xl bg-slate-950 px-4 py-3 text-center text-xs font-black uppercase text-white shadow"
+                                  >
+                                    Ver acta
+                                  </Link>
+                                ) : (
+                                  <div />
+                                )}
 
                                 <div className="text-right">
                                   <p className="text-xs font-black uppercase text-slate-400">

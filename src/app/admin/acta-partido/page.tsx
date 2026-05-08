@@ -35,6 +35,7 @@ type RawGroupMatch = {
   home_score: number | null;
   away_score: number | null;
   status: string | null;
+  incidents: string | null;
   home_team: TeamRef[] | TeamRef | null;
   away_team: TeamRef[] | TeamRef | null;
 };
@@ -53,6 +54,7 @@ type FinalMatch = {
   home_penalties: number | null;
   away_penalties: number | null;
   status: string | null;
+  incidents: string | null;
 };
 
 type ActaMatch = {
@@ -72,6 +74,7 @@ type ActaMatch = {
   home_penalties: number | null;
   away_penalties: number | null;
   status: string | null;
+  incidents: string | null;
 };
 
 type MatchPlayerRow = {
@@ -252,6 +255,7 @@ function ActaPartidoContent() {
           home_score,
           away_score,
           status,
+          incidents,
           home_team:teams!matches_home_team_id_fkey(id, name),
           away_team:teams!matches_away_team_id_fkey(id, name)
         `
@@ -287,6 +291,7 @@ function ActaPartidoContent() {
         home_penalties: null,
         away_penalties: null,
         status: match.status,
+        incidents: match.incidents,
       };
     } else {
       const { data, error } = await supabase
@@ -305,7 +310,8 @@ function ActaPartidoContent() {
           away_score,
           home_penalties,
           away_penalties,
-          status
+          status,
+          incidents
         `
         )
         .eq("id", matchId)
@@ -345,6 +351,7 @@ function ActaPartidoContent() {
         home_penalties: match.home_penalties,
         away_penalties: match.away_penalties,
         status: match.status,
+        incidents: match.incidents,
       };
     }
 
@@ -599,44 +606,48 @@ function ActaPartidoContent() {
               </p>
 
               <div className="mt-5 rounded-[2rem] bg-white p-4 shadow-sm print:border print:border-slate-200 print:shadow-none">
-                <div className="grid grid-cols-1 items-center gap-4 sm:grid-cols-[1fr_auto_1fr]">
-                  <div className="min-w-0 text-center sm:text-right">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl bg-slate-100 p-4 text-center print:border print:border-slate-200 print:bg-white">
                     <p className="text-xs font-black uppercase tracking-widest text-slate-400">
                       Local
                     </p>
-                    <p className="mt-1 break-words text-2xl font-black leading-tight text-slate-950 sm:text-xl">
+                    <p className="mt-2 break-words text-xl font-black leading-tight text-slate-950">
                       {acta.home_name}
                     </p>
                   </div>
 
-                  <div className="mx-auto w-full max-w-[180px] rounded-3xl bg-slate-950 px-5 py-4 text-center text-white print:border print:border-slate-900 print:bg-white print:text-slate-950">
-                    <p className="text-5xl font-black leading-none">
-                      {acta.home_score ?? "-"}
-                    </p>
-                    <p className="my-1 text-3xl font-black leading-none text-red-400 print:text-slate-500">
-                      -
-                    </p>
-                    <p className="text-5xl font-black leading-none">
-                      {acta.away_score ?? "-"}
-                    </p>
-
-                    {acta.tipo === "final" &&
-                      acta.home_penalties !== null &&
-                      acta.away_penalties !== null && (
-                        <p className="mt-3 rounded-full bg-white/10 px-2 py-1 text-xs font-black uppercase print:bg-slate-100">
-                          Penaltis {acta.home_penalties} - {acta.away_penalties}
-                        </p>
-                      )}
-                  </div>
-
-                  <div className="min-w-0 text-center sm:text-left">
+                  <div className="rounded-2xl bg-slate-100 p-4 text-center print:border print:border-slate-200 print:bg-white">
                     <p className="text-xs font-black uppercase tracking-widest text-slate-400">
                       Visitante
                     </p>
-                    <p className="mt-1 break-words text-2xl font-black leading-tight text-slate-950 sm:text-xl">
+                    <p className="mt-2 break-words text-xl font-black leading-tight text-slate-950">
                       {acta.away_name}
                     </p>
                   </div>
+                </div>
+
+                <div className="mt-4 rounded-3xl bg-slate-950 px-5 py-5 text-center text-white print:border print:border-slate-900 print:bg-white print:text-slate-950">
+                  <div className="flex items-center justify-center gap-5">
+                    <span className="min-w-12 text-6xl font-black leading-none">
+                      {acta.home_score ?? "-"}
+                    </span>
+
+                    <span className="text-5xl font-black leading-none text-red-400 print:text-slate-500">
+                      -
+                    </span>
+
+                    <span className="min-w-12 text-6xl font-black leading-none">
+                      {acta.away_score ?? "-"}
+                    </span>
+                  </div>
+
+                  {acta.tipo === "final" &&
+                    acta.home_penalties !== null &&
+                    acta.away_penalties !== null && (
+                      <p className="mt-3 rounded-full bg-white/10 px-3 py-2 text-xs font-black uppercase print:bg-slate-100">
+                        Penaltis {acta.home_penalties} - {acta.away_penalties}
+                      </p>
+                    )}
                 </div>
               </div>
 
@@ -668,6 +679,20 @@ function ActaPartidoContent() {
                   </p>
                 </div>
               </div>
+            </section>
+
+            <section className="mt-5 rounded-3xl bg-slate-50 p-5 print:border print:border-slate-300 print:bg-white">
+              <h2 className="text-xl font-black">Incidencias</h2>
+
+              {acta.incidents && acta.incidents.trim() !== "" ? (
+                <p className="mt-3 whitespace-pre-wrap text-sm font-bold leading-relaxed text-slate-700">
+                  {acta.incidents}
+                </p>
+              ) : (
+                <p className="mt-3 text-sm font-bold text-slate-500">
+                  No hay incidencias registradas.
+                </p>
+              )}
             </section>
 
             <section className="mt-5 rounded-3xl bg-slate-50 p-5 print:border print:border-slate-300 print:bg-white">

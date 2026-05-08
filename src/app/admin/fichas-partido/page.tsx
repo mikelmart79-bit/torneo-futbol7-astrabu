@@ -36,7 +36,6 @@ type GroupMatch = {
   away_score: number | null;
   status: string | null;
   mvp_open: boolean | null;
-  incidents: string | null;
   home_team: TeamRef | null;
   away_team: TeamRef | null;
 };
@@ -62,7 +61,6 @@ type FinalMatch = {
   status: string | null;
   sort_order: number;
   mvp_open: boolean | null;
-  incidents: string | null;
   home_source_type?: string | null;
   home_source_match_title?: string | null;
   away_source_type?: string | null;
@@ -270,14 +268,14 @@ function partidosEquipoParaSancion(
   teamId: string,
   teamName: string,
   partidos: GroupMatch[],
-  eliminatorias: FinalMatch[]
+  eliminatorias: FinalMatch[],
 ) {
   const nombreNormalizado = normalizarTexto(teamName);
 
   const partidosGrupo: SuspensionMatchRef[] = partidos
     .filter(
       (match) =>
-        match.home_team?.id === teamId || match.away_team?.id === teamId
+        match.home_team?.id === teamId || match.away_team?.id === teamId,
     )
     .map((match) => ({
       id: match.id,
@@ -289,7 +287,7 @@ function partidosEquipoParaSancion(
     .filter(
       (match) =>
         normalizarTexto(match.home_ref) === nombreNormalizado ||
-        normalizarTexto(match.away_ref) === nombreNormalizado
+        normalizarTexto(match.away_ref) === nombreNormalizado,
     )
     .map((match) => ({
       id: match.id,
@@ -306,7 +304,7 @@ function partidosEquipoParaSancion(
 function origenSancionValor(
   suspension: Suspension,
   partidos: GroupMatch[],
-  eliminatorias: FinalMatch[]
+  eliminatorias: FinalMatch[],
 ) {
   if (suspension.match_id) {
     const match = partidos.find((item) => item.id === suspension.match_id);
@@ -318,7 +316,7 @@ function origenSancionValor(
 
   if (suspension.final_match_id) {
     const match = eliminatorias.find(
-      (item) => item.id === suspension.final_match_id
+      (item) => item.id === suspension.final_match_id,
     );
 
     if (match) {
@@ -342,14 +340,6 @@ function ordenarCalendario(partidos: AdminCalendarMatch[]) {
 
     return a.sort_order - b.sort_order;
   });
-}
-
-function scrollToElement(elementId: string) {
-  setTimeout(() => {
-    document
-      .getElementById(elementId)
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, 120);
 }
 
 export default function AdminFichasPartidoPage() {
@@ -377,8 +367,6 @@ export default function AdminFichasPartidoPage() {
 
   const [homePenalties, setHomePenalties] = useState("");
   const [awayPenalties, setAwayPenalties] = useState("");
-
-  const [incidents, setIncidents] = useState("");
 
   const [selectedDate, setSelectedDate] = useState("");
   const [monthPosition, setMonthPosition] = useState(0);
@@ -434,7 +422,6 @@ export default function AdminFichasPartidoPage() {
     setAwayScore("");
     setHomePenalties("");
     setAwayPenalties("");
-    setIncidents("");
   }
 
   async function cargarDatos(opciones?: {
@@ -471,10 +458,9 @@ export default function AdminFichasPartidoPage() {
         away_score,
         status,
         mvp_open,
-        incidents,
         home_team:teams!matches_home_team_id_fkey(id, name),
         away_team:teams!matches_away_team_id_fkey(id, name)
-      `
+      `,
       )
       .order("match_date", { ascending: true })
       .order("match_time", { ascending: true });
@@ -482,7 +468,7 @@ export default function AdminFichasPartidoPage() {
     if (matchesError) {
       console.error("Error cargando partidos:", matchesError);
       setMensaje(
-        `No se han podido cargar los partidos: ${matchesError.message}`
+        `No se han podido cargar los partidos: ${matchesError.message}`,
       );
       setLoading(false);
       return;
@@ -517,19 +503,18 @@ export default function AdminFichasPartidoPage() {
         status,
         sort_order,
         mvp_open,
-        incidents,
         home_source_type,
         home_source_match_title,
         away_source_type,
         away_source_match_title
-      `
+      `,
       )
       .order("sort_order", { ascending: true });
 
     if (finalError) {
       console.error("Error cargando eliminatorias:", finalError);
       setMensaje(
-        `No se han podido cargar las eliminatorias: ${finalError.message}`
+        `No se han podido cargar las eliminatorias: ${finalError.message}`,
       );
       setLoading(false);
       return;
@@ -543,8 +528,8 @@ export default function AdminFichasPartidoPage() {
         [
           ...partidos.map((partido) => partido.match_date),
           ...eliminatorias.map((partido) => partido.match_date),
-        ].filter(Boolean) as string[]
-      )
+        ].filter(Boolean) as string[],
+      ),
     ).sort();
 
     if (fechas.length > 0) {
@@ -558,14 +543,20 @@ export default function AdminFichasPartidoPage() {
     const idInicial =
       opciones?.idMantener ??
       (tipoInicial === "grupo"
-        ? partidos[0]?.id ?? ""
-        : eliminatorias[0]?.id ?? "");
+        ? (partidos[0]?.id ?? "")
+        : (eliminatorias[0]?.id ?? ""));
 
     setMatchType(tipoInicial);
     setSelectedId(idInicial);
 
     if (idInicial) {
-      await cargarFicha(tipoInicial, idInicial, equipos, partidos, eliminatorias);
+      await cargarFicha(
+        tipoInicial,
+        idInicial,
+        equipos,
+        partidos,
+        eliminatorias,
+      );
     } else {
       limpiarFicha();
     }
@@ -578,7 +569,7 @@ export default function AdminFichasPartidoPage() {
     id: string,
     equipos: Team[],
     partidos: GroupMatch[],
-    eliminatorias: FinalMatch[]
+    eliminatorias: FinalMatch[],
   ) {
     if (tipo === "grupo") {
       const partido = partidos.find((item) => item.id === id);
@@ -596,7 +587,6 @@ export default function AdminFichasPartidoPage() {
           scoreVisitante: "",
           penLocal: "",
           penVisitante: "",
-          incidentsFicha: "",
         };
       }
 
@@ -616,7 +606,6 @@ export default function AdminFichasPartidoPage() {
         scoreVisitante: partido.away_score?.toString() ?? "",
         penLocal: "",
         penVisitante: "",
-        incidentsFicha: partido.incidents ?? "",
       };
     }
 
@@ -635,18 +624,17 @@ export default function AdminFichasPartidoPage() {
         scoreVisitante: "",
         penLocal: "",
         penVisitante: "",
-        incidentsFicha: "",
       };
     }
 
     const local = equipos.find(
       (team) =>
-        normalizarTexto(team.name) === normalizarTexto(eliminatoria.home_ref)
+        normalizarTexto(team.name) === normalizarTexto(eliminatoria.home_ref),
     );
 
     const visitante = equipos.find(
       (team) =>
-        normalizarTexto(team.name) === normalizarTexto(eliminatoria.away_ref)
+        normalizarTexto(team.name) === normalizarTexto(eliminatoria.away_ref),
     );
 
     const aviso =
@@ -670,7 +658,6 @@ export default function AdminFichasPartidoPage() {
       scoreVisitante: eliminatoria.away_score?.toString() ?? "",
       penLocal: eliminatoria.home_penalties?.toString() ?? "",
       penVisitante: eliminatoria.away_penalties?.toString() ?? "",
-      incidentsFicha: eliminatoria.incidents ?? "",
     };
   }
 
@@ -679,7 +666,7 @@ export default function AdminFichasPartidoPage() {
     id: string,
     equiposBase = teams,
     partidosBase = groupMatches,
-    eliminatoriasBase = finalMatches
+    eliminatoriasBase = finalMatches,
   ) {
     if (!id) {
       limpiarFicha();
@@ -693,7 +680,7 @@ export default function AdminFichasPartidoPage() {
       id,
       equiposBase,
       partidosBase,
-      eliminatoriasBase
+      eliminatoriasBase,
     );
 
     setFichaTitulo(contexto.titulo);
@@ -708,10 +695,9 @@ export default function AdminFichasPartidoPage() {
     setAwayScore(contexto.scoreVisitante);
     setHomePenalties(contexto.penLocal);
     setAwayPenalties(contexto.penVisitante);
-    setIncidents(contexto.incidentsFicha);
 
     const teamIds = [contexto.local?.id, contexto.visitante?.id].filter(
-      Boolean
+      Boolean,
     ) as string[];
 
     if (teamIds.length === 0) {
@@ -730,7 +716,7 @@ export default function AdminFichasPartidoPage() {
     if (playersError) {
       console.error("Error cargando jugadores:", playersError);
       setMensaje(
-        `No se han podido cargar los jugadores: ${playersError.message}`
+        `No se han podido cargar los jugadores: ${playersError.message}`,
       );
       setLoadingFicha(false);
       return;
@@ -757,7 +743,7 @@ export default function AdminFichasPartidoPage() {
         ? await supabase
             .from("suspensions")
             .select(
-              "id, player_id, team_id, match_id, final_match_id, reason, games, served, status, created_at"
+              "id, player_id, team_id, match_id, final_match_id, reason, games, served, status, created_at",
             )
             .in("player_id", playerIds)
         : { data: [], error: null };
@@ -765,7 +751,7 @@ export default function AdminFichasPartidoPage() {
     if (suspensionRequest.error) {
       console.error("Error cargando sanciones:", suspensionRequest.error);
       setMensaje(
-        `No se han podido cargar las sanciones: ${suspensionRequest.error.message}`
+        `No se han podido cargar las sanciones: ${suspensionRequest.error.message}`,
       );
       setLoadingFicha(false);
       return;
@@ -774,12 +760,12 @@ export default function AdminFichasPartidoPage() {
     const sanciones = ((suspensionRequest.data ?? []) as Suspension[]).filter(
       (suspension) =>
         estadoPendiente(suspension.status) &&
-        Math.max(suspension.games - suspension.served, 0) > 0
+        Math.max(suspension.games - suspension.served, 0) > 0,
     );
 
     function sancionParaJugador(player: Player): SuspensionInfo | null {
       const sancionesJugador = sanciones.filter(
-        (suspension) => suspension.player_id === player.id
+        (suspension) => suspension.player_id === player.id,
       );
 
       for (const suspension of sancionesJugador) {
@@ -794,13 +780,13 @@ export default function AdminFichasPartidoPage() {
           suspension.team_id,
           teamName,
           partidosBase,
-          eliminatoriasBase
+          eliminatoriasBase,
         );
 
         const origenValor = origenSancionValor(
           suspension,
           partidosBase,
-          eliminatoriasBase
+          eliminatoriasBase,
         );
 
         const partidosPendientesDeSancion = partidosEquipo
@@ -808,7 +794,7 @@ export default function AdminFichasPartidoPage() {
           .slice(suspension.served, suspension.games);
 
         const indicePartidoSancion = partidosPendientesDeSancion.findIndex(
-          (match) => match.tipo === tipo && match.id === id
+          (match) => match.tipo === tipo && match.id === id,
         );
 
         const afectaEstePartido = indicePartidoSancion !== -1;
@@ -822,7 +808,7 @@ export default function AdminFichasPartidoPage() {
             restantes,
             partidoActual: Math.min(
               suspension.served + indicePartidoSancion + 1,
-              suspension.games
+              suspension.games,
             ),
           };
         }
@@ -841,7 +827,7 @@ export default function AdminFichasPartidoPage() {
     if (matchPlayersError) {
       console.error("Error cargando participantes:", matchPlayersError);
       setMensaje(
-        `No se han podido cargar los jugadores de la ficha: ${matchPlayersError.message}`
+        `No se han podido cargar los jugadores de la ficha: ${matchPlayersError.message}`,
       );
       setLoadingFicha(false);
       return;
@@ -870,9 +856,7 @@ export default function AdminFichasPartidoPage() {
 
     if (cardsError) {
       console.error("Error cargando tarjetas:", cardsError);
-      setMensaje(
-        `No se han podido cargar las tarjetas: ${cardsError.message}`
-      );
+      setMensaje(`No se han podido cargar las tarjetas: ${cardsError.message}`);
       setLoadingFicha(false);
       return;
     }
@@ -885,10 +869,10 @@ export default function AdminFichasPartidoPage() {
       const played = participantes.some((item) => item.player_id === player.id);
       const goals = goles.filter((item) => item.player_id === player.id).length;
       const yellow = tarjetas.filter(
-        (item) => item.player_id === player.id && item.card_type === "yellow"
+        (item) => item.player_id === player.id && item.card_type === "yellow",
       ).length;
       const red = tarjetas.filter(
-        (item) => item.player_id === player.id && item.card_type === "red"
+        (item) => item.player_id === player.id && item.card_type === "red",
       ).length;
 
       if (sancion) {
@@ -928,55 +912,32 @@ export default function AdminFichasPartidoPage() {
     setLoadingFicha(false);
   }
 
-  async function seleccionarPartidoJornada(
-    match: AdminCalendarMatch,
-    opciones?: { scrollTo?: "jornada" | "edicion" | "none" }
-  ) {
+  async function seleccionarPartidoJornada(match: AdminCalendarMatch) {
     setMatchType(match.tipo);
     setSelectedId(match.id);
     setMensaje("");
 
     await cargarFicha(match.tipo, match.id);
 
-    const destino = opciones?.scrollTo ?? "edicion";
-
-    if (destino === "jornada") {
-      scrollToElement("jornada-partidos");
-    }
-
-    if (destino === "edicion") {
-      scrollToElement("ficha-edicion");
-    }
-  }
-
-  async function seleccionarFechaCalendario(
-    date: string,
-    dayMatches: AdminCalendarMatch[]
-  ) {
-    setSelectedDate(date);
-
-    const primerPartido = dayMatches[0];
-
-    if (primerPartido) {
-      await seleccionarPartidoJornada(primerPartido, { scrollTo: "jornada" });
-      return;
-    }
-
-    scrollToElement("jornada-partidos");
+    setTimeout(() => {
+      document
+        .getElementById("ficha-edicion")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
   }
 
   function actualizarJugo(playerId: string, played: boolean) {
     setRows((actuales) =>
       actuales.map((row) =>
-        row.player.id === playerId && !row.suspended ? { ...row, played } : row
-      )
+        row.player.id === playerId && !row.suspended ? { ...row, played } : row,
+      ),
     );
   }
 
   function actualizarNumero(
     playerId: string,
     campo: "goals" | "yellow" | "red",
-    valor: string
+    valor: string,
   ) {
     const numero = Number.parseInt(valor, 10);
     const numeroSeguro = Number.isNaN(numero) ? 0 : Math.max(0, numero);
@@ -989,16 +950,14 @@ export default function AdminFichasPartidoPage() {
               [campo]: numeroSeguro,
               played: numeroSeguro > 0 ? true : row.played,
             }
-          : row
-      )
+          : row,
+      ),
     );
   }
 
   function marcarTodos() {
     setRows((actuales) =>
-      actuales.map((row) =>
-        row.suspended ? row : { ...row, played: true }
-      )
+      actuales.map((row) => (row.suspended ? row : { ...row, played: true })),
     );
   }
 
@@ -1010,7 +969,7 @@ export default function AdminFichasPartidoPage() {
         goals: 0,
         yellow: 0,
         red: 0,
-      }))
+      })),
     );
   }
 
@@ -1097,11 +1056,13 @@ export default function AdminFichasPartidoPage() {
 
   const monthPositionSeguro = Math.min(
     monthPosition,
-    Math.max(calendarMonths.length - 1, 0)
+    Math.max(calendarMonths.length - 1, 0),
   );
 
   const currentMonth = calendarMonths[monthPositionSeguro] ?? DEFAULT_MONTHS[0];
-  const selectedMatches = selectedDate ? matchesByDate[selectedDate] ?? [] : [];
+  const selectedMatches = selectedDate
+    ? (matchesByDate[selectedDate] ?? [])
+    : [];
 
   function renderMonth(month: CalendarMonth) {
     const firstDay = new Date(month.year, month.monthIndex, 1);
@@ -1142,7 +1103,7 @@ export default function AdminFichasPartidoPage() {
           <button
             onClick={() =>
               setMonthPosition((actual) =>
-                Math.min(actual + 1, calendarMonths.length - 1)
+                Math.min(actual + 1, calendarMonths.length - 1),
               )
             }
             disabled={monthPositionSeguro >= calendarMonths.length - 1}
@@ -1174,17 +1135,15 @@ export default function AdminFichasPartidoPage() {
                 <button
                   key={date}
                   onClick={() => {
-                    if (hasMatches) {
-                      void seleccionarFechaCalendario(date, dayMatches);
-                    }
+                    if (hasMatches) setSelectedDate(date);
                   }}
                   disabled={!hasMatches}
                   className={`min-h-[58px] rounded-2xl p-1 text-left shadow-sm transition ${
                     selected
                       ? "bg-red-600 text-white"
                       : hasMatches
-                      ? "bg-slate-950 text-white"
-                      : "bg-slate-100 text-slate-400"
+                        ? "bg-slate-950 text-white"
+                        : "bg-slate-100 text-slate-400"
                   }`}
                 >
                   <p className="text-sm font-black">{day}</p>
@@ -1225,7 +1184,7 @@ export default function AdminFichasPartidoPage() {
 
     function resolver(
       matchTitle: string | null | undefined,
-      tipo: "winner" | "loser"
+      tipo: "winner" | "loser",
     ) {
       if (!matchTitle) return "";
 
@@ -1271,14 +1230,14 @@ export default function AdminFichasPartidoPage() {
           match.home_source_type === "winner"
             ? resolver(match.home_source_match_title, "winner")
             : match.home_source_type === "loser"
-            ? resolver(match.home_source_match_title, "loser")
-            : match.home_ref,
+              ? resolver(match.home_source_match_title, "loser")
+              : match.home_ref,
         away_ref:
           match.away_source_type === "winner"
             ? resolver(match.away_source_match_title, "winner")
             : match.away_source_type === "loser"
-            ? resolver(match.away_source_match_title, "loser")
-            : match.away_ref,
+              ? resolver(match.away_source_match_title, "loser")
+              : match.away_ref,
       }));
     }
 
@@ -1308,7 +1267,7 @@ export default function AdminFichasPartidoPage() {
     if (jugadoresRevisar.length === 0) return null;
 
     const playerIds = Array.from(
-      new Set(jugadoresRevisar.map((player) => player.id))
+      new Set(jugadoresRevisar.map((player) => player.id)),
     );
 
     const { data: cardsData, error: cardsError } = await supabase
@@ -1360,18 +1319,18 @@ export default function AdminFichasPartidoPage() {
 
     jugadoresRevisar.forEach((player) => {
       const totalAmarillas = amarillas.filter(
-        (card) => card.player_id === player.id
+        (card) => card.player_id === player.id,
       ).length;
 
       const sancionesNecesarias = Math.floor(totalAmarillas / 2);
 
       const sancionesYaCreadas = sancionesExistentes.filter(
-        (suspension) => suspension.player_id === player.id
+        (suspension) => suspension.player_id === player.id,
       ).length;
 
       const sancionesPendientesDeCrear = Math.max(
         sancionesNecesarias - sancionesYaCreadas,
-        0
+        0,
       );
 
       for (let i = 0; i < sancionesPendientesDeCrear; i++) {
@@ -1390,7 +1349,9 @@ export default function AdminFichasPartidoPage() {
 
     if (nuevasSanciones.length === 0) return null;
 
-    const { error } = await supabase.from("suspensions").insert(nuevasSanciones);
+    const { error } = await supabase
+      .from("suspensions")
+      .insert(nuevasSanciones);
 
     if (error) {
       console.error("Error creando sanciones por acumulación:", error);
@@ -1408,7 +1369,7 @@ export default function AdminFichasPartidoPage() {
     }
 
     const sancionadosFicha = rows.filter(
-      (row) => row.suspended && row.suspensionId
+      (row) => row.suspended && row.suspensionId,
     );
 
     if (sancionadosFicha.length === 0) return null;
@@ -1468,7 +1429,7 @@ export default function AdminFichasPartidoPage() {
       }
 
       const gamesActuales = Number(
-        suspensionActual.games ?? row.suspensionGames
+        suspensionActual.games ?? row.suspensionGames,
       );
       const servedActual = Number(suspensionActual.served ?? 0);
 
@@ -1500,7 +1461,7 @@ export default function AdminFichasPartidoPage() {
 
     if (estadoCerradoPartido(estadoGuardado)) {
       setMensaje(
-        "Este partido está cerrado. El acta es definitiva y ya no se puede modificar."
+        "Este partido está cerrado. El acta es definitiva y ya no se puede modificar.",
       );
       return;
     }
@@ -1513,14 +1474,14 @@ export default function AdminFichasPartidoPage() {
     const sancionadoConDatos = rows.find(
       (row) =>
         row.suspended &&
-        (row.played || row.goals > 0 || row.yellow > 0 || row.red > 0)
+        (row.played || row.goals > 0 || row.yellow > 0 || row.red > 0),
     );
 
     if (sancionadoConDatos) {
       setMensaje(
         `${jugadorNombre(
-          sancionadoConDatos.player
-        )} está sancionado y no puede tener datos en esta ficha.`
+          sancionadoConDatos.player,
+        )} está sancionado y no puede tener datos en esta ficha.`,
       );
       return;
     }
@@ -1555,7 +1516,7 @@ export default function AdminFichasPartidoPage() {
         (penLocal !== null && penVisitante === null)
       ) {
         setMensaje(
-          "Si indicas penaltis, debes poner los penaltis de los dos equipos."
+          "Si indicas penaltis, debes poner los penaltis de los dos equipos.",
         );
         return;
       }
@@ -1605,7 +1566,7 @@ export default function AdminFichasPartidoPage() {
     if (deletePlayers.error) {
       console.error("Error borrando jugadores ficha:", deletePlayers.error);
       setMensaje(
-        `No se han podido actualizar los jugadores: ${deletePlayers.error.message}`
+        `No se han podido actualizar los jugadores: ${deletePlayers.error.message}`,
       );
       setSaving(false);
       return;
@@ -1619,7 +1580,7 @@ export default function AdminFichasPartidoPage() {
     if (deleteGoals.error) {
       console.error("Error borrando goles:", deleteGoals.error);
       setMensaje(
-        `No se han podido actualizar los goles: ${deleteGoals.error.message}`
+        `No se han podido actualizar los goles: ${deleteGoals.error.message}`,
       );
       setSaving(false);
       return;
@@ -1633,7 +1594,7 @@ export default function AdminFichasPartidoPage() {
     if (deleteCards.error) {
       console.error("Error borrando tarjetas:", deleteCards.error);
       setMensaje(
-        `No se han podido actualizar las tarjetas: ${deleteCards.error.message}`
+        `No se han podido actualizar las tarjetas: ${deleteCards.error.message}`,
       );
       setSaving(false);
       return;
@@ -1648,10 +1609,10 @@ export default function AdminFichasPartidoPage() {
     if (deleteAutoSuspensions.error) {
       console.error(
         "Error borrando sanciones automáticas:",
-        deleteAutoSuspensions.error
+        deleteAutoSuspensions.error,
       );
       setMensaje(
-        `No se han podido actualizar las sanciones: ${deleteAutoSuspensions.error.message}`
+        `No se han podido actualizar las sanciones: ${deleteAutoSuspensions.error.message}`,
       );
       setSaving(false);
       return;
@@ -1666,10 +1627,10 @@ export default function AdminFichasPartidoPage() {
     if (deleteAutoYellowSuspensions.error) {
       console.error(
         "Error borrando sanciones por acumulación:",
-        deleteAutoYellowSuspensions.error
+        deleteAutoYellowSuspensions.error,
       );
       setMensaje(
-        `No se han podido actualizar las sanciones por amarillas: ${deleteAutoYellowSuspensions.error.message}`
+        `No se han podido actualizar las sanciones por amarillas: ${deleteAutoYellowSuspensions.error.message}`,
       );
       setSaving(false);
       return;
@@ -1679,7 +1640,7 @@ export default function AdminFichasPartidoPage() {
       .filter(
         (row) =>
           !row.suspended &&
-          (row.played || row.goals > 0 || row.yellow > 0 || row.red > 0)
+          (row.played || row.goals > 0 || row.yellow > 0 || row.red > 0),
       )
       .map((row) => ({
         ...payloadPartido(matchType, selectedId),
@@ -1783,7 +1744,7 @@ export default function AdminFichasPartidoPage() {
 
     if (errorAcumulacion) {
       setMensaje(
-        `Las tarjetas se guardaron, pero no se pudo revisar la acumulación de amarillas: ${errorAcumulacion}`
+        `Las tarjetas se guardaron, pero no se pudo revisar la acumulación de amarillas: ${errorAcumulacion}`,
       );
       setSaving(false);
       return;
@@ -1822,7 +1783,6 @@ export default function AdminFichasPartidoPage() {
       away_score: marcadorVisitante,
       status: estado,
       mvp_open: seCierraPartido ? false : mvpOpen,
-      incidents: incidents.trim() === "" ? null : incidents.trim(),
     };
 
     if (matchType === "final") {
@@ -1840,7 +1800,7 @@ export default function AdminFichasPartidoPage() {
     if (updateError) {
       console.error("Error actualizando resultado:", updateError);
       setMensaje(
-        `La ficha se guardó, pero no se actualizó el resultado: ${updateError.message}`
+        `La ficha se guardó, pero no se actualizó el resultado: ${updateError.message}`,
       );
       setSaving(false);
       return;
@@ -1854,7 +1814,7 @@ export default function AdminFichasPartidoPage() {
 
     if (errorCumplimiento) {
       setMensaje(
-        `La ficha se guardó, pero no se pudo actualizar el cumplimiento de sanciones: ${errorCumplimiento}`
+        `La ficha se guardó, pero no se pudo actualizar el cumplimiento de sanciones: ${errorCumplimiento}`,
       );
       setSaving(false);
       return;
@@ -1868,18 +1828,177 @@ export default function AdminFichasPartidoPage() {
     setMensaje(
       seCierraPartido
         ? "Partido cerrado correctamente. El acta queda como definitiva."
-        : "Ficha, marcador, incidencias, tarjetas y sanciones guardados correctamente."
+        : "Ficha, marcador, tarjetas y sanciones guardados correctamente.",
     );
     setSaving(false);
   }
 
   const fichaBloqueada = estadoCerradoPartido(estadoGuardado);
+  const actaDisponible =
+    Boolean(selectedId) && estadoFinalizadoPartido(estadoGuardado);
+  const actaHref = `/admin/acta-partido?match=${selectedId}&type=${matchType}`;
 
   const mensajeCorrecto =
     mensaje.includes("correctamente") ||
     mensaje.includes("guardad") ||
     mensaje.includes("actualizad") ||
     mensaje.includes("cerrado");
+
+  const rowsLocal = rows.filter((row) => row.player.team_id === homeTeam?.id);
+
+  const rowsVisitante = rows.filter(
+    (row) => row.player.team_id === awayTeam?.id,
+  );
+
+  const rowsOtros = rows.filter(
+    (row) =>
+      row.player.team_id !== homeTeam?.id &&
+      row.player.team_id !== awayTeam?.id,
+  );
+
+  function renderJugadorFicha(row: FichaRow) {
+    return (
+      <div
+        key={row.player.id}
+        className={`rounded-2xl p-4 shadow-sm ${
+          row.suspended ? "border-2 border-red-200 bg-red-50" : "bg-slate-100"
+        }`}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="font-black leading-tight">
+              {jugadorNombre(row.player)}
+            </p>
+            <p className="text-sm font-bold text-slate-500">
+              {nombreEquipo(row.player.team_id)}
+            </p>
+          </div>
+
+          <label
+            className={`flex flex-col items-center gap-1 text-xs font-black uppercase ${
+              row.suspended ? "text-red-500" : "text-slate-500"
+            }`}
+          >
+            {row.suspended ? "Sancionado" : "Jugó"}
+            <input
+              type="checkbox"
+              checked={row.played}
+              disabled={row.suspended || fichaBloqueada}
+              onChange={(event) =>
+                actualizarJugo(row.player.id, event.target.checked)
+              }
+              className="h-6 w-6 disabled:opacity-40"
+            />
+          </label>
+        </div>
+
+        {row.suspended && (
+          <div className="mt-3 rounded-xl bg-red-100 p-3 text-sm font-bold text-red-800">
+            <p className="font-black">Sancionado para este partido</p>
+
+            <p className="mt-1">
+              {row.suspensionReason} · Partido {row.suspensionPartidoActual} de{" "}
+              {row.suspensionGames} de sanción
+            </p>
+          </div>
+        )}
+
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          <div>
+            <label className="text-xs font-black uppercase text-slate-500">
+              Goles
+            </label>
+
+            <select
+              value={row.goals}
+              disabled={row.suspended || fichaBloqueada}
+              onChange={(event) =>
+                actualizarNumero(row.player.id, "goals", event.target.value)
+              }
+              className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-lg font-black disabled:bg-slate-200 disabled:text-slate-400"
+            >
+              {opcionesNumero(10).map((numero) => (
+                <option key={numero} value={numero}>
+                  {numero}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-black uppercase text-slate-500">
+              Amar.
+            </label>
+
+            <select
+              value={row.yellow}
+              disabled={row.suspended || fichaBloqueada}
+              onChange={(event) =>
+                actualizarNumero(row.player.id, "yellow", event.target.value)
+              }
+              className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-lg font-black disabled:bg-slate-200 disabled:text-slate-400"
+            >
+              {opcionesNumero(2).map((numero) => (
+                <option key={numero} value={numero}>
+                  {numero}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-black uppercase text-slate-500">
+              Rojas
+            </label>
+
+            <select
+              value={row.red}
+              disabled={row.suspended || fichaBloqueada}
+              onChange={(event) =>
+                actualizarNumero(row.player.id, "red", event.target.value)
+              }
+              className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-lg font-black disabled:bg-slate-200 disabled:text-slate-400"
+            >
+              {opcionesNumero(1).map((numero) => (
+                <option key={numero} value={numero}>
+                  {numero}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderBloqueEquipo(
+    titulo: string,
+    equipo: string,
+    jugadores: FichaRow[],
+  ) {
+    return (
+      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+        <div className="bg-slate-950 px-4 py-4 text-white">
+          <p className="text-xs font-black uppercase tracking-widest text-red-300">
+            {titulo}
+          </p>
+          <h3 className="mt-1 break-words text-xl font-black leading-tight">
+            {equipo}
+          </h3>
+        </div>
+
+        <div className="space-y-3 p-3">
+          {jugadores.length === 0 ? (
+            <p className="rounded-2xl bg-slate-100 p-4 text-sm font-bold text-slate-500">
+              No hay jugadores en este equipo.
+            </p>
+          ) : (
+            jugadores.map((row) => renderJugadorFicha(row))
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <AdminGuard>
@@ -1901,7 +2020,7 @@ export default function AdminFichasPartidoPage() {
             </h1>
 
             <p className="mt-2 text-center text-sm font-bold text-emerald-100">
-              Marcador, jugadores, goles, tarjetas, incidencias y sanciones
+              Marcador, jugadores, goles, tarjetas y sanciones
             </p>
           </div>
 
@@ -1932,17 +2051,16 @@ export default function AdminFichasPartidoPage() {
             <div className="mt-6 space-y-5">
               {renderMonth(currentMonth)}
 
-              <div
-                id="jornada-partidos"
-                className="overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur"
-              >
+              <div className="overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
                 <div className="bg-slate-950 px-5 py-4 text-center text-white">
                   <p className="text-sm font-black uppercase tracking-widest text-red-300">
                     Jornada del
                   </p>
 
                   <h2 className="mt-1 text-2xl font-black">
-                    {selectedDate ? formatearJornada(selectedDate) : "Sin fecha"}
+                    {selectedDate
+                      ? formatearJornada(selectedDate)
+                      : "Sin fecha"}
                   </h2>
                 </div>
 
@@ -1956,11 +2074,6 @@ export default function AdminFichasPartidoPage() {
                       {selectedMatches.map((match) => {
                         const seleccionado =
                           match.tipo === matchType && match.id === selectedId;
-                        const cerrado = estadoCerradoPartido(match.status);
-                        const puedeVerFicha = estadoFinalizadoPartido(
-                          match.status
-                        );
-                        const fichaHref = `/admin/acta-partido?match=${match.id}&type=${match.tipo}`;
 
                         return (
                           <div
@@ -1991,61 +2104,18 @@ export default function AdminFichasPartidoPage() {
                               </div>
                             </div>
 
-                            {seleccionado ? (
-                              <>
-                                <div className="mt-3 w-full rounded-xl bg-slate-950 py-3 text-center text-sm font-black text-white shadow">
-                                  Ficha seleccionada
-                                </div>
-
-                                <div className="mt-3 grid grid-cols-2 gap-3">
-                                  <button
-                                    onClick={() => scrollToElement("ficha-edicion")}
-                                    disabled={cerrado}
-                                    className={`rounded-xl py-3 text-sm font-black shadow ${
-                                      cerrado
-                                        ? "bg-slate-200 text-slate-400"
-                                        : "bg-red-600 text-white"
-                                    }`}
-                                  >
-                                    Modificar ficha
-                                  </button>
-
-                                  {puedeVerFicha ? (
-                                    <Link
-                                      href={fichaHref}
-                                      className="rounded-xl bg-slate-950 py-3 text-center text-sm font-black text-white shadow"
-                                    >
-                                      Ver ficha
-                                    </Link>
-                                  ) : (
-                                    <button
-                                      disabled
-                                      className="rounded-xl bg-slate-200 py-3 text-sm font-black text-slate-400 shadow"
-                                    >
-                                      Ver ficha
-                                    </button>
-                                  )}
-                                </div>
-
-                                {cerrado && (
-                                  <p className="mt-3 rounded-xl bg-emerald-100 p-3 text-xs font-bold text-emerald-800">
-                                    Partido cerrado: solo se puede consultar el
-                                    acta.
-                                  </p>
-                                )}
-                              </>
-                            ) : (
-                              <button
-                                onClick={() =>
-                                  seleccionarPartidoJornada(match, {
-                                    scrollTo: "edicion",
-                                  })
-                                }
-                                className="mt-3 w-full rounded-xl bg-red-600 py-3 text-sm font-black text-white shadow"
-                              >
-                                Modificar ficha
-                              </button>
-                            )}
+                            <button
+                              onClick={() => seleccionarPartidoJornada(match)}
+                              className={`mt-3 w-full rounded-xl py-3 text-sm font-black shadow ${
+                                seleccionado
+                                  ? "bg-slate-950 text-white"
+                                  : "bg-red-600 text-white"
+                              }`}
+                            >
+                              {seleccionado
+                                ? "Ficha seleccionada"
+                                : "Modificar ficha"}
+                            </button>
                           </div>
                         );
                       })}
@@ -2053,6 +2123,15 @@ export default function AdminFichasPartidoPage() {
                   )}
                 </div>
               </div>
+
+              {actaDisponible && (
+                <Link
+                  href={actaHref}
+                  className="block rounded-2xl bg-slate-950 p-4 text-center text-lg font-black text-white shadow-2xl"
+                >
+                  Ver acta del partido
+                </Link>
+              )}
 
               {fichaBloqueada && (
                 <div className="rounded-3xl border-2 border-emerald-500 bg-emerald-50 p-5 text-emerald-900 shadow-2xl">
@@ -2095,21 +2174,25 @@ export default function AdminFichasPartidoPage() {
                         </div>
                       )}
 
-                      <div className="rounded-3xl bg-slate-100 p-4 text-center">
-                        <p className="break-words text-lg font-black leading-tight text-slate-950">
-                          {homeTeam?.name ?? "Local"}
-                        </p>
+                      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                        <div className="text-center">
+                          <p className="text-sm font-black leading-tight">
+                            {homeTeam?.name ?? "Local"}
+                          </p>
+                        </div>
 
-                        <div className="mx-auto mt-3 inline-flex min-w-[120px] items-center justify-center rounded-3xl bg-slate-950 px-6 py-4 text-white shadow">
-                          <p className="text-5xl font-black leading-none">
+                        <div className="rounded-2xl bg-slate-950 px-5 py-3 text-center text-white shadow">
+                          <p className="text-4xl font-black">
                             {homeScore.trim() === "" ? "-" : homeScore} -{" "}
                             {awayScore.trim() === "" ? "-" : awayScore}
                           </p>
                         </div>
 
-                        <p className="mt-3 break-words text-lg font-black leading-tight text-slate-950">
-                          {awayTeam?.name ?? "Visitante"}
-                        </p>
+                        <div className="text-center">
+                          <p className="text-sm font-black leading-tight">
+                            {awayTeam?.name ?? "Visitante"}
+                          </p>
+                        </div>
                       </div>
 
                       <div className="mt-5 rounded-2xl bg-slate-100 p-4">
@@ -2204,25 +2287,6 @@ export default function AdminFichasPartidoPage() {
                         </div>
                       )}
 
-                      <div className="mt-4 rounded-2xl bg-slate-100 p-4">
-                        <label className="text-sm font-black uppercase text-slate-500">
-                          Incidencias del partido
-                        </label>
-
-                        <textarea
-                          value={incidents}
-                          disabled={fichaBloqueada}
-                          onChange={(event) => setIncidents(event.target.value)}
-                          rows={4}
-                          placeholder="Ejemplo: retraso en el inicio, lesión, comportamiento, observaciones arbitrales..."
-                          className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm font-bold leading-relaxed text-slate-900 disabled:bg-slate-200 disabled:text-slate-500"
-                        />
-
-                        <p className="mt-2 text-xs font-bold text-slate-500">
-                          Este texto aparecerá en el acta del partido.
-                        </p>
-                      </div>
-
                       <label className="mt-4 flex items-center justify-between rounded-2xl bg-slate-100 p-4 font-black">
                         <span>Abrir votación MVP</span>
 
@@ -2272,141 +2336,25 @@ export default function AdminFichasPartidoPage() {
                         No hay jugadores disponibles para esta ficha.
                       </p>
                     ) : (
-                      <div className="mt-5 space-y-4">
-                        {rows.map((row) => (
-                          <div
-                            key={row.player.id}
-                            className={`rounded-2xl p-4 shadow-sm ${
-                              row.suspended
-                                ? "border-2 border-red-200 bg-red-50"
-                                : "bg-slate-100"
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <p className="font-black leading-tight">
-                                  {jugadorNombre(row.player)}
-                                </p>
-                                <p className="text-sm font-bold text-slate-500">
-                                  {nombreEquipo(row.player.team_id)}
-                                </p>
-                              </div>
+                      <div className="mt-5 space-y-5">
+                        {renderBloqueEquipo(
+                          "Equipo local",
+                          homeTeam?.name ?? "Local",
+                          rowsLocal,
+                        )}
 
-                              <label
-                                className={`flex flex-col items-center gap-1 text-xs font-black uppercase ${
-                                  row.suspended
-                                    ? "text-red-500"
-                                    : "text-slate-500"
-                                }`}
-                              >
-                                {row.suspended ? "Sancionado" : "Jugó"}
-                                <input
-                                  type="checkbox"
-                                  checked={row.played}
-                                  disabled={row.suspended || fichaBloqueada}
-                                  onChange={(event) =>
-                                    actualizarJugo(
-                                      row.player.id,
-                                      event.target.checked
-                                    )
-                                  }
-                                  className="h-6 w-6 disabled:opacity-40"
-                                />
-                              </label>
-                            </div>
+                        {renderBloqueEquipo(
+                          "Equipo visitante",
+                          awayTeam?.name ?? "Visitante",
+                          rowsVisitante,
+                        )}
 
-                            {row.suspended && (
-                              <div className="mt-3 rounded-xl bg-red-100 p-3 text-sm font-bold text-red-800">
-                                <p className="font-black">
-                                  Sancionado para este partido
-                                </p>
-
-                                <p className="mt-1">
-                                  {row.suspensionReason} · Partido{" "}
-                                  {row.suspensionPartidoActual} de{" "}
-                                  {row.suspensionGames} de sanción
-                                </p>
-                              </div>
-                            )}
-
-                            <div className="mt-4 grid grid-cols-3 gap-2">
-                              <div>
-                                <label className="text-xs font-black uppercase text-slate-500">
-                                  Goles
-                                </label>
-
-                                <select
-                                  value={row.goals}
-                                  disabled={row.suspended || fichaBloqueada}
-                                  onChange={(event) =>
-                                    actualizarNumero(
-                                      row.player.id,
-                                      "goals",
-                                      event.target.value
-                                    )
-                                  }
-                                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-lg font-black disabled:bg-slate-200 disabled:text-slate-400"
-                                >
-                                  {opcionesNumero(10).map((numero) => (
-                                    <option key={numero} value={numero}>
-                                      {numero}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-
-                              <div>
-                                <label className="text-xs font-black uppercase text-slate-500">
-                                  Amar.
-                                </label>
-
-                                <select
-                                  value={row.yellow}
-                                  disabled={row.suspended || fichaBloqueada}
-                                  onChange={(event) =>
-                                    actualizarNumero(
-                                      row.player.id,
-                                      "yellow",
-                                      event.target.value
-                                    )
-                                  }
-                                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-lg font-black disabled:bg-slate-200 disabled:text-slate-400"
-                                >
-                                  {opcionesNumero(2).map((numero) => (
-                                    <option key={numero} value={numero}>
-                                      {numero}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-
-                              <div>
-                                <label className="text-xs font-black uppercase text-slate-500">
-                                  Rojas
-                                </label>
-
-                                <select
-                                  value={row.red}
-                                  disabled={row.suspended || fichaBloqueada}
-                                  onChange={(event) =>
-                                    actualizarNumero(
-                                      row.player.id,
-                                      "red",
-                                      event.target.value
-                                    )
-                                  }
-                                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-lg font-black disabled:bg-slate-200 disabled:text-slate-400"
-                                >
-                                  {opcionesNumero(1).map((numero) => (
-                                    <option key={numero} value={numero}>
-                                      {numero}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                        {rowsOtros.length > 0 &&
+                          renderBloqueEquipo(
+                            "Otros jugadores",
+                            "Sin equipo asignado",
+                            rowsOtros,
+                          )}
                       </div>
                     )}
                   </div>
@@ -2419,10 +2367,10 @@ export default function AdminFichasPartidoPage() {
                     {fichaBloqueada
                       ? "Partido cerrado"
                       : saving
-                      ? "Guardando ficha..."
-                      : estadoCerradoPartido(estado)
-                      ? "Cerrar partido y generar acta definitiva"
-                      : "Guardar ficha y marcador"}
+                        ? "Guardando ficha..."
+                        : estadoCerradoPartido(estado)
+                          ? "Cerrar partido y generar acta definitiva"
+                          : "Guardar ficha y marcador"}
                   </button>
                 </div>
               ) : (

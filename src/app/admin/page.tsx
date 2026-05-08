@@ -30,7 +30,7 @@ const principales: AdminLink[] = [
   },
   {
     href: "/admin/fase-final",
-    title: "Configurar eliminatorias",
+    title: "Gestionar eliminatorias",
     description: "Crear y editar octavos, cuartos, semis, tercer puesto y final.",
   },
 ];

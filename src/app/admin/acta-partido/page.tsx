@@ -23,6 +23,8 @@ type Player = {
   team_id: string;
   name: string;
   number: number | null;
+  municipio?: boolean | null;
+  federado?: boolean | null;
 };
 
 type RawGroupMatch = {
@@ -144,6 +146,14 @@ function estadoFinalizado(status: string | null | undefined) {
 function nombreJugador(player: Player | undefined) {
   if (!player) return "Jugador";
   return player.number !== null ? `${player.number} · ${player.name}` : player.name;
+}
+
+function tieneMarcaMunicipio(player: Player | undefined) {
+  return Boolean(player?.municipio);
+}
+
+function tieneMarcaFederado(player: Player | undefined) {
+  return Boolean(player?.federado);
 }
 
 function sumarPorJugador(rows: Array<{ player_id: string; team_id: string }>) {
@@ -362,7 +372,7 @@ function ActaPartidoContent() {
     ] = await Promise.all([
       supabase
         .from("players")
-        .select("id, team_id, name, number")
+        .select("id, team_id, name, number, municipio, federado")
         .order("number", { ascending: true })
         .order("name", { ascending: true }),
       supabase
@@ -514,43 +524,76 @@ function ActaPartidoContent() {
     window.print();
   }
 
+  function renderMarcaJugador(player: Player | undefined) {
+    const esMunicipio = tieneMarcaMunicipio(player);
+    const esFederado = tieneMarcaFederado(player);
+
+    if (!esMunicipio && !esFederado) {
+      return (
+        <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-black text-slate-500">
+          -
+        </span>
+      );
+    }
+
+    return (
+      <div className="flex items-center justify-end gap-2">
+        {esMunicipio && (
+          <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-black text-blue-800">
+            M
+          </span>
+        )}
+
+        {esFederado && (
+          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-800">
+            F
+          </span>
+        )}
+      </div>
+    );
+  }
+
   function renderParticipantesEquipo(
     titulo: string,
     equipo: string,
     rows: MatchPlayerRow[]
   ) {
     return (
-      <div className="rounded-2xl bg-white p-4 print:border print:border-slate-200">
-        <p className="text-xs font-black uppercase tracking-widest text-red-600">
-          {titulo}
-        </p>
-
-        <h3 className="mt-1 break-words text-lg font-black leading-tight text-slate-950">
-          {equipo}
-        </h3>
-
-        {rows.length === 0 ? (
-          <p className="mt-3 text-sm font-bold text-slate-400">
-            Sin jugadores registrados.
+      <div className="overflow-hidden rounded-2xl bg-white print:border print:border-slate-200">
+        <div className="bg-red-600 px-4 py-4 text-white print:bg-slate-900">
+          <p className="text-xs font-black uppercase tracking-widest text-red-100 print:text-slate-300">
+            {titulo}
           </p>
-        ) : (
-          <div className="mt-3 space-y-2">
-            {rows.map((row) => (
-              <div
-                key={`${row.player_id}-${row.team_id}`}
-                className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-3 print:border print:border-slate-100 print:bg-white"
-              >
-                <p className="font-black">
-                  {nombreJugador(playerById(row.player_id))}
-                </p>
 
-                <p className="text-right text-xs font-bold text-slate-500">
-                  {teamName(row.team_id)}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
+          <h3 className="mt-1 break-words text-lg font-black leading-tight text-white">
+            {equipo}
+          </h3>
+        </div>
+
+        <div className="p-4">
+          {rows.length === 0 ? (
+            <p className="text-sm font-bold text-slate-400">
+              Sin jugadores registrados.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {rows.map((row) => {
+                const player = playerById(row.player_id);
+
+                return (
+                  <div
+                    key={`${row.player_id}-${row.team_id}`}
+                    className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-3 print:border print:border-slate-100 print:bg-white"
+                  >
+                    <p className="font-black">{nombreJugador(player)}</p>
+
+                    {renderMarcaJugador(player)}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -766,9 +809,7 @@ function ActaPartidoContent() {
                               {nombreJugador(playerById(row.player_id))}
                             </p>
 
-                            <p className="text-right text-xs font-bold text-slate-500">
-                              {teamName(row.team_id)}
-                            </p>
+                            {renderMarcaJugador(playerById(row.player_id))}
                           </div>
                         ))}
                       </div>

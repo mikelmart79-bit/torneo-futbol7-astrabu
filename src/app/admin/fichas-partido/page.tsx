@@ -91,12 +91,42 @@ type CardRow = {
   card_type: "yellow" | "red";
 };
 
+type Suspension = {
+  id: string;
+  player_id: string;
+  team_id: string;
+  match_id: string | null;
+  final_match_id: string | null;
+  reason: string;
+  games: number;
+  served: number;
+  status: string;
+  created_at: string | null;
+};
+
+type SuspensionMatchRef = {
+  id: string;
+  tipo: MatchType;
+  dateValue: number;
+};
+
+type SuspensionInfo = {
+  id: string;
+  reason: string;
+  games: number;
+  served: number;
+  restantes: number;
+};
+
 type FichaRow = {
   player: Player;
   played: boolean;
   goals: number;
   yellow: number;
   red: number;
+  suspended: boolean;
+  suspensionReason: string;
+  suspensionRestantes: number;
 };
 
 function normalizarEquipo(equipo: RawGroupMatch["home_team"]): TeamRef | null {
@@ -107,6 +137,17 @@ function normalizarEquipo(equipo: RawGroupMatch["home_team"]): TeamRef | null {
 
 function normalizarTexto(texto: string | null | undefined) {
   return (texto ?? "").trim().toLowerCase();
+}
+
+function estadoPendiente(status: string | null | undefined) {
+  const limpio = normalizarTexto(status);
+
+  return (
+    limpio !== "cumplida" &&
+    limpio !== "completada" &&
+    limpio !== "served" &&
+    limpio !== "completed"
+  );
 }
 
 function formatearFechaSegura(fecha: string | null) {
@@ -122,6 +163,85 @@ function numeroDesdeInput(valor: string) {
 
 function opcionesNumero(max: number) {
   return Array.from({ length: max + 1 }, (_, index) => index);
+}
+
+function fechaPartidoValor(fecha: string | null, hora: string | null) {
+  if (!fecha) return Number.POSITIVE_INFINITY;
+
+  const [year, month, day] = fecha.split("-").map(Number);
+  const [hour, minute] = (hora ?? "23:59").split(":").map(Number);
+
+  return new Date(year, month - 1, day, hour || 0, minute || 0).getTime();
+}
+
+function fechaCreacionValor(createdAt: string | null) {
+  if (!createdAt) return Date.now();
+
+  const value = new Date(createdAt).getTime();
+
+  return Number.isNaN(value) ? Date.now() : value;
+}
+
+function partidosEquipoParaSancion(
+  teamId: string,
+  teamName: string,
+  partidos: GroupMatch[],
+  eliminatorias: FinalMatch[]
+) {
+  const nombreNormalizado = normalizarTexto(teamName);
+
+  const partidosGrupo: SuspensionMatchRef[] = partidos
+    .filter(
+      (match) => match.home_team?.id === teamId || match.away_team?.id === teamId
+    )
+    .map((match) => ({
+      id: match.id,
+      tipo: "grupo" as MatchType,
+      dateValue: fechaPartidoValor(match.match_date, match.match_time),
+    }));
+
+  const partidosFinales: SuspensionMatchRef[] = eliminatorias
+    .filter(
+      (match) =>
+        normalizarTexto(match.home_ref) === nombreNormalizado ||
+        normalizarTexto(match.away_ref) === nombreNormalizado
+    )
+    .map((match) => ({
+      id: match.id,
+      tipo: "final" as MatchType,
+      dateValue: fechaPartidoValor(match.match_date, match.match_time),
+    }));
+
+  return [...partidosGrupo, ...partidosFinales].sort((a, b) => {
+    if (a.dateValue !== b.dateValue) return a.dateValue - b.dateValue;
+    return a.id.localeCompare(b.id);
+  });
+}
+
+function origenSancionValor(
+  suspension: Suspension,
+  partidos: GroupMatch[],
+  eliminatorias: FinalMatch[]
+) {
+  if (suspension.match_id) {
+    const match = partidos.find((item) => item.id === suspension.match_id);
+
+    if (match) {
+      return fechaPartidoValor(match.match_date, match.match_time);
+    }
+  }
+
+  if (suspension.final_match_id) {
+    const match = eliminatorias.find(
+      (item) => item.id === suspension.final_match_id
+    );
+
+    if (match) {
+      return fechaPartidoValor(match.match_date, match.match_time);
+    }
+  }
+
+  return fechaCreacionValor(suspension.created_at);
 }
 
 export default function AdminFichasPartidoPage() {
@@ -485,6 +605,81 @@ export default function AdminFichasPartidoPage() {
       return a.name.localeCompare(b.name);
     });
 
+    const playerIds = jugadores.map((player) => player.id);
+
+    const suspensionRequest =
+      playerIds.length > 0
+        ? await supabase
+            .from("suspensions")
+            .select(
+              "id, player_id, team_id, match_id, final_match_id, reason, games, served, status, created_at"
+            )
+            .in("player_id", playerIds)
+        : { data: [], error: null };
+
+    if (suspensionRequest.error) {
+      console.error("Error cargando sanciones:", suspensionRequest.error);
+      setMensaje(
+        `No se han podido cargar las sanciones: ${suspensionRequest.error.message}`
+      );
+      setLoadingFicha(false);
+      return;
+    }
+
+    const sanciones = ((suspensionRequest.data ?? []) as Suspension[]).filter(
+      (suspension) =>
+        estadoPendiente(suspension.status) &&
+        Math.max(suspension.games - suspension.served, 0) > 0
+    );
+
+    function sancionParaJugador(player: Player): SuspensionInfo | null {
+      const sancionesJugador = sanciones.filter(
+        (suspension) => suspension.player_id === player.id
+      );
+
+      for (const suspension of sancionesJugador) {
+        const restantes = Math.max(suspension.games - suspension.served, 0);
+        if (restantes <= 0) continue;
+
+        const teamName =
+          equiposBase.find((team) => team.id === suspension.team_id)?.name ??
+          player.team_id;
+
+        const partidosEquipo = partidosEquipoParaSancion(
+          suspension.team_id,
+          teamName,
+          partidosBase,
+          eliminatoriasBase
+        );
+
+        const origenValor = origenSancionValor(
+          suspension,
+          partidosBase,
+          eliminatoriasBase
+        );
+
+        const partidosNoPuede = partidosEquipo
+          .filter((match) => match.dateValue > origenValor)
+          .slice(0, restantes);
+
+        const afectaEstePartido = partidosNoPuede.some(
+          (match) => match.tipo === tipo && match.id === id
+        );
+
+        if (afectaEstePartido) {
+          return {
+            id: suspension.id,
+            reason: suspension.reason,
+            games: suspension.games,
+            served: suspension.served,
+            restantes,
+          };
+        }
+      }
+
+      return null;
+    }
+
     const columna = columnaPartido(tipo);
 
     const { data: matchPlayersData, error: matchPlayersError } = await supabase
@@ -534,6 +729,8 @@ export default function AdminFichasPartidoPage() {
     const tarjetas = (cardsData ?? []) as CardRow[];
 
     const rowsFicha: FichaRow[] = jugadores.map((player) => {
+      const sancion = sancionParaJugador(player);
+
       const played = participantes.some((item) => item.player_id === player.id);
       const goals = goles.filter((item) => item.player_id === player.id).length;
       const yellow = tarjetas.filter(
@@ -543,12 +740,28 @@ export default function AdminFichasPartidoPage() {
         (item) => item.player_id === player.id && item.card_type === "red"
       ).length;
 
+      if (sancion) {
+        return {
+          player,
+          played: false,
+          goals: 0,
+          yellow: 0,
+          red: 0,
+          suspended: true,
+          suspensionReason: sancion.reason,
+          suspensionRestantes: sancion.restantes,
+        };
+      }
+
       return {
         player,
         played: played || goals > 0 || yellow > 0 || red > 0,
         goals,
         yellow,
         red,
+        suspended: false,
+        suspensionReason: "",
+        suspensionRestantes: 0,
       };
     });
 
@@ -580,7 +793,7 @@ export default function AdminFichasPartidoPage() {
   function actualizarJugo(playerId: string, played: boolean) {
     setRows((actuales) =>
       actuales.map((row) =>
-        row.player.id === playerId ? { ...row, played } : row
+        row.player.id === playerId && !row.suspended ? { ...row, played } : row
       )
     );
   }
@@ -595,7 +808,7 @@ export default function AdminFichasPartidoPage() {
 
     setRows((actuales) =>
       actuales.map((row) =>
-        row.player.id === playerId
+        row.player.id === playerId && !row.suspended
           ? {
               ...row,
               [campo]: numeroSeguro,
@@ -607,7 +820,11 @@ export default function AdminFichasPartidoPage() {
   }
 
   function marcarTodos() {
-    setRows((actuales) => actuales.map((row) => ({ ...row, played: true })));
+    setRows((actuales) =>
+      actuales.map((row) =>
+        row.suspended ? row : { ...row, played: true }
+      )
+    );
   }
 
   function limpiarJugadores() {
@@ -730,6 +947,21 @@ export default function AdminFichasPartidoPage() {
 
     if (!homeTeam || !awayTeam) {
       setMensaje("El partido todavía no tiene los dos equipos resueltos.");
+      return;
+    }
+
+    const sancionadoConDatos = rows.find(
+      (row) =>
+        row.suspended &&
+        (row.played || row.goals > 0 || row.yellow > 0 || row.red > 0)
+    );
+
+    if (sancionadoConDatos) {
+      setMensaje(
+        `${jugadorNombre(
+          sancionadoConDatos.player
+        )} está sancionado y no puede tener datos en esta ficha.`
+      );
       return;
     }
 
@@ -867,7 +1099,9 @@ export default function AdminFichasPartidoPage() {
 
     const filasJugadores = rows
       .filter(
-        (row) => row.played || row.goals > 0 || row.yellow > 0 || row.red > 0
+        (row) =>
+          !row.suspended &&
+          (row.played || row.goals > 0 || row.yellow > 0 || row.red > 0)
       )
       .map((row) => ({
         ...payloadPartido(matchType, selectedId),
@@ -898,6 +1132,8 @@ export default function AdminFichasPartidoPage() {
     > = [];
 
     rows.forEach((row) => {
+      if (row.suspended) return;
+
       for (let i = 0; i < row.goals; i++) {
         filasGoles.push({
           ...payloadPartido(matchType, selectedId),
@@ -929,6 +1165,8 @@ export default function AdminFichasPartidoPage() {
     > = [];
 
     rows.forEach((row) => {
+      if (row.suspended) return;
+
       for (let i = 0; i < row.yellow; i++) {
         filasTarjetas.push({
           ...payloadPartido(matchType, selectedId),
@@ -964,7 +1202,7 @@ export default function AdminFichasPartidoPage() {
     }
 
     const filasSanciones = rows
-      .filter((row) => row.red > 0)
+      .filter((row) => !row.suspended && row.red > 0)
       .map((row) => ({
         ...payloadPartido(matchType, selectedId),
         player_id: row.player.id,
@@ -972,7 +1210,7 @@ export default function AdminFichasPartidoPage() {
         reason: "Tarjeta roja",
         games: 1,
         served: 0,
-        status: "Pendiente",
+        status: "Activa",
       }));
 
     if (filasSanciones.length > 0) {
@@ -1040,7 +1278,7 @@ export default function AdminFichasPartidoPage() {
 
   return (
     <AdminGuard>
-      <main className="relative min-h-screen overflow-hidden bg-black text-slate-900">
+      <main className="relative min-h-screen overflow-x-hidden bg-black text-slate-900">
         <img
           src="/torneo-verano.png"
           alt="Fondo torneo"
@@ -1316,7 +1554,11 @@ export default function AdminFichasPartidoPage() {
                         {rows.map((row) => (
                           <div
                             key={row.player.id}
-                            className="rounded-2xl bg-slate-100 p-4 shadow-sm"
+                            className={`rounded-2xl p-4 shadow-sm ${
+                              row.suspended
+                                ? "border-2 border-red-200 bg-red-50"
+                                : "bg-slate-100"
+                            }`}
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div>
@@ -1328,21 +1570,38 @@ export default function AdminFichasPartidoPage() {
                                 </p>
                               </div>
 
-                              <label className="flex flex-col items-center gap-1 text-xs font-black uppercase text-slate-500">
-                                Jugó
+                              <label
+                                className={`flex flex-col items-center gap-1 text-xs font-black uppercase ${
+                                  row.suspended
+                                    ? "text-red-500"
+                                    : "text-slate-500"
+                                }`}
+                              >
+                                {row.suspended ? "Sancionado" : "Jugó"}
                                 <input
                                   type="checkbox"
                                   checked={row.played}
+                                  disabled={row.suspended}
                                   onChange={(event) =>
                                     actualizarJugo(
                                       row.player.id,
                                       event.target.checked
                                     )
                                   }
-                                  className="h-6 w-6"
+                                  className="h-6 w-6 disabled:opacity-40"
                                 />
                               </label>
                             </div>
+
+                            {row.suspended && (
+                              <div className="mt-3 rounded-xl bg-red-100 p-3 text-sm font-bold text-red-800">
+                                Sancionado para este partido ·{" "}
+                                {row.suspensionReason}
+                                {row.suspensionRestantes > 0
+                                  ? ` · Restan ${row.suspensionRestantes}`
+                                  : ""}
+                              </div>
+                            )}
 
                             <div className="mt-4 grid grid-cols-3 gap-2">
                               <div>
@@ -1352,6 +1611,7 @@ export default function AdminFichasPartidoPage() {
 
                                 <select
                                   value={row.goals}
+                                  disabled={row.suspended}
                                   onChange={(event) =>
                                     actualizarNumero(
                                       row.player.id,
@@ -1359,7 +1619,7 @@ export default function AdminFichasPartidoPage() {
                                       event.target.value
                                     )
                                   }
-                                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-lg font-black"
+                                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-lg font-black disabled:bg-slate-200 disabled:text-slate-400"
                                 >
                                   {opcionesNumero(10).map((numero) => (
                                     <option key={numero} value={numero}>
@@ -1376,6 +1636,7 @@ export default function AdminFichasPartidoPage() {
 
                                 <select
                                   value={row.yellow}
+                                  disabled={row.suspended}
                                   onChange={(event) =>
                                     actualizarNumero(
                                       row.player.id,
@@ -1383,7 +1644,7 @@ export default function AdminFichasPartidoPage() {
                                       event.target.value
                                     )
                                   }
-                                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-lg font-black"
+                                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-lg font-black disabled:bg-slate-200 disabled:text-slate-400"
                                 >
                                   {opcionesNumero(2).map((numero) => (
                                     <option key={numero} value={numero}>
@@ -1400,6 +1661,7 @@ export default function AdminFichasPartidoPage() {
 
                                 <select
                                   value={row.red}
+                                  disabled={row.suspended}
                                   onChange={(event) =>
                                     actualizarNumero(
                                       row.player.id,
@@ -1407,7 +1669,7 @@ export default function AdminFichasPartidoPage() {
                                       event.target.value
                                     )
                                   }
-                                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-lg font-black"
+                                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-lg font-black disabled:bg-slate-200 disabled:text-slate-400"
                                 >
                                   {opcionesNumero(1).map((numero) => (
                                     <option key={numero} value={numero}>

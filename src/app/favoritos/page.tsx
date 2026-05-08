@@ -12,6 +12,16 @@ type Team = {
   name: string;
 };
 
+type PlayerType = "M" | "F";
+
+type Player = {
+  id: string;
+  team_id: string;
+  name: string;
+  number: number | null;
+  player_type: PlayerType | null;
+};
+
 type TeamRef = {
   id: string;
   name: string;
@@ -106,6 +116,20 @@ type TableRow = {
   pts: number;
 };
 
+type StatRow = {
+  id?: string;
+  player_id?: string | null;
+  [key: string]: unknown;
+};
+
+type PlayerStat = Player & {
+  team_name: string;
+  pj: number;
+  goles: number;
+  amarillas: number;
+  rojas: number;
+};
+
 function normalizarEquipo(equipo: RawGroupMatch["home_team"]): TeamRef | null {
   if (!equipo) return null;
   if (Array.isArray(equipo)) return equipo[0] ?? null;
@@ -114,6 +138,19 @@ function normalizarEquipo(equipo: RawGroupMatch["home_team"]): TeamRef | null {
 
 function normalizarTexto(texto: string | null | undefined) {
   return (texto ?? "").trim().toLowerCase();
+}
+
+function parseStringArray(valor: string | null) {
+  if (!valor) return [];
+
+  try {
+    const parsed = JSON.parse(valor);
+    return Array.isArray(parsed)
+      ? parsed.filter((item) => typeof item === "string")
+      : [];
+  } catch {
+    return [];
+  }
 }
 
 function getUserId() {
@@ -236,13 +273,49 @@ function calcularClasificacion(teams: Team[], matches: GroupMatch[]) {
   });
 }
 
+function tipoTarjeta(row: StatRow) {
+  return String(
+    row.card_type ?? row.type ?? row.card ?? row.color ?? ""
+  ).toLowerCase();
+}
+
+function esAmarilla(row: StatRow) {
+  const tipo = tipoTarjeta(row);
+  return (
+    tipo.includes("yellow") ||
+    tipo.includes("amarilla") ||
+    tipo === "ta" ||
+    tipo === "a"
+  );
+}
+
+function esRoja(row: StatRow) {
+  const tipo = tipoTarjeta(row);
+  return (
+    tipo.includes("red") ||
+    tipo.includes("roja") ||
+    tipo === "tr" ||
+    tipo === "r"
+  );
+}
+
 export default function FavoritosPage() {
   const [tabActiva, setTabActiva] = useState<TabActiva>("equipos");
   const [favoritos, setFavoritos] = useState<string[]>([]);
+  const [jugadoresFavoritosIds, setJugadoresFavoritosIds] = useState<string[]>(
+    []
+  );
+
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<GroupMatch[]>([]);
   const [finalMatches, setFinalMatches] = useState<FinalMatch[]>([]);
   const [votes, setVotes] = useState<Vote[]>([]);
+
+  const [playersFavoritos, setPlayersFavoritos] = useState<Player[]>([]);
+  const [matchPlayers, setMatchPlayers] = useState<StatRow[]>([]);
+  const [matchGoals, setMatchGoals] = useState<StatRow[]>([]);
+  const [matchCards, setMatchCards] = useState<StatRow[]>([]);
+
   const [userId, setUserId] = useState("");
   const [equipoAbierto, setEquipoAbierto] = useState("");
   const [loading, setLoading] = useState(true);
@@ -252,19 +325,20 @@ export default function FavoritosPage() {
     const usuario = getUserId();
     setUserId(usuario);
 
-    try {
-      const guardados = localStorage.getItem("equiposFavoritos");
-      const ids = guardados ? JSON.parse(guardados) : [];
-      setFavoritos(Array.isArray(ids) ? ids : []);
-    } catch {
-      localStorage.removeItem("equiposFavoritos");
-      setFavoritos([]);
-    }
+    const idsEquipos = parseStringArray(
+      localStorage.getItem("equiposFavoritos")
+    );
+    const idsJugadores = parseStringArray(
+      localStorage.getItem("jugadoresFavoritos")
+    );
 
-    cargarDatos(usuario);
+    setFavoritos(idsEquipos);
+    setJugadoresFavoritosIds(idsJugadores);
+
+    cargarDatos(usuario, idsJugadores);
   }, []);
 
-  async function cargarDatos(usuario: string) {
+  async function cargarDatos(usuario: string, idsJugadores: string[]) {
     setLoading(true);
     setMensaje("");
 
@@ -351,6 +425,60 @@ export default function FavoritosPage() {
       return;
     }
 
+    const playersRequest =
+      idsJugadores.length > 0
+        ? await supabase
+            .from("players")
+            .select("id, team_id, name, number, player_type")
+            .in("id", idsJugadores)
+            .order("number", { ascending: true })
+            .order("name", { ascending: true })
+        : { data: [], error: null };
+
+    if (playersRequest.error) {
+      console.error("Error cargando jugadores favoritos:", playersRequest.error);
+      setMensaje("No se han podido cargar tus jugadores favoritos.");
+      setLoading(false);
+      return;
+    }
+
+    const matchPlayersRequest =
+      idsJugadores.length > 0
+        ? await supabase
+            .from("match_players")
+            .select("*")
+            .in("player_id", idsJugadores)
+        : { data: [], error: null };
+
+    const matchGoalsRequest =
+      idsJugadores.length > 0
+        ? await supabase
+            .from("match_goals")
+            .select("*")
+            .in("player_id", idsJugadores)
+        : { data: [], error: null };
+
+    const matchCardsRequest =
+      idsJugadores.length > 0
+        ? await supabase
+            .from("match_cards")
+            .select("*")
+            .in("player_id", idsJugadores)
+        : { data: [], error: null };
+
+    if (
+      matchPlayersRequest.error ||
+      matchGoalsRequest.error ||
+      matchCardsRequest.error
+    ) {
+      console.error(
+        "Error cargando estadísticas:",
+        matchPlayersRequest.error ||
+          matchGoalsRequest.error ||
+          matchCardsRequest.error
+      );
+    }
+
     const partidosNormalizados: GroupMatch[] = (
       (matchesData as unknown as RawGroupMatch[]) || []
     ).map((match) => ({
@@ -363,6 +491,10 @@ export default function FavoritosPage() {
     setMatches(partidosNormalizados);
     setFinalMatches((finalData ?? []) as FinalMatch[]);
     setVotes((votesData ?? []) as Vote[]);
+    setPlayersFavoritos((playersRequest.data ?? []) as Player[]);
+    setMatchPlayers((matchPlayersRequest.data ?? []) as StatRow[]);
+    setMatchGoals((matchGoalsRequest.data ?? []) as StatRow[]);
+    setMatchCards((matchCardsRequest.data ?? []) as StatRow[]);
     setLoading(false);
   }
 
@@ -372,6 +504,50 @@ export default function FavoritosPage() {
   );
 
   const equiposFavoritos = teams.filter((team) => favoritos.includes(team.id));
+
+  const jugadoresFavoritos = useMemo<PlayerStat[]>(() => {
+    const teamMap = new Map(teams.map((team) => [team.id, team.name]));
+
+    return playersFavoritos
+      .filter((player) => jugadoresFavoritosIds.includes(player.id))
+      .map((player) => {
+        const pj = matchPlayers.filter(
+          (row) => row.player_id === player.id
+        ).length;
+
+        const goles = matchGoals.filter(
+          (row) => row.player_id === player.id
+        ).length;
+
+        const tarjetasJugador = matchCards.filter(
+          (row) => row.player_id === player.id
+        );
+
+        const amarillas = tarjetasJugador.filter(esAmarilla).length;
+        const rojas = tarjetasJugador.filter(esRoja).length;
+
+        return {
+          ...player,
+          team_name: teamMap.get(player.team_id) ?? "Equipo",
+          pj,
+          goles,
+          amarillas,
+          rojas,
+        };
+      })
+      .sort((a, b) => {
+        if (b.goles !== a.goles) return b.goles - a.goles;
+        if (b.pj !== a.pj) return b.pj - a.pj;
+        return a.name.localeCompare(b.name);
+      });
+  }, [
+    playersFavoritos,
+    jugadoresFavoritosIds,
+    teams,
+    matchPlayers,
+    matchGoals,
+    matchCards,
+  ]);
 
   function posicionEquipo(teamId: string) {
     const index = clasificacion.findIndex((row) => row.teamId === teamId);
@@ -451,11 +627,22 @@ export default function FavoritosPage() {
     }
   }
 
+  function quitarJugadorFavorito(playerId: string) {
+    const nuevosFavoritos = jugadoresFavoritosIds.filter(
+      (id) => id !== playerId
+    );
+
+    setJugadoresFavoritosIds(nuevosFavoritos);
+    localStorage.setItem(
+      "jugadoresFavoritos",
+      JSON.stringify(nuevosFavoritos)
+    );
+  }
+
   function votoEmitido(match: DisplayMatch) {
     if (match.tipo === "final") {
       return votes.some(
-        (vote) =>
-          vote.final_match_id === match.id && vote.user_id === userId
+        (vote) => vote.final_match_id === match.id && vote.user_id === userId
       );
     }
 
@@ -691,44 +878,92 @@ export default function FavoritosPage() {
               })}
             </div>
           )
-        ) : (
+        ) : jugadoresFavoritos.length === 0 ? (
           <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl">
             <p className="text-lg font-black text-slate-950">
               Jugadores favoritos
             </p>
 
             <p className="mt-2 text-sm font-bold text-slate-500">
-              Próximamente podrás marcar jugadores como favoritos desde la
-              plantilla de cada equipo.
+              Todavía no tienes jugadores favoritos. Entra en la plantilla de un
+              equipo y pulsa la estrella junto al jugador.
             </p>
+          </div>
+        ) : (
+          <div className="mt-6 space-y-4">
+            {jugadoresFavoritos.map((player) => {
+              const tipo = player.player_type === "F" ? "F" : "M";
 
-            <div className="mt-4 rounded-2xl bg-slate-50 p-4">
-              <p className="text-sm font-black text-slate-700">
-                La idea será mostrar aquí:
-              </p>
+              return (
+                <div
+                  key={player.id}
+                  className="rounded-3xl bg-white/95 p-4 shadow-2xl backdrop-blur"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-600 text-xl font-black text-white">
+                      {player.number ?? "-"}
+                    </div>
 
-              <div className="mt-3 grid grid-cols-4 gap-2 text-center">
-                <div className="rounded-xl bg-white p-3 shadow-sm">
-                  <p className="text-xs font-black text-slate-400">PJ</p>
-                  <p className="text-xl font-black">0</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="break-words text-xl font-black leading-tight text-slate-950">
+                        {player.name}
+                      </p>
+
+                      <p className="mt-1 text-sm font-bold text-slate-500">
+                        {player.team_name}
+                      </p>
+                    </div>
+
+                    <div
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-black shadow ${
+                        tipo === "F"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-slate-200 text-slate-700"
+                      }`}
+                    >
+                      {tipo}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-4 gap-2 text-center">
+                    <div className="rounded-xl bg-slate-50 p-3 shadow-sm">
+                      <p className="text-xs font-black text-slate-400">PJ</p>
+                      <p className="text-xl font-black text-slate-950">
+                        {player.pj}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl bg-slate-50 p-3 shadow-sm">
+                      <p className="text-xs font-black text-slate-400">G</p>
+                      <p className="text-xl font-black text-slate-950">
+                        {player.goles}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl bg-yellow-50 p-3 shadow-sm">
+                      <p className="text-xs font-black text-yellow-600">TA</p>
+                      <p className="text-xl font-black text-slate-950">
+                        {player.amarillas}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl bg-red-50 p-3 shadow-sm">
+                      <p className="text-xs font-black text-red-600">TR</p>
+                      <p className="text-xl font-black text-slate-950">
+                        {player.rojas}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => quitarJugadorFavorito(player.id)}
+                    className="mt-4 w-full rounded-xl bg-slate-950 py-3 text-sm font-black text-white shadow"
+                  >
+                    Quitar jugador de favoritos
+                  </button>
                 </div>
-
-                <div className="rounded-xl bg-white p-3 shadow-sm">
-                  <p className="text-xs font-black text-slate-400">G</p>
-                  <p className="text-xl font-black">0</p>
-                </div>
-
-                <div className="rounded-xl bg-white p-3 shadow-sm">
-                  <p className="text-xs font-black text-slate-400">TA</p>
-                  <p className="text-xl font-black">0</p>
-                </div>
-
-                <div className="rounded-xl bg-white p-3 shadow-sm">
-                  <p className="text-xs font-black text-slate-400">TR</p>
-                  <p className="text-xl font-black">0</p>
-                </div>
-              </div>
-            </div>
+              );
+            })}
           </div>
         )}
       </section>

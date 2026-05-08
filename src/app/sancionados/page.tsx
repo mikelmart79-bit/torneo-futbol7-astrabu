@@ -20,6 +20,14 @@ type Suspension = {
   created_at: string | null;
 };
 
+type SuspensionServedMatch = {
+  id: string;
+  suspension_id: string;
+  match_id: string | null;
+  final_match_id: string | null;
+  created_at: string | null;
+};
+
 type Player = {
   id: string;
   team_id: string;
@@ -75,6 +83,7 @@ type SuspensionMatch = {
   home_name: string;
   away_name: string;
   dateValue: number;
+  sanctionGameNumber: number;
 };
 
 type SuspensionRow = {
@@ -149,7 +158,7 @@ function leerJugadoresFavoritos() {
   }
 }
 
-function partidoGrupoToSuspensionMatch(match: Match): SuspensionMatch {
+function partidoGrupoToSuspensionMatch(match: Match): Omit<SuspensionMatch, "sanctionGameNumber"> {
   return {
     id: match.id,
     tipo: "grupo",
@@ -164,7 +173,9 @@ function partidoGrupoToSuspensionMatch(match: Match): SuspensionMatch {
   };
 }
 
-function partidoFinalToSuspensionMatch(match: FinalMatch): SuspensionMatch {
+function partidoFinalToSuspensionMatch(
+  match: FinalMatch
+): Omit<SuspensionMatch, "sanctionGameNumber"> {
   return {
     id: match.id,
     tipo: "final",
@@ -179,7 +190,9 @@ function partidoFinalToSuspensionMatch(match: FinalMatch): SuspensionMatch {
   };
 }
 
-function ordenarPartidosSancion(matches: SuspensionMatch[]) {
+function ordenarPartidosSancion(
+  matches: Array<Omit<SuspensionMatch, "sanctionGameNumber">>
+) {
   return [...matches].sort((a, b) => {
     if (a.dateValue !== b.dateValue) return a.dateValue - b.dateValue;
     return a.title.localeCompare(b.title);
@@ -212,6 +225,18 @@ export default function SancionadosPage() {
     if (suspensionsError) {
       console.error("Error cargando sanciones:", suspensionsError);
       setMensaje("No se han podido cargar los sancionados.");
+      setLoading(false);
+      return;
+    }
+
+    const { data: servedData, error: servedError } = await supabase
+      .from("suspension_served_matches")
+      .select("id, suspension_id, match_id, final_match_id, created_at")
+      .order("created_at", { ascending: true });
+
+    if (servedError) {
+      console.error("Error cargando partidos de sanción cumplidos:", servedError);
+      setMensaje("No se han podido cargar los partidos de sanción cumplidos.");
       setLoading(false);
       return;
     }
@@ -270,6 +295,7 @@ export default function SancionadosPage() {
     }
 
     const suspensions = (suspensionsData ?? []) as Suspension[];
+    const servedMatches = (servedData ?? []) as SuspensionServedMatch[];
     const players = (playersData ?? []) as Player[];
     const teams = (teamsData ?? []) as Team[];
 
@@ -289,6 +315,18 @@ export default function SancionadosPage() {
 
       const teamName = team?.name ?? "Equipo";
       const teamNameNorm = normalizarTexto(teamName);
+
+      const partidosCumplidosRegistrados = servedMatches.filter(
+        (item) => item.suspension_id === suspension.id
+      ).length;
+
+      const servedReal = Math.min(
+        Math.max(suspension.served ?? 0, partidosCumplidosRegistrados),
+        suspension.games
+      );
+
+      const restantes = Math.max(suspension.games - servedReal, 0);
+      const statusReal = restantes <= 0 ? "Cumplida" : "Activa";
 
       let origin = "Partido no identificado";
       let originDateValue = fechaCreacionValor(suspension.created_at);
@@ -333,8 +371,6 @@ export default function SancionadosPage() {
         }
       }
 
-      const restantes = Math.max(suspension.games - suspension.served, 0);
-
       const partidosGrupo = matches
         .filter(
           (match) =>
@@ -351,12 +387,17 @@ export default function SancionadosPage() {
         )
         .map(partidoFinalToSuspensionMatch);
 
-      const unavailableMatches = ordenarPartidosSancion([
+      const partidosOrdenados = ordenarPartidosSancion([
         ...partidosGrupo,
         ...partidosFinales,
-      ])
-        .filter((match) => match.dateValue > originDateValue)
-        .slice(0, restantes);
+      ]).filter((match) => match.dateValue > originDateValue);
+
+      const unavailableMatches = partidosOrdenados
+        .slice(servedReal, suspension.games)
+        .map((match, index) => ({
+          ...match,
+          sanctionGameNumber: servedReal + index + 1,
+        }));
 
       return {
         id: suspension.id,
@@ -368,8 +409,8 @@ export default function SancionadosPage() {
         teamName,
         reason: suspension.reason,
         games: suspension.games,
-        served: suspension.served,
-        status: suspension.status,
+        served: servedReal,
+        status: statusReal,
         origin,
         originDateValue,
         unavailableMatches,
@@ -553,7 +594,8 @@ export default function SancionadosPage() {
                     </p>
 
                     <p className="mt-1 text-sm font-bold text-slate-600">
-                      Cumplidos: {row.served} · Restan: {restantes}
+                      Cumplidos: {row.served} de {row.games} · Restan:{" "}
+                      {restantes}
                     </p>
                   </div>
 
@@ -576,6 +618,11 @@ export default function SancionadosPage() {
                               className="rounded-xl bg-white p-3 shadow-sm"
                             >
                               <p className="text-xs font-black uppercase text-red-600">
+                                Partido {match.sanctionGameNumber} de{" "}
+                                {row.games} de sanción
+                              </p>
+
+                              <p className="mt-1 text-xs font-black uppercase text-slate-500">
                                 {match.tipo === "final"
                                   ? `${match.phase} · ${match.title}`
                                   : "Clasificación"}

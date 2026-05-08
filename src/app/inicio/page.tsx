@@ -100,7 +100,6 @@ function esPartidoProximo(partido: Match) {
   if (partido.match_date > hoy) return true;
   if (partido.match_date < hoy) return false;
 
-  // Si es hoy y no hay hora, lo mantenemos visible porque sigue programado.
   if (!horaPartido) return true;
 
   return horaPartido >= horaActual;
@@ -195,20 +194,22 @@ export default function InicioPage() {
 
       const partidosGrupo: Match[] = matchesError
         ? []
-        : (((matchesData as unknown as RawMatch[]) || []).map((match, index) => ({
-            id: match.id,
-            tipo: "grupo" as const,
-            group_name: match.group_name,
-            match_date: match.match_date,
-            match_time: match.match_time,
-            field: match.field,
-            home_score: match.home_score,
-            away_score: match.away_score,
-            status: match.status,
-            sort_order: index + 1,
-            home_team: normalizarEquipo(match.home_team),
-            away_team: normalizarEquipo(match.away_team),
-          })));
+        : (((matchesData as unknown as RawMatch[]) || []).map(
+            (match, index) => ({
+              id: match.id,
+              tipo: "grupo" as const,
+              group_name: match.group_name,
+              match_date: match.match_date,
+              match_time: match.match_time,
+              field: match.field,
+              home_score: match.home_score,
+              away_score: match.away_score,
+              status: match.status,
+              sort_order: index + 1,
+              home_team: normalizarEquipo(match.home_team),
+              away_team: normalizarEquipo(match.away_team),
+            })
+          ));
 
       const partidosFinales: Match[] = finalError
         ? []
@@ -251,7 +252,8 @@ export default function InicioPage() {
       const nuevo = actual + 1;
 
       if (nuevo >= 5) {
-        router.push("/admin");
+        sessionStorage.setItem("zonaPeligrosaAdmin", "true");
+        router.push("/admin?danger=1");
         return 0;
       }
 
@@ -360,7 +362,6 @@ export default function InicioPage() {
                     {partido.field ?? "Campo pendiente"}
                   </p>
                 </div>
-
               </div>
             </div>
           ) : (

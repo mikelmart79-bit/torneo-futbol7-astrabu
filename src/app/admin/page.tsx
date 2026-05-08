@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import AdminGuard from "@/components/AdminGuard";
 import { supabase } from "@/lib/supabase";
 
@@ -85,6 +86,23 @@ function AdminCard({ item }: { item: AdminLink }) {
 }
 
 export default function AdminPage() {
+  const [mostrarZonaPeligrosa, setMostrarZonaPeligrosa] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const vieneDeAccesoOculto = params.get("danger") === "1";
+    const permisoTemporal =
+      sessionStorage.getItem("zonaPeligrosaAdmin") === "true";
+
+    setMostrarZonaPeligrosa(vieneDeAccesoOculto && permisoTemporal);
+  }, []);
+
+  function ocultarZonaPeligrosa() {
+    sessionStorage.removeItem("zonaPeligrosaAdmin");
+    setMostrarZonaPeligrosa(false);
+    window.history.replaceState(null, "", "/admin");
+  }
+
   async function borrarDatosTorneo() {
     const confirmar1 = window.confirm(
       "⚠️ Esto borrará TODOS los datos del torneo:\n\n- equipos\n- jugadores\n- partidos\n- fichas de partido\n- goles\n- tarjetas\n- sanciones\n- eliminatorias\n- votos MVP\n\n¿Quieres continuar?"
@@ -106,6 +124,7 @@ export default function AdminPage() {
       return;
     }
 
+    sessionStorage.removeItem("zonaPeligrosaAdmin");
     alert("Datos del torneo borrados correctamente.");
     window.location.reload();
   }
@@ -172,27 +191,37 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <div className="mt-8 rounded-3xl border-2 border-red-600 bg-red-50 p-5 shadow-2xl">
-            <p className="text-sm font-black uppercase tracking-widest text-red-700">
-              Zona peligrosa
-            </p>
+          {mostrarZonaPeligrosa && (
+            <div className="mt-8 rounded-3xl border-2 border-red-600 bg-red-50 p-5 shadow-2xl">
+              <p className="text-sm font-black uppercase tracking-widest text-red-700">
+                Zona peligrosa
+              </p>
 
-            <p className="mt-2 text-sm font-bold text-red-900">
-              Borra todos los datos del torneo para empezar pruebas desde cero.
-            </p>
+              <p className="mt-2 text-sm font-bold text-red-900">
+                Borra todos los datos del torneo para empezar pruebas desde
+                cero.
+              </p>
 
-            <p className="mt-2 text-xs font-bold text-red-700">
-              Se eliminarán equipos, jugadores, partidos, fichas, goles,
-              tarjetas, sanciones, eliminatorias y votos MVP.
-            </p>
+              <p className="mt-2 text-xs font-bold text-red-700">
+                Se eliminarán equipos, jugadores, partidos, fichas, goles,
+                tarjetas, sanciones, eliminatorias y votos MVP.
+              </p>
 
-            <button
-              onClick={borrarDatosTorneo}
-              className="mt-4 w-full rounded-xl bg-red-600 py-3 font-black text-white shadow"
-            >
-              Borrar datos del torneo
-            </button>
-          </div>
+              <button
+                onClick={borrarDatosTorneo}
+                className="mt-4 w-full rounded-xl bg-red-600 py-3 font-black text-white shadow"
+              >
+                Borrar datos del torneo
+              </button>
+
+              <button
+                onClick={ocultarZonaPeligrosa}
+                className="mt-3 w-full rounded-xl bg-slate-900 py-3 font-black text-white shadow"
+              >
+                Ocultar zona peligrosa
+              </button>
+            </div>
+          )}
         </section>
       </main>
     </AdminGuard>

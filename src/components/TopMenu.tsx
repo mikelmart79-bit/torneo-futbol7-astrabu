@@ -154,12 +154,10 @@ export default function TopMenu() {
           <aside className="absolute right-0 top-0 h-full w-[58%] min-w-[230px] max-w-[300px] overflow-y-auto bg-slate-950 text-white shadow-2xl sm:w-1/2">
             <div className="sticky top-0 z-10 border-b border-white/10 bg-slate-950/95 px-5 py-5 backdrop-blur">
               <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[0.22em] text-red-300">
-                    Torneo Fútbol 7
-                  </p>
-
-                  <h2 className="mt-1 text-2xl font-black">Menú</h2>
+                <div className="min-w-0">
+                  <h2 className="text-2xl font-black leading-tight">
+                    Menú
+                  </h2>
                 </div>
 
                 <button

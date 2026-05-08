@@ -461,13 +461,6 @@ export default function MvpPage() {
           Volver al inicio
         </Link>
 
-        <Link
-          href="/votar-mvp"
-          className="mt-4 block w-full rounded-2xl bg-red-600 py-4 text-center text-lg font-black text-white shadow-2xl"
-        >
-          Votar MVP
-        </Link>
-
         {loading ? (
           <div className="mt-6 rounded-2xl bg-white/95 p-5 font-bold shadow">
             Cargando MVP...

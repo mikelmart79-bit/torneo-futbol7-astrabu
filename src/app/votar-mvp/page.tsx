@@ -64,6 +64,12 @@ type Vote = {
   team_id: string | null;
 };
 
+type MatchPlayerRow = {
+  id: string;
+  player_id: string;
+  team_id: string;
+};
+
 function normalizarEquipo(
   equipo: RawMatch["home_team"]
 ): { name: string } | null {
@@ -94,6 +100,10 @@ function formatearFechaSegura(fecha: string | null) {
   return formatearFecha(fecha);
 }
 
+function columnaPartido(tipo: MatchType) {
+  return tipo === "final" ? "final_match_id" : "match_id";
+}
+
 export default function VotarMvpPage() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [selectedGroup, setSelectedGroup] = useState("");
@@ -119,7 +129,13 @@ export default function VotarMvpPage() {
     ? players.filter((player) => player.team_id === selectedMatch.away_team_id)
     : [];
 
-  const totalVotosPartido = votes.length;
+  const votosValidosPartido = useMemo(() => {
+    const jugadoresValidos = new Set(players.map((player) => player.id));
+
+    return votes.filter((vote) => jugadoresValidos.has(vote.player_id));
+  }, [votes, players]);
+
+  const totalVotosPartido = votosValidosPartido.length;
 
   const yaVotoPartido = votes.some((vote) => vote.user_id === userId);
 
@@ -275,29 +291,75 @@ export default function VotarMvpPage() {
 
   async function cargarJugadoresYVotos(match: Match) {
     setMensaje("");
+    setPlayers([]);
+    setVotes([]);
 
-    const { data: playersData, error: playersError } = await supabase
-      .from("players")
-      .select("id, team_id, name, number")
-      .in("team_id", [match.home_team_id, match.away_team_id])
-      .order("number", { ascending: true })
-      .order("name", { ascending: true });
+    const columnaFicha = columnaPartido(match.tipo);
 
-    const columnaVoto = match.tipo === "final" ? "final_match_id" : "match_id";
+    const { data: participantesData, error: participantesError } =
+      await supabase
+        .from("match_players")
+        .select("id, player_id, team_id")
+        .eq(columnaFicha, match.id);
+
+    const columnaVoto = columnaPartido(match.tipo);
 
     const { data: votesData, error: votesError } = await supabase
       .from("mvp_votes")
       .select("id, match_id, final_match_id, player_id, user_id, team_id")
       .eq(columnaVoto, match.id);
 
-    if (playersError || votesError) {
-      console.error("Error cargando jugadores o votos:", playersError || votesError);
-      setMensaje("No se han podido cargar jugadores o votos.");
+    if (participantesError || votesError) {
+      console.error(
+        "Error cargando ficha o votos:",
+        participantesError || votesError
+      );
+      setMensaje("No se han podido cargar los jugadores de la ficha o los votos.");
       return;
     }
 
-    setPlayers((playersData ?? []) as Player[]);
-    setVotes((votesData ?? []) as Vote[]);
+    const participantes = (participantesData ?? []) as MatchPlayerRow[];
+    const votosPartido = (votesData ?? []) as Vote[];
+
+    setVotes(votosPartido);
+
+    const playerIds = Array.from(
+      new Set(participantes.map((row) => row.player_id))
+    );
+
+    if (playerIds.length === 0) {
+      setPlayers([]);
+      return;
+    }
+
+    const { data: playersData, error: playersError } = await supabase
+      .from("players")
+      .select("id, team_id, name, number")
+      .in("id", playerIds)
+      .order("number", { ascending: true })
+      .order("name", { ascending: true });
+
+    if (playersError) {
+      console.error("Error cargando jugadores participantes:", playersError);
+      setMensaje("No se han podido cargar los jugadores de este partido.");
+      return;
+    }
+
+    const jugadores = ((playersData ?? []) as Player[]).sort((a, b) => {
+      const ordenA = a.team_id === match.home_team_id ? 0 : 1;
+      const ordenB = b.team_id === match.home_team_id ? 0 : 1;
+
+      if (ordenA !== ordenB) return ordenA - ordenB;
+
+      const dorsalA = a.number ?? 9999;
+      const dorsalB = b.number ?? 9999;
+
+      if (dorsalA !== dorsalB) return dorsalA - dorsalB;
+
+      return a.name.localeCompare(b.name);
+    });
+
+    setPlayers(jugadores);
   }
 
   async function cambiarGrupo(grupo: string) {
@@ -328,7 +390,8 @@ export default function VotarMvpPage() {
   }
 
   function contarVotos(playerId: string) {
-    return votes.filter((vote) => vote.player_id === playerId).length;
+    return votosValidosPartido.filter((vote) => vote.player_id === playerId)
+      .length;
   }
 
   async function votar(player: Player) {
@@ -336,6 +399,13 @@ export default function VotarMvpPage() {
 
     if (yaVotoPartido) {
       setMensaje("Ya has votado el MVP de este partido.");
+      return;
+    }
+
+    const jugadorPuedeSerVotado = players.some((item) => item.id === player.id);
+
+    if (!jugadorPuedeSerVotado) {
+      setMensaje("Este jugador no está registrado en la ficha del partido.");
       return;
     }
 
@@ -386,7 +456,7 @@ export default function VotarMvpPage() {
         <div className="space-y-3 p-4">
           {jugadores.length === 0 ? (
             <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">
-              No hay jugadores cargados para este equipo.
+              No hay jugadores registrados en la ficha de este partido.
             </p>
           ) : (
             jugadores.map((player) => {
@@ -556,6 +626,14 @@ export default function VotarMvpPage() {
                   <p className="mt-2 text-sm font-bold text-slate-500">
                     Votos emitidos: {totalVotosPartido}
                   </p>
+                </div>
+              )}
+
+              {players.length === 0 && selectedMatch && (
+                <div className="mt-4 rounded-xl bg-yellow-100 p-3 text-sm font-bold text-yellow-900">
+                  Todavía no hay jugadores registrados en la ficha de este
+                  partido. Para abrir correctamente la votación, primero hay que
+                  guardar la ficha del partido.
                 </div>
               )}
 

@@ -149,7 +149,7 @@ export default function EquiposPage() {
                         {team.name}
                       </p>
 
-                      <span className="mt-3 inline-flex items-center rounded-full bg-slate-950 px-4 py-2 text-xs font-black uppercase tracking-wide text-white shadow">
+                      <span className="mt-3 inline-flex items-center rounded-full bg-red-600 px-4 py-2 text-xs font-black uppercase tracking-wide text-white shadow">
                         Ver plantilla →
                       </span>
                     </Link>

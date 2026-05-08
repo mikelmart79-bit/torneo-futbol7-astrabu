@@ -169,17 +169,6 @@ function formatearFechaSegura(fecha: string | null) {
   return formatearFecha(fecha);
 }
 
-function estadoBonito(status: string | null) {
-  if (!status) return "Pendiente";
-
-  if (status === "pending") return "Pendiente";
-  if (status === "live") return "En juego";
-  if (status === "finished") return "Finalizado";
-  if (status === "closed") return "Cerrado";
-
-  return status;
-}
-
 function ordenarPartidos(partidos: DisplayMatch[]) {
   return [...partidos].sort((a, b) => {
     const fechaA = a.match_date ?? "9999-12-31";
@@ -212,6 +201,21 @@ function marcadorTexto(match: DisplayMatch) {
   }
 
   return marcador;
+}
+
+function tituloPartido(match: DisplayMatch) {
+  if (match.tipo === "grupo") return "Clasificación";
+  return match.title || match.phase || "Eliminatoria";
+}
+
+function estadoPermiteVerActa(status: string | null | undefined) {
+  const limpio = (status ?? "").trim().toLowerCase();
+
+  return limpio === "finalizado" || limpio === "cerrado";
+}
+
+function tipoActa(match: DisplayMatch) {
+  return match.tipo === "final" ? "final" : "grupo";
 }
 
 function calcularClasificacion(teams: Team[], matches: GroupMatch[]) {
@@ -674,6 +678,98 @@ export default function FavoritosPage() {
     );
   }
 
+  function renderPartidoFavorito(match: DisplayMatch) {
+    const hayResultado =
+      match.home_score !== null && match.away_score !== null;
+
+    return (
+      <div key={`${match.tipo}-${match.id}`} className="py-4 first:pt-0 last:pb-0">
+        <div className="overflow-hidden rounded-3xl bg-slate-100 shadow-sm">
+          <div
+            className={`px-4 py-3 text-white ${
+              match.tipo === "final" ? "bg-slate-950" : "bg-red-600"
+            }`}
+          >
+            <div className="grid grid-cols-[72px_1fr_72px] items-center gap-2">
+              <div />
+
+              <p className="text-center text-base font-black text-white">
+                {tituloPartido(match)}
+              </p>
+
+              <p className="justify-self-end rounded-full bg-white/20 px-3 py-1 text-xs font-black">
+                {match.status ?? "Pendiente"}
+              </p>
+            </div>
+          </div>
+
+          <div className="p-4">
+            <div className="grid grid-cols-[minmax(0,1fr)_46px_minmax(0,1fr)] items-center gap-2">
+              <p className="min-w-0 break-words text-center text-sm font-black leading-tight text-slate-950">
+                {match.home_name}
+              </p>
+
+              <div className="rounded-xl bg-slate-950 px-1 py-2 text-center text-white shadow">
+                <p
+                  className={`font-black leading-none ${
+                    hayResultado ? "text-base" : "text-sm uppercase"
+                  }`}
+                >
+                  {marcadorTexto(match)}
+                </p>
+              </div>
+
+              <p className="min-w-0 break-words text-center text-sm font-black leading-tight text-slate-950">
+                {match.away_name}
+              </p>
+            </div>
+
+            <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-2xl bg-white p-3">
+              <div>
+                <p className="text-xs font-black uppercase text-slate-400">
+                  Hora
+                </p>
+
+                <p className="text-lg font-black text-slate-950">
+                  {match.match_time ?? "--:--"}
+                </p>
+              </div>
+
+              {estadoPermiteVerActa(match.status) ? (
+                <Link
+                  href={`/admin/acta-partido?match=${match.id}&type=${tipoActa(
+                    match
+                  )}`}
+                  className="rounded-xl bg-slate-950 px-4 py-3 text-center text-xs font-black uppercase text-white shadow"
+                >
+                  Ver acta
+                </Link>
+              ) : (
+                <div />
+              )}
+
+              <div className="text-right">
+                <p className="text-xs font-black uppercase text-slate-400">
+                  Campo
+                </p>
+
+                <p className="text-sm font-black text-slate-950">
+                  {match.field ?? "Pendiente"}
+                </p>
+              </div>
+            </div>
+
+            <p className="mt-3 text-center text-xs font-bold text-slate-500">
+              {formatearFechaSegura(match.match_date)}
+            </p>
+
+            {renderMvp(match)}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <main className="relative min-h-screen overflow-x-hidden bg-black text-slate-900">
       <img
@@ -759,7 +855,9 @@ export default function FavoritosPage() {
                         setEquipoAbierto(abierto ? "" : team.id)
                       }
                       className={`flex w-full items-center justify-between gap-3 px-5 py-4 text-left ${
-                        abierto ? "bg-red-600 text-white" : "bg-white text-slate-900"
+                        abierto
+                          ? "bg-red-600 text-white"
+                          : "bg-white text-slate-900"
                       }`}
                     >
                       <div className="min-w-0">
@@ -805,69 +903,10 @@ export default function FavoritosPage() {
                               Todavía no hay partidos asignados a este equipo.
                             </p>
                           ) : (
-                            <div className="divide-y divide-slate-200">
-                              {partidos.map((match) => {
-                                const hayResultado =
-                                  match.home_score !== null &&
-                                  match.away_score !== null;
-
-                                return (
-                                  <div
-                                    key={`${match.tipo}-${match.id}`}
-                                    className="py-3 first:pt-0 last:pb-0"
-                                  >
-                                    <div className="rounded-2xl bg-slate-50 p-4 shadow-sm">
-                                      <div className="flex items-center justify-between gap-3">
-                                        <p className="text-xs font-black uppercase tracking-widest text-red-600">
-                                          {match.tipo === "final"
-                                            ? match.phase
-                                            : "Clasificación"}
-                                        </p>
-
-                                        <p className="shrink-0 rounded-full bg-slate-200 px-3 py-1 text-[11px] font-black text-slate-600">
-                                          {estadoBonito(match.status)}
-                                        </p>
-                                      </div>
-
-                                      {match.tipo === "final" && (
-                                        <p className="mt-1 text-sm font-black text-slate-500">
-                                          {match.title}
-                                        </p>
-                                      )}
-
-                                      <div className="mt-3 grid grid-cols-[1fr_52px_1fr] items-center gap-2">
-                                        <p className="break-words text-center text-sm font-black leading-tight text-slate-950">
-                                          {match.home_name}
-                                        </p>
-
-                                        <div className="rounded-xl bg-slate-950 px-1 py-2 text-center text-white shadow">
-                                          <p
-                                            className={`font-black leading-none ${
-                                              hayResultado
-                                                ? "text-base"
-                                                : "text-sm uppercase"
-                                            }`}
-                                          >
-                                            {marcadorTexto(match)}
-                                          </p>
-                                        </div>
-
-                                        <p className="break-words text-center text-sm font-black leading-tight text-slate-950">
-                                          {match.away_name}
-                                        </p>
-                                      </div>
-
-                                      <p className="mt-3 text-sm font-bold text-slate-500">
-                                        {formatearFechaSegura(match.match_date)} ·{" "}
-                                        {match.match_time ?? "Hora pendiente"} ·{" "}
-                                        {match.field ?? "Campo pendiente"}
-                                      </p>
-
-                                      {renderMvp(match)}
-                                    </div>
-                                  </div>
-                                );
-                              })}
+                            <div className="divide-y divide-slate-300">
+                              {partidos.map((match) =>
+                                renderPartidoFavorito(match)
+                              )}
                             </div>
                           )}
                         </div>

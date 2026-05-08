@@ -230,7 +230,7 @@ export default function FaseFinalPage() {
                 <div
                   key={fase}
                   className={`overflow-hidden rounded-3xl shadow-2xl backdrop-blur ${
-                    esFinal ? "bg-amber-100/95" : "bg-slate-950/90"
+                    esFinal ? "bg-amber-100/95" : "bg-red-900/80"
                   }`}
                 >
                   <button
@@ -238,7 +238,7 @@ export default function FaseFinalPage() {
                     className={`flex w-full items-center justify-between gap-3 px-5 py-4 text-left ${
                       esFinal
                         ? "bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 text-slate-950"
-                        : "bg-slate-950 text-white"
+                        : "bg-red-800/90 text-white"
                     }`}
                   >
                     <p className="break-words text-xl font-black leading-tight">
@@ -253,7 +253,7 @@ export default function FaseFinalPage() {
                   {abierta && (
                     <div
                       className={`space-y-3 p-3 ${
-                        esFinal ? "bg-amber-50" : "bg-slate-100"
+                        esFinal ? "bg-amber-50" : "bg-red-50"
                       }`}
                     >
                       {cruces.length === 0 ? (

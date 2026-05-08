@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import BottomNav from "@/components/BottomNav";
+import TopMenu from "@/components/TopMenu";
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -14,7 +15,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
   return (
     <>
       <main>{children}</main>
-      {!ocultarMenu && <BottomNav />}
+
+      {!ocultarMenu && (
+        <>
+          <TopMenu />
+          <BottomNav />
+        </>
+      )}
     </>
   );
 }

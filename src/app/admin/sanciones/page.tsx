@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import AdminGuard from "@/components/AdminGuard";
 import { supabase } from "@/lib/supabase";
+import { formatearFecha } from "@/lib/formatDate";
 
 type Team = {
   id: string;
@@ -20,10 +21,42 @@ type Player = {
   player_type: PlayerType | null;
 };
 
+type TeamRef = {
+  name: string;
+};
+
+type GroupMatch = {
+  id: string;
+  group_name: string | null;
+  match_date: string | null;
+  match_time: string | null;
+  field: string | null;
+  home_team: TeamRef | null;
+  away_team: TeamRef | null;
+};
+
+type RawGroupMatch = Omit<GroupMatch, "home_team" | "away_team"> & {
+  home_team: TeamRef[] | TeamRef | null;
+  away_team: TeamRef[] | TeamRef | null;
+};
+
+type FinalMatch = {
+  id: string;
+  phase: string;
+  title: string;
+  home_ref: string;
+  away_ref: string;
+  match_date: string | null;
+  match_time: string | null;
+  field: string | null;
+};
+
 type Suspension = {
   id: string;
   player_id: string;
   team_id: string;
+  match_id: string | null;
+  final_match_id: string | null;
   reason: string;
   games: number;
   served: number;
@@ -41,6 +74,7 @@ type SuspensionRow = {
   games: number;
   served: number;
   status: string;
+  origin: string;
 };
 
 const MOTIVOS = [
@@ -54,6 +88,12 @@ const MOTIVOS = [
   "Otro",
 ];
 
+function normalizarEquipo(equipo: RawGroupMatch["home_team"]): TeamRef | null {
+  if (!equipo) return null;
+  if (Array.isArray(equipo)) return equipo[0] ?? null;
+  return equipo;
+}
+
 function estadoPendiente(status: string) {
   const limpio = status.trim().toLowerCase();
 
@@ -65,16 +105,40 @@ function estadoPendiente(status: string) {
   );
 }
 
+function formatearFechaSegura(fecha: string | null) {
+  if (!fecha) return "Fecha pendiente";
+  return formatearFecha(fecha);
+}
+
+function labelPartidoGrupo(match: GroupMatch) {
+  return `${match.home_team?.name ?? "Local"} vs ${
+    match.away_team?.name ?? "Visitante"
+  } · ${formatearFechaSegura(match.match_date)} · ${
+    match.match_time ?? "Hora pendiente"
+  }`;
+}
+
+function labelPartidoFinal(match: FinalMatch) {
+  return `${match.phase} · ${match.title} · ${match.home_ref || "Local"} vs ${
+    match.away_ref || "Visitante"
+  } · ${formatearFechaSegura(match.match_date)} · ${
+    match.match_time ?? "Hora pendiente"
+  }`;
+}
+
 export default function AdminSancionesPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [suspensions, setSuspensions] = useState<Suspension[]>([]);
+  const [groupMatches, setGroupMatches] = useState<GroupMatch[]>([]);
+  const [finalMatches, setFinalMatches] = useState<FinalMatch[]>([]);
 
   const [teamId, setTeamId] = useState("");
   const [playerId, setPlayerId] = useState("");
   const [motivo, setMotivo] = useState("Doble amarilla");
   const [detalle, setDetalle] = useState("");
   const [partidos, setPartidos] = useState("1");
+  const [origenPartido, setOrigenPartido] = useState("none");
 
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
@@ -115,12 +179,59 @@ export default function AdminSancionesPage() {
 
     const { data: suspensionsData, error: suspensionsError } = await supabase
       .from("suspensions")
-      .select("id, player_id, team_id, reason, games, served, status, created_at")
+      .select(
+        "id, player_id, team_id, match_id, final_match_id, reason, games, served, status, created_at"
+      )
       .order("created_at", { ascending: false });
 
     if (suspensionsError) {
       console.error("Error cargando sanciones:", suspensionsError);
       setMensaje("No se han podido cargar las sanciones.");
+      setLoading(false);
+      return;
+    }
+
+    const { data: matchesData, error: matchesError } = await supabase
+      .from("matches")
+      .select(
+        `
+        id,
+        group_name,
+        match_date,
+        match_time,
+        field,
+        home_team:teams!matches_home_team_id_fkey(name),
+        away_team:teams!matches_away_team_id_fkey(name)
+      `
+      )
+      .order("match_date", { ascending: true })
+      .order("match_time", { ascending: true });
+
+    if (matchesError) {
+      console.error("Error cargando partidos:", matchesError);
+      setMensaje("No se han podido cargar los partidos.");
+      setLoading(false);
+      return;
+    }
+
+    const partidosGrupo: GroupMatch[] = (
+      (matchesData as unknown as RawGroupMatch[]) || []
+    ).map((match) => ({
+      ...match,
+      home_team: normalizarEquipo(match.home_team),
+      away_team: normalizarEquipo(match.away_team),
+    }));
+
+    const { data: finalData, error: finalError } = await supabase
+      .from("final_matches")
+      .select("id, phase, title, home_ref, away_ref, match_date, match_time, field")
+      .order("match_date", { ascending: true })
+      .order("match_time", { ascending: true })
+      .order("sort_order", { ascending: true });
+
+    if (finalError) {
+      console.error("Error cargando eliminatorias:", finalError);
+      setMensaje("No se han podido cargar las eliminatorias.");
       setLoading(false);
       return;
     }
@@ -131,6 +242,8 @@ export default function AdminSancionesPage() {
     setTeams(equipos);
     setPlayers(jugadores);
     setSuspensions((suspensionsData ?? []) as Suspension[]);
+    setGroupMatches(partidosGrupo);
+    setFinalMatches((finalData ?? []) as FinalMatch[]);
 
     if (equipos.length > 0 && !teamId) {
       const primerEquipo = equipos[0].id;
@@ -156,6 +269,28 @@ export default function AdminSancionesPage() {
         const player = players.find((item) => item.id === suspension.player_id);
         const team = teams.find((item) => item.id === suspension.team_id);
 
+        let origin = "Partido no identificado";
+
+        if (suspension.match_id) {
+          const match = groupMatches.find(
+            (item) => item.id === suspension.match_id
+          );
+
+          if (match) {
+            origin = labelPartidoGrupo(match);
+          }
+        }
+
+        if (suspension.final_match_id) {
+          const finalMatch = finalMatches.find(
+            (item) => item.id === suspension.final_match_id
+          );
+
+          if (finalMatch) {
+            origin = labelPartidoFinal(finalMatch);
+          }
+        }
+
         return {
           id: suspension.id,
           playerName: player?.name ?? "Jugador",
@@ -166,6 +301,7 @@ export default function AdminSancionesPage() {
           games: suspension.games,
           served: suspension.served,
           status: suspension.status,
+          origin,
         };
       })
       .sort((a, b) => {
@@ -180,7 +316,7 @@ export default function AdminSancionesPage() {
 
         return a.playerName.localeCompare(b.playerName);
       });
-  }, [suspensions, players, teams]);
+  }, [suspensions, players, teams, groupMatches, finalMatches]);
 
   function cambiarEquipo(id: string) {
     setTeamId(id);
@@ -194,6 +330,28 @@ export default function AdminSancionesPage() {
     setMotivo("Doble amarilla");
     setDetalle("");
     setPartidos("1");
+    setOrigenPartido("none");
+  }
+
+  function getOrigenPayload() {
+    if (origenPartido.startsWith("grupo:")) {
+      return {
+        match_id: origenPartido.replace("grupo:", ""),
+        final_match_id: null,
+      };
+    }
+
+    if (origenPartido.startsWith("final:")) {
+      return {
+        match_id: null,
+        final_match_id: origenPartido.replace("final:", ""),
+      };
+    }
+
+    return {
+      match_id: null,
+      final_match_id: null,
+    };
   }
 
   async function guardarSancion() {
@@ -218,17 +376,14 @@ export default function AdminSancionesPage() {
 
     const detalleLimpio = detalle.trim();
 
-    const reason = detalleLimpio
-      ? `${motivo} · ${detalleLimpio}`
-      : motivo;
+    const reason = detalleLimpio ? `${motivo} · ${detalleLimpio}` : motivo;
 
     setGuardando(true);
 
     const payload = {
       player_id: playerId,
       team_id: teamId,
-      match_id: null,
-      final_match_id: null,
+      ...getOrigenPayload(),
       reason,
       games: partidosNumero,
       served: 0,
@@ -382,6 +537,45 @@ export default function AdminSancionesPage() {
 
                 <div className="mt-4">
                   <label className="text-sm font-black uppercase text-slate-500">
+                    Partido de origen
+                  </label>
+
+                  <select
+                    value={origenPartido}
+                    onChange={(event) => setOrigenPartido(event.target.value)}
+                    className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
+                  >
+                    <option value="none">Sin partido identificado</option>
+
+                    {groupMatches.length > 0 && (
+                      <optgroup label="Clasificación">
+                        {groupMatches.map((match) => (
+                          <option key={match.id} value={`grupo:${match.id}`}>
+                            {labelPartidoGrupo(match)}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+
+                    {finalMatches.length > 0 && (
+                      <optgroup label="Eliminatorias">
+                        {finalMatches.map((match) => (
+                          <option key={match.id} value={`final:${match.id}`}>
+                            {labelPartidoFinal(match)}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+
+                  <p className="mt-2 text-xs font-bold text-slate-500">
+                    Si seleccionas el partido donde ocurrió el incidente, la
+                    sanción se calculará desde ese partido.
+                  </p>
+                </div>
+
+                <div className="mt-4">
+                  <label className="text-sm font-black uppercase text-slate-500">
                     Motivo
                   </label>
 
@@ -427,7 +621,11 @@ export default function AdminSancionesPage() {
 
                 <button
                   onClick={guardarSancion}
-                  disabled={guardando || teams.length === 0 || jugadoresEquipo.length === 0}
+                  disabled={
+                    guardando ||
+                    teams.length === 0 ||
+                    jugadoresEquipo.length === 0
+                  }
                   className="mt-6 w-full rounded-xl bg-red-600 py-3 font-black text-white shadow disabled:bg-slate-300"
                 >
                   {guardando ? "Guardando..." : "Guardar sanción"}
@@ -510,6 +708,10 @@ export default function AdminSancionesPage() {
                               Sanción: {row.games} partido
                               {row.games === 1 ? "" : "s"} · Cumplidos:{" "}
                               {row.served} · Restan: {restantes}
+                            </p>
+
+                            <p className="mt-2 text-xs font-bold text-slate-400">
+                              Origen: {row.origin}
                             </p>
                           </div>
 

@@ -25,7 +25,7 @@ const principales: AdminLink[] = [
   },
   {
     href: "/admin/gestionar-partidos",
-    title: "Configurar partidos",
+    title: "Gestionar calendario y partidos",
     description: "Crear, editar o eliminar partidos de clasificación.",
   },
   {

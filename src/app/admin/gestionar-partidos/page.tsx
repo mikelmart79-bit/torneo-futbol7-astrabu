@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { type ChangeEvent, useEffect, useState } from "react";
 import Link from "next/link";
+import * as XLSX from "xlsx";
 import AdminGuard from "@/components/AdminGuard";
 import { supabase } from "@/lib/supabase";
 import { formatearFecha } from "@/lib/formatDate";
 
 const CLASIFICACION = "Clasificación";
+
+const ESTADOS_VALIDOS = ["Pendiente", "En juego", "Finalizado", "Cerrado"];
 
 type Team = {
   id: string;
@@ -35,6 +38,19 @@ type RawMatch = Omit<Match, "home_team" | "away_team"> & {
   away_team: { name: string }[] | { name: string } | null;
 };
 
+type ImportMatchPayload = {
+  group_name: string;
+  home_team_id: string;
+  away_team_id: string;
+  match_date: string;
+  match_time: string;
+  field: string;
+  home_score: null;
+  away_score: null;
+  status: string;
+  mvp_open: boolean;
+};
+
 function normalizarEquipo(
   equipo: RawMatch["home_team"]
 ): { name: string } | null {
@@ -46,6 +62,152 @@ function normalizarEquipo(
 function formatearFechaSegura(fecha: string | null) {
   if (!fecha) return "Fecha pendiente";
   return formatearFecha(fecha);
+}
+
+function normalizarTexto(valor: string | null | undefined) {
+  return (valor ?? "")
+    .toString()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function normalizarClave(valor: string) {
+  return valor
+    .toString()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+}
+
+function leerCampo(row: Record<string, unknown>, posiblesClaves: string[]) {
+  const normalizado: Record<string, unknown> = {};
+
+  Object.entries(row).forEach(([key, value]) => {
+    normalizado[normalizarClave(key)] = value;
+  });
+
+  for (const key of posiblesClaves) {
+    const value = normalizado[normalizarClave(key)];
+
+    if (value !== undefined && value !== null && String(value).trim() !== "") {
+      return value;
+    }
+  }
+
+  return "";
+}
+
+function fechaDesdeExcel(valor: unknown) {
+  if (valor instanceof Date) {
+    const year = valor.getFullYear();
+    const month = String(valor.getMonth() + 1).padStart(2, "0");
+    const day = String(valor.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  }
+
+  if (typeof valor === "number") {
+    const parsed = XLSX.SSF.parse_date_code(valor);
+
+    if (parsed) {
+      const year = String(parsed.y).padStart(4, "0");
+      const month = String(parsed.m).padStart(2, "0");
+      const day = String(parsed.d).padStart(2, "0");
+
+      return `${year}-${month}-${day}`;
+    }
+  }
+
+  const texto = String(valor ?? "").trim();
+
+  if (!texto) return "";
+
+  const iso = texto.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+
+  if (iso) {
+    const year = iso[1];
+    const month = iso[2].padStart(2, "0");
+    const day = iso[3].padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  }
+
+  const europeo = texto.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+
+  if (europeo) {
+    const day = europeo[1].padStart(2, "0");
+    const month = europeo[2].padStart(2, "0");
+    const year =
+      europeo[3].length === 2 ? `20${europeo[3]}` : europeo[3].padStart(4, "0");
+
+    return `${year}-${month}-${day}`;
+  }
+
+  return "";
+}
+
+function horaDesdeExcel(valor: unknown) {
+  if (valor instanceof Date) {
+    const hour = String(valor.getHours()).padStart(2, "0");
+    const minute = String(valor.getMinutes()).padStart(2, "0");
+
+    return `${hour}:${minute}`;
+  }
+
+  if (typeof valor === "number") {
+    const totalMinutes = Math.round(valor * 24 * 60);
+    const hours = Math.floor(totalMinutes / 60) % 24;
+    const minutes = totalMinutes % 60;
+
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  }
+
+  const texto = String(valor ?? "").trim();
+
+  if (!texto) return "";
+
+  const normalizado = texto.replace(".", ":");
+  const match = normalizado.match(/^(\d{1,2}):(\d{1,2})(?::\d{1,2})?$/);
+
+  if (match) {
+    const hours = match[1].padStart(2, "0");
+    const minutes = match[2].padStart(2, "0");
+
+    return `${hours}:${minutes}`;
+  }
+
+  const soloHora = normalizado.match(/^(\d{1,2})$/);
+
+  if (soloHora) {
+    return `${soloHora[1].padStart(2, "0")}:00`;
+  }
+
+  return "";
+}
+
+function estadoDesdeExcel(valor: unknown) {
+  const texto = String(valor ?? "").trim();
+
+  if (!texto) return "Pendiente";
+
+  const encontrado = ESTADOS_VALIDOS.find(
+    (estado) => normalizarTexto(estado) === normalizarTexto(texto)
+  );
+
+  return encontrado ?? "Pendiente";
+}
+
+function clavePartido(
+  fecha: string | null,
+  hora: string | null,
+  homeTeamId: string,
+  awayTeamId: string
+) {
+  return `${fecha ?? ""}|${(hora ?? "").slice(0, 5)}|${homeTeamId}|${awayTeamId}`;
 }
 
 export default function AdminGestionarPartidosPage() {
@@ -64,6 +226,7 @@ export default function AdminGestionarPartidosPage() {
   const [mensaje, setMensaje] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [importando, setImportando] = useState(false);
 
   useEffect(() => {
     cargarDatos();
@@ -156,7 +319,7 @@ export default function AdminGestionarPartidosPage() {
     setHomeTeamId(match.home_team_id);
     setAwayTeamId(match.away_team_id);
     setFecha(match.match_date ?? "");
-    setHora(match.match_time ?? "");
+    setHora((match.match_time ?? "").slice(0, 5));
     setCampo(match.field ?? "Campo 1");
     setEstado(match.status ?? "Pendiente");
     setMvpOpen(Boolean(match.mvp_open));
@@ -278,12 +441,267 @@ export default function AdminGestionarPartidosPage() {
     setSaving(false);
   }
 
+  function descargarPlantillaCalendario() {
+    const rows = [
+      {
+        FECHA: "01/07/2026",
+        HORA: "18:00",
+        CAMPO: "Campo 1",
+        LOCAL: "Equipo 1",
+        VISITANTE: "Equipo 2",
+        ESTADO: "Pendiente",
+      },
+      {
+        FECHA: "01/07/2026",
+        HORA: "18:30",
+        CAMPO: "Campo 1",
+        LOCAL: "Equipo 3",
+        VISITANTE: "Equipo 4",
+        ESTADO: "Pendiente",
+      },
+      {
+        FECHA: "02/07/2026",
+        HORA: "19:00",
+        CAMPO: "Campo 2",
+        LOCAL: "Equipo 5",
+        VISITANTE: "Equipo 6",
+        ESTADO: "Pendiente",
+      },
+    ];
+
+    const instrucciones = [
+      ["Columna", "Uso"],
+      ["FECHA", "Obligatoria. Formato recomendado: dd/mm/yyyy, por ejemplo 01/07/2026."],
+      ["HORA", "Obligatoria. Formato recomendado: HH:mm, por ejemplo 18:00."],
+      ["CAMPO", "Obligatoria. Ejemplo: Campo 1."],
+      ["LOCAL", "Obligatoria. Debe coincidir con el nombre exacto de un equipo ya creado."],
+      ["VISITANTE", "Obligatoria. Debe coincidir con el nombre exacto de un equipo ya creado."],
+      ["ESTADO", "Opcional. Pendiente, En juego, Finalizado o Cerrado. Si está vacío se usa Pendiente."],
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    const sheet = XLSX.utils.json_to_sheet(rows);
+    const sheetInstrucciones = XLSX.utils.aoa_to_sheet(instrucciones);
+
+    XLSX.utils.book_append_sheet(workbook, sheet, "Calendario");
+    XLSX.utils.book_append_sheet(workbook, sheetInstrucciones, "Instrucciones");
+    XLSX.writeFile(workbook, "plantilla_calendario_partidos.xlsx");
+  }
+
+  async function importarCalendarioDesdeExcel(
+    event: ChangeEvent<HTMLInputElement>
+  ) {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    if (teams.length === 0) {
+      setMensaje("Primero importa o crea los equipos antes de cargar partidos.");
+      event.target.value = "";
+      return;
+    }
+
+    setImportando(true);
+    setMensaje("");
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+
+      if (!sheet) {
+        setMensaje("El Excel no tiene ninguna hoja válida.");
+        setImportando(false);
+        event.target.value = "";
+        return;
+      }
+
+      const excelRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+        defval: "",
+      });
+
+      if (excelRows.length === 0) {
+        setMensaje("El Excel no tiene filas de partidos.");
+        setImportando(false);
+        event.target.value = "";
+        return;
+      }
+
+      const equiposPorNombre = new Map<string, Team>(
+        teams.map((team) => [normalizarTexto(team.name), team])
+      );
+
+      const partidosExistentes = new Set(
+        matches.map((match) =>
+          clavePartido(
+            match.match_date,
+            match.match_time,
+            match.home_team_id,
+            match.away_team_id
+          )
+        )
+      );
+
+      const partidosExcel = new Set<string>();
+      const nuevosPartidos: ImportMatchPayload[] = [];
+      const errores: string[] = [];
+      let omitidos = 0;
+
+      excelRows.forEach((row, index) => {
+        const fila = index + 2;
+
+        const fechaExcel = leerCampo(row, ["FECHA", "DATE"]);
+        const horaExcel = leerCampo(row, ["HORA", "HOUR", "TIME"]);
+        const campoExcel = leerCampo(row, ["CAMPO", "FIELD"]);
+        const localExcel = leerCampo(row, [
+          "LOCAL",
+          "EQUIPO_LOCAL",
+          "HOME",
+          "HOME_TEAM",
+        ]);
+        const visitanteExcel = leerCampo(row, [
+          "VISITANTE",
+          "EQUIPO_VISITANTE",
+          "AWAY",
+          "AWAY_TEAM",
+        ]);
+        const estadoExcel = leerCampo(row, ["ESTADO", "STATUS"]);
+
+        const fechaImportada = fechaDesdeExcel(fechaExcel);
+        const horaImportada = horaDesdeExcel(horaExcel);
+        const campoImportado = String(campoExcel ?? "").trim();
+        const localNombre = String(localExcel ?? "").trim();
+        const visitanteNombre = String(visitanteExcel ?? "").trim();
+        const estadoImportado = estadoDesdeExcel(estadoExcel);
+
+        if (
+          !fechaImportada &&
+          !horaImportada &&
+          !campoImportado &&
+          !localNombre &&
+          !visitanteNombre
+        ) {
+          return;
+        }
+
+        if (!fechaImportada) {
+          errores.push(`Fila ${fila}: fecha no válida.`);
+          return;
+        }
+
+        if (!horaImportada) {
+          errores.push(`Fila ${fila}: hora no válida.`);
+          return;
+        }
+
+        if (!campoImportado) {
+          errores.push(`Fila ${fila}: falta el campo.`);
+          return;
+        }
+
+        if (!localNombre || !visitanteNombre) {
+          errores.push(`Fila ${fila}: falta local o visitante.`);
+          return;
+        }
+
+        const local = equiposPorNombre.get(normalizarTexto(localNombre));
+        const visitante = equiposPorNombre.get(normalizarTexto(visitanteNombre));
+
+        if (!local) {
+          errores.push(`Fila ${fila}: no existe el equipo local "${localNombre}".`);
+          return;
+        }
+
+        if (!visitante) {
+          errores.push(
+            `Fila ${fila}: no existe el equipo visitante "${visitanteNombre}".`
+          );
+          return;
+        }
+
+        if (local.id === visitante.id) {
+          errores.push(`Fila ${fila}: local y visitante son el mismo equipo.`);
+          return;
+        }
+
+        const key = clavePartido(
+          fechaImportada,
+          horaImportada,
+          local.id,
+          visitante.id
+        );
+
+        if (partidosExistentes.has(key) || partidosExcel.has(key)) {
+          omitidos += 1;
+          return;
+        }
+
+        partidosExcel.add(key);
+
+        nuevosPartidos.push({
+          group_name: CLASIFICACION,
+          home_team_id: local.id,
+          away_team_id: visitante.id,
+          match_date: fechaImportada,
+          match_time: horaImportada,
+          field: campoImportado,
+          home_score: null,
+          away_score: null,
+          status: estadoImportado,
+          mvp_open: false,
+        });
+      });
+
+      if (nuevosPartidos.length > 0) {
+        const { error } = await supabase.from("matches").insert(nuevosPartidos);
+
+        if (error) {
+          console.error("Error importando calendario:", error);
+          setMensaje(`No se ha podido importar el calendario: ${error.message}`);
+          setImportando(false);
+          event.target.value = "";
+          return;
+        }
+      }
+
+      const resumen = [
+        `${nuevosPartidos.length} partido${
+          nuevosPartidos.length === 1 ? "" : "s"
+        } creado${nuevosPartidos.length === 1 ? "" : "s"}`,
+        `${omitidos} duplicado${omitidos === 1 ? "" : "s"} omitido${
+          omitidos === 1 ? "" : "s"
+        }`,
+      ];
+
+      if (errores.length > 0) {
+        resumen.push(`${errores.length} aviso${errores.length === 1 ? "" : "s"}`);
+      }
+
+      setMensaje(
+        `${resumen.join(" · ")}. ${
+          errores.length > 0 ? errores.slice(0, 5).join(" ") : ""
+        }`
+      );
+
+      await cargarDatos();
+    } catch (error) {
+      console.error("Error leyendo Excel:", error);
+      setMensaje("No se ha podido leer el Excel. Revisa el formato del archivo.");
+    } finally {
+      setImportando(false);
+      event.target.value = "";
+    }
+  }
+
   const mensajeCorrecto =
-    mensaje.includes("correctamente") || mensaje.includes("eliminado");
+    mensaje.includes("correctamente") ||
+    mensaje.includes("eliminado") ||
+    mensaje.includes("creado");
 
   return (
     <AdminGuard>
-      <main className="relative min-h-screen overflow-hidden bg-black text-slate-900">
+      <main className="relative min-h-screen overflow-x-hidden bg-black text-slate-900">
         <img
           src="/torneo-verano.png"
           alt="Fondo torneo"
@@ -297,7 +715,7 @@ export default function AdminGestionarPartidosPage() {
             </p>
 
             <h1 className="mt-2 text-center text-3xl font-black">
-              Configurar partidos
+              Gestionar calendario y partidos
             </h1>
 
             <p className="mt-2 text-center text-sm font-bold text-emerald-100">
@@ -331,6 +749,43 @@ export default function AdminGestionarPartidosPage() {
           ) : (
             <div className="mt-6 space-y-5">
               <div className="rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
+                <p className="text-sm font-black uppercase tracking-widest text-red-600">
+                  Importar calendario desde Excel
+                </p>
+
+                <p className="mt-2 text-sm font-bold text-slate-500">
+                  Carga partidos de clasificación de golpe. Los equipos deben
+                  existir antes y los nombres del Excel deben coincidir con los
+                  equipos importados.
+                </p>
+
+                <div className="mt-4 grid grid-cols-1 gap-3">
+                  <button
+                    onClick={descargarPlantillaCalendario}
+                    className="rounded-xl bg-slate-900 py-3 text-sm font-black text-white shadow"
+                  >
+                    Descargar plantilla Excel
+                  </button>
+
+                  <label className="block cursor-pointer rounded-xl bg-red-600 py-3 text-center text-sm font-black text-white shadow">
+                    {importando ? "Importando calendario..." : "Subir Excel calendario"}
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls"
+                      disabled={importando}
+                      onChange={(event) => void importarCalendarioDesdeExcel(event)}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                <div className="mt-4 rounded-2xl bg-slate-100 p-4 text-xs font-bold text-slate-500">
+                  Columnas admitidas: FECHA, HORA, CAMPO, LOCAL, VISITANTE y
+                  ESTADO. El estado es opcional.
+                </div>
+              </div>
+
+              <div className="rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
                 <label className="text-sm font-black uppercase text-slate-500">
                   Partido existente
                 </label>
@@ -347,7 +802,7 @@ export default function AdminGestionarPartidosPage() {
                       {match.home_team?.name ?? "Local"} vs{" "}
                       {match.away_team?.name ?? "Visitante"} ·{" "}
                       {formatearFechaSegura(match.match_date)} ·{" "}
-                      {match.match_time ?? "Hora pendiente"}
+                      {(match.match_time ?? "Hora pendiente").slice(0, 5)}
                     </option>
                   ))}
                 </select>

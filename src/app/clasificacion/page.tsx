@@ -35,6 +35,7 @@ export default function ClasificacionPage() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorCarga, setErrorCarga] = useState("");
+  const [mostrarAmpliada, setMostrarAmpliada] = useState(false);
 
   useEffect(() => {
     cargarDatos();
@@ -181,6 +182,18 @@ export default function ClasificacionPage() {
               </p>
             </div>
 
+            <div className="border-b border-slate-200 bg-white px-4 py-3">
+              <button
+                onClick={() => setMostrarAmpliada(!mostrarAmpliada)}
+                className="flex w-full items-center justify-between rounded-2xl bg-slate-950 px-4 py-3 text-left font-black text-white shadow"
+              >
+                <span>Clasificación ampliada</span>
+                <span className="text-2xl leading-none">
+                  {mostrarAmpliada ? "−" : "+"}
+                </span>
+              </button>
+            </div>
+
             <div className="space-y-3 p-4">
               {clasificacion.map((team, index) => {
                 const entraOctavos = index < 16;
@@ -194,7 +207,7 @@ export default function ClasificacionPage() {
                         : "border-slate-200 bg-slate-50"
                     }`}
                   >
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-center gap-3">
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-xl font-black text-red-600 shadow-sm">
                         {index + 1}
                       </div>
@@ -216,72 +229,74 @@ export default function ClasificacionPage() {
                       </div>
                     </div>
 
-                    <div className="mt-4 rounded-2xl bg-white/85 px-3 py-3 shadow-sm">
-                      <div className="grid grid-cols-7 gap-1 text-center">
-                        <div>
-                          <p className="text-[10px] font-black uppercase text-slate-400">
-                            PJ
-                          </p>
-                          <p className="text-base font-black text-slate-800">
-                            {team.pj}
-                          </p>
-                        </div>
+                    {mostrarAmpliada && (
+                      <div className="mt-4 rounded-2xl bg-white/85 px-3 py-3 shadow-sm">
+                        <div className="grid grid-cols-7 gap-1 text-center">
+                          <div>
+                            <p className="text-[10px] font-black uppercase text-slate-400">
+                              PJ
+                            </p>
+                            <p className="text-base font-black text-slate-800">
+                              {team.pj}
+                            </p>
+                          </div>
 
-                        <div>
-                          <p className="text-[10px] font-black uppercase text-slate-400">
-                            G
-                          </p>
-                          <p className="text-base font-black text-slate-800">
-                            {team.g}
-                          </p>
-                        </div>
+                          <div>
+                            <p className="text-[10px] font-black uppercase text-slate-400">
+                              G
+                            </p>
+                            <p className="text-base font-black text-slate-800">
+                              {team.g}
+                            </p>
+                          </div>
 
-                        <div>
-                          <p className="text-[10px] font-black uppercase text-slate-400">
-                            E
-                          </p>
-                          <p className="text-base font-black text-slate-800">
-                            {team.e}
-                          </p>
-                        </div>
+                          <div>
+                            <p className="text-[10px] font-black uppercase text-slate-400">
+                              E
+                            </p>
+                            <p className="text-base font-black text-slate-800">
+                              {team.e}
+                            </p>
+                          </div>
 
-                        <div>
-                          <p className="text-[10px] font-black uppercase text-slate-400">
-                            P
-                          </p>
-                          <p className="text-base font-black text-slate-800">
-                            {team.p}
-                          </p>
-                        </div>
+                          <div>
+                            <p className="text-[10px] font-black uppercase text-slate-400">
+                              P
+                            </p>
+                            <p className="text-base font-black text-slate-800">
+                              {team.p}
+                            </p>
+                          </div>
 
-                        <div>
-                          <p className="text-[10px] font-black uppercase text-slate-400">
-                            GF
-                          </p>
-                          <p className="text-base font-black text-slate-800">
-                            {team.gf}
-                          </p>
-                        </div>
+                          <div>
+                            <p className="text-[10px] font-black uppercase text-slate-400">
+                              GF
+                            </p>
+                            <p className="text-base font-black text-slate-800">
+                              {team.gf}
+                            </p>
+                          </div>
 
-                        <div>
-                          <p className="text-[10px] font-black uppercase text-slate-400">
-                            GC
-                          </p>
-                          <p className="text-base font-black text-slate-800">
-                            {team.gc}
-                          </p>
-                        </div>
+                          <div>
+                            <p className="text-[10px] font-black uppercase text-slate-400">
+                              GC
+                            </p>
+                            <p className="text-base font-black text-slate-800">
+                              {team.gc}
+                            </p>
+                          </div>
 
-                        <div>
-                          <p className="text-[10px] font-black uppercase text-slate-400">
-                            DG
-                          </p>
-                          <p className="text-base font-black text-slate-800">
-                            {team.dg}
-                          </p>
+                          <div>
+                            <p className="text-[10px] font-black uppercase text-slate-400">
+                              DG
+                            </p>
+                            <p className="text-base font-black text-slate-800">
+                              {team.dg}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 );
               })}

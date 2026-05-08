@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import AdminGuard from "@/components/AdminGuard";
 import { supabase } from "@/lib/supabase";
@@ -134,6 +134,32 @@ type FichaRow = {
   suspensionPartidoActual: number;
 };
 
+type CalendarMonth = {
+  year: number;
+  monthIndex: number;
+};
+
+type AdminCalendarMatch = {
+  id: string;
+  tipo: MatchType;
+  phase: string;
+  title: string;
+  match_date: string;
+  match_time: string | null;
+  field: string | null;
+  home_name: string;
+  away_name: string;
+  status: string | null;
+  sort_order: number;
+};
+
+const DEFAULT_MONTHS: CalendarMonth[] = [
+  { year: 2026, monthIndex: 6 },
+  { year: 2026, monthIndex: 7 },
+];
+
+const WEEK_DAYS = ["L", "M", "X", "J", "V", "S", "D"];
+
 function normalizarEquipo(equipo: RawGroupMatch["home_team"]): TeamRef | null {
   if (!equipo) return null;
   if (Array.isArray(equipo)) return equipo[0] ?? null;
@@ -171,6 +197,12 @@ function formatearFechaSegura(fecha: string | null) {
   return formatearFecha(fecha);
 }
 
+function formatearJornada(fecha: string) {
+  const [year, month, day] = fecha.split("-");
+
+  return `${day}/${month}/${year.slice(2)}`;
+}
+
 function numeroDesdeInput(valor: string) {
   if (valor.trim() === "") return null;
   const numero = Number.parseInt(valor, 10);
@@ -196,6 +228,30 @@ function fechaCreacionValor(createdAt: string | null) {
   const value = new Date(createdAt).getTime();
 
   return Number.isNaN(value) ? Date.now() : value;
+}
+
+function fechaToParts(fecha: string) {
+  const [year, month, day] = fecha.split("-").map(Number);
+
+  return {
+    year,
+    monthIndex: month - 1,
+    day,
+  };
+}
+
+function fechaDesdeParts(year: number, monthIndex: number, day: number) {
+  const month = String(monthIndex + 1).padStart(2, "0");
+  const dayText = String(day).padStart(2, "0");
+
+  return `${year}-${month}-${dayText}`;
+}
+
+function nombreMes(year: number, monthIndex: number) {
+  return new Intl.DateTimeFormat("es-ES", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(year, monthIndex, 1));
 }
 
 function partidosEquipoParaSancion(
@@ -261,6 +317,21 @@ function origenSancionValor(
   return fechaCreacionValor(suspension.created_at);
 }
 
+function ordenarCalendario(partidos: AdminCalendarMatch[]) {
+  return [...partidos].sort((a, b) => {
+    if (a.match_date !== b.match_date) {
+      return a.match_date.localeCompare(b.match_date);
+    }
+
+    const horaA = a.match_time ?? "99:99";
+    const horaB = b.match_time ?? "99:99";
+
+    if (horaA !== horaB) return horaA.localeCompare(horaB);
+
+    return a.sort_order - b.sort_order;
+  });
+}
+
 export default function AdminFichasPartidoPage() {
   const [matchType, setMatchType] = useState<MatchType>("grupo");
   const [selectedId, setSelectedId] = useState("");
@@ -285,6 +356,9 @@ export default function AdminFichasPartidoPage() {
 
   const [homePenalties, setHomePenalties] = useState("");
   const [awayPenalties, setAwayPenalties] = useState("");
+
+  const [selectedDate, setSelectedDate] = useState("");
+  const [monthPosition, setMonthPosition] = useState(0);
 
   const [mensaje, setMensaje] = useState("");
   const [loading, setLoading] = useState(true);
@@ -428,6 +502,19 @@ export default function AdminFichasPartidoPage() {
 
     const eliminatorias = (finalData ?? []) as FinalMatch[];
     setFinalMatches(eliminatorias);
+
+    const fechas = Array.from(
+      new Set(
+        [
+          ...partidos.map((partido) => partido.match_date),
+          ...eliminatorias.map((partido) => partido.match_date),
+        ].filter(Boolean) as string[]
+      )
+    ).sort();
+
+    if (fechas.length > 0) {
+      setSelectedDate((actual) => actual || fechas[0]);
+    }
 
     const tipoInicial =
       opciones?.tipoMantener ??
@@ -821,6 +908,20 @@ export default function AdminFichasPartidoPage() {
     await cargarFicha(matchType, id);
   }
 
+  async function seleccionarPartidoJornada(match: AdminCalendarMatch) {
+    setMatchType(match.tipo);
+    setSelectedId(match.id);
+    setMensaje("");
+
+    await cargarFicha(match.tipo, match.id);
+
+    setTimeout(() => {
+      document
+        .getElementById("ficha-edicion")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
+  }
+
   function actualizarJugo(playerId: string, played: boolean) {
     setRows((actuales) =>
       actuales.map((row) =>
@@ -881,6 +982,188 @@ export default function AdminFichasPartidoPage() {
 
   const golesFichaLocal = golesEquipo(homeTeam?.id);
   const golesFichaVisitante = golesEquipo(awayTeam?.id);
+
+  const calendarMatches = useMemo<AdminCalendarMatch[]>(() => {
+    const partidosGrupo: AdminCalendarMatch[] = groupMatches
+      .filter((match) => Boolean(match.match_date))
+      .map((match, index) => ({
+        id: match.id,
+        tipo: "grupo",
+        phase: "Clasificación",
+        title: "Clasificación",
+        match_date: match.match_date as string,
+        match_time: match.match_time,
+        field: match.field,
+        home_name: match.home_team?.name ?? "Local",
+        away_name: match.away_team?.name ?? "Visitante",
+        status: match.status,
+        sort_order: index + 1,
+      }));
+
+    const partidosFinales: AdminCalendarMatch[] = finalMatches
+      .filter((match) => Boolean(match.match_date))
+      .map((match) => ({
+        id: match.id,
+        tipo: "final",
+        phase: match.phase,
+        title: match.title,
+        match_date: match.match_date as string,
+        match_time: match.match_time,
+        field: match.field,
+        home_name: match.home_ref || "Local",
+        away_name: match.away_ref || "Visitante",
+        status: match.status,
+        sort_order: match.sort_order,
+      }));
+
+    return ordenarCalendario([...partidosGrupo, ...partidosFinales]);
+  }, [groupMatches, finalMatches]);
+
+  const matchesByDate = useMemo(() => {
+    const grouped: Record<string, AdminCalendarMatch[]> = {};
+
+    calendarMatches.forEach((match) => {
+      if (!grouped[match.match_date]) grouped[match.match_date] = [];
+      grouped[match.match_date].push(match);
+    });
+
+    Object.keys(grouped).forEach((date) => {
+      grouped[date] = ordenarCalendario(grouped[date]);
+    });
+
+    return grouped;
+  }, [calendarMatches]);
+
+  const calendarMonths = useMemo(() => {
+    const uniqueMonths = new Map<string, CalendarMonth>();
+
+    calendarMatches.forEach((match) => {
+      const { year, monthIndex } = fechaToParts(match.match_date);
+      const key = `${year}-${monthIndex}`;
+
+      uniqueMonths.set(key, { year, monthIndex });
+    });
+
+    const result = Array.from(uniqueMonths.values()).sort((a, b) => {
+      if (a.year !== b.year) return a.year - b.year;
+      return a.monthIndex - b.monthIndex;
+    });
+
+    return result.length > 0 ? result : DEFAULT_MONTHS;
+  }, [calendarMatches]);
+
+  const monthPositionSeguro = Math.min(
+    monthPosition,
+    Math.max(calendarMonths.length - 1, 0)
+  );
+
+  const currentMonth = calendarMonths[monthPositionSeguro] ?? DEFAULT_MONTHS[0];
+  const selectedMatches = selectedDate ? matchesByDate[selectedDate] ?? [] : [];
+
+  function renderMonth(month: CalendarMonth) {
+    const firstDay = new Date(month.year, month.monthIndex, 1);
+    const daysInMonth = new Date(month.year, month.monthIndex + 1, 0).getDate();
+    const startOffset = (firstDay.getDay() + 6) % 7;
+
+    const cells: Array<number | null> = [];
+
+    for (let i = 0; i < startOffset; i++) {
+      cells.push(null);
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      cells.push(day);
+    }
+
+    while (cells.length % 7 !== 0) {
+      cells.push(null);
+    }
+
+    return (
+      <div className="overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
+        <div className="flex items-center justify-between gap-3 bg-red-600 px-4 py-4 text-white">
+          <button
+            onClick={() =>
+              setMonthPosition((actual) => Math.max(actual - 1, 0))
+            }
+            disabled={monthPositionSeguro <= 0}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-2xl font-black disabled:opacity-30"
+          >
+            ‹
+          </button>
+
+          <p className="text-center text-lg font-black capitalize">
+            {nombreMes(month.year, month.monthIndex)}
+          </p>
+
+          <button
+            onClick={() =>
+              setMonthPosition((actual) =>
+                Math.min(actual + 1, calendarMonths.length - 1)
+              )
+            }
+            disabled={monthPositionSeguro >= calendarMonths.length - 1}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-2xl font-black disabled:opacity-30"
+          >
+            ›
+          </button>
+        </div>
+
+        <div className="p-3">
+          <div className="grid grid-cols-7 gap-1 px-1 pb-2 text-center text-xs font-black uppercase text-slate-400">
+            {WEEK_DAYS.map((day) => (
+              <p key={day}>{day}</p>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7 gap-1">
+            {cells.map((day, index) => {
+              if (day === null) {
+                return <div key={`empty-${index}`} className="min-h-[58px]" />;
+              }
+
+              const date = fechaDesdeParts(month.year, month.monthIndex, day);
+              const dayMatches = matchesByDate[date] ?? [];
+              const hasMatches = dayMatches.length > 0;
+              const selected = selectedDate === date;
+
+              return (
+                <button
+                  key={date}
+                  onClick={() => {
+                    if (hasMatches) setSelectedDate(date);
+                  }}
+                  disabled={!hasMatches}
+                  className={`min-h-[58px] rounded-2xl p-1 text-left shadow-sm transition ${
+                    selected
+                      ? "bg-red-600 text-white"
+                      : hasMatches
+                      ? "bg-slate-950 text-white"
+                      : "bg-slate-100 text-slate-400"
+                  }`}
+                >
+                  <p className="text-sm font-black">{day}</p>
+
+                  {hasMatches ? (
+                    <p
+                      className={`mt-1 text-[10px] font-black leading-tight ${
+                        selected ? "text-red-100" : "text-red-300"
+                      }`}
+                    >
+                      {dayMatches.length} partido
+                      {dayMatches.length === 1 ? "" : "s"}
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-[10px] font-bold">—</p>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   async function actualizarArrastresFinales() {
     const { data, error } = await supabase
@@ -1139,7 +1422,9 @@ export default function AdminFichasPartidoPage() {
         return readError?.message ?? "No se ha podido leer la sanción.";
       }
 
-      const gamesActuales = Number(suspensionActual.games ?? row.suspensionGames);
+      const gamesActuales = Number(
+        suspensionActual.games ?? row.suspensionGames
+      );
       const servedActual = Number(suspensionActual.served ?? 0);
 
       const nuevoServed = Math.min(servedActual + 1, gamesActuales);
@@ -1587,6 +1872,79 @@ export default function AdminFichasPartidoPage() {
             </div>
           ) : (
             <div className="mt-6 space-y-5">
+              {renderMonth(currentMonth)}
+
+              <div className="overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
+                <div className="bg-slate-950 px-5 py-4 text-center text-white">
+                  <p className="text-sm font-black uppercase tracking-widest text-red-300">
+                    Jornada del
+                  </p>
+
+                  <h2 className="mt-1 text-2xl font-black">
+                    {selectedDate ? formatearJornada(selectedDate) : "Sin fecha"}
+                  </h2>
+                </div>
+
+                <div className="p-4">
+                  {selectedMatches.length === 0 ? (
+                    <p className="rounded-2xl bg-slate-100 p-4 text-sm font-bold text-slate-500">
+                      Toca un día con partidos para ver la jornada.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {selectedMatches.map((match) => {
+                        const seleccionado =
+                          match.tipo === matchType && match.id === selectedId;
+
+                        return (
+                          <div
+                            key={`${match.tipo}-${match.id}`}
+                            className={`rounded-2xl p-4 shadow-sm ${
+                              seleccionado
+                                ? "border-2 border-red-500 bg-red-50"
+                                : "bg-slate-100"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-black uppercase tracking-widest text-red-600">
+                                  {match.tipo === "final"
+                                    ? `${match.phase} · ${match.title}`
+                                    : "Clasificación"}
+                                </p>
+
+                                <p className="mt-2 break-words text-lg font-black leading-tight">
+                                  {match.home_name} vs {match.away_name}
+                                </p>
+
+                                <p className="mt-2 text-xs font-bold text-slate-500">
+                                  {match.match_time ?? "Hora pendiente"} ·{" "}
+                                  {match.field ?? "Campo pendiente"} ·{" "}
+                                  {match.status ?? "Pendiente"}
+                                </p>
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={() => seleccionarPartidoJornada(match)}
+                              className={`mt-3 w-full rounded-xl py-3 text-sm font-black shadow ${
+                                seleccionado
+                                  ? "bg-slate-950 text-white"
+                                  : "bg-red-600 text-white"
+                              }`}
+                            >
+                              {seleccionado
+                                ? "Ficha seleccionada"
+                                : "Modificar ficha"}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
                 <label className="text-sm font-black uppercase text-slate-500">
                   Tipo de partido
@@ -1639,7 +1997,7 @@ export default function AdminFichasPartidoPage() {
                   Cargando ficha...
                 </div>
               ) : selectedId ? (
-                <>
+                <div id="ficha-edicion" className="space-y-5">
                   <div className="overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
                     <div className="bg-red-600 px-5 py-4 text-white">
                       <p className="text-sm font-black uppercase tracking-widest">
@@ -1958,7 +2316,7 @@ export default function AdminFichasPartidoPage() {
                   >
                     {saving ? "Guardando ficha..." : "Guardar ficha y marcador"}
                   </button>
-                </>
+                </div>
               ) : (
                 <div className="rounded-3xl bg-white/95 p-5 font-bold text-slate-500 shadow-2xl">
                   No hay partidos disponibles para crear fichas.

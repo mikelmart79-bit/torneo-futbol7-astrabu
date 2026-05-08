@@ -134,7 +134,7 @@ export default function TopMenu() {
             aria-label="Cerrar menú"
           />
 
-          <aside className="absolute right-0 top-0 h-full w-[86%] max-w-sm overflow-y-auto bg-slate-950 text-white shadow-2xl">
+          <aside className="absolute right-0 top-0 h-full w-[58%] min-w-[230px] max-w-[300px] overflow-y-auto bg-slate-950 text-white shadow-2xl sm:w-1/2">
             <div className="sticky top-0 z-10 border-b border-white/10 bg-slate-950/95 px-5 py-5 backdrop-blur">
               <div className="flex items-center justify-between gap-4">
                 <div>

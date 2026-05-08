@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import AdminGuard from "@/components/AdminGuard";
 import { supabase } from "@/lib/supabase";
-import { formatearFecha } from "@/lib/formatDate";
 
 type MatchType = "grupo" | "final";
 
@@ -120,11 +119,6 @@ function normalizarEquipo(equipo: RawGroupMatch["home_team"]): TeamRef | null {
 
 function normalizarTexto(texto: string | null | undefined) {
   return (texto ?? "").trim().toLowerCase();
-}
-
-function formatearFechaSegura(fecha: string | null) {
-  if (!fecha) return "Fecha pendiente";
-  return formatearFecha(fecha);
 }
 
 function formatearFechaCorta(fecha: string | null) {
@@ -468,8 +462,17 @@ function ActaPartidoContent() {
     });
   }
 
-  const participantesOrdenados = useMemo(() => {
-    return ordenarPorEquipoYJugador(participants);
+  const participantesAgrupados = useMemo(() => {
+    const ordenados = ordenarPorEquipoYJugador(participants);
+
+    return {
+      local: ordenados.filter((row) => row.team_id === acta?.home_team_id),
+      visitante: ordenados.filter((row) => row.team_id === acta?.away_team_id),
+      otros: ordenados.filter(
+        (row) =>
+          row.team_id !== acta?.home_team_id && row.team_id !== acta?.away_team_id
+      ),
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [participants, players, acta]);
 
@@ -511,6 +514,47 @@ function ActaPartidoContent() {
     window.print();
   }
 
+  function renderParticipantesEquipo(
+    titulo: string,
+    equipo: string,
+    rows: MatchPlayerRow[]
+  ) {
+    return (
+      <div className="rounded-2xl bg-white p-4 print:border print:border-slate-200">
+        <p className="text-xs font-black uppercase tracking-widest text-red-600">
+          {titulo}
+        </p>
+
+        <h3 className="mt-1 break-words text-lg font-black leading-tight text-slate-950">
+          {equipo}
+        </h3>
+
+        {rows.length === 0 ? (
+          <p className="mt-3 text-sm font-bold text-slate-400">
+            Sin jugadores registrados.
+          </p>
+        ) : (
+          <div className="mt-3 space-y-2">
+            {rows.map((row) => (
+              <div
+                key={`${row.player_id}-${row.team_id}`}
+                className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-3 print:border print:border-slate-100 print:bg-white"
+              >
+                <p className="font-black">
+                  {nombreJugador(playerById(row.player_id))}
+                </p>
+
+                <p className="text-right text-xs font-bold text-slate-500">
+                  {teamName(row.team_id)}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (loading) {
     return <LoadingActa />;
   }
@@ -542,6 +586,10 @@ function ActaPartidoContent() {
 
   const cerrada = estadoCerrado(acta.status);
   const finalizada = estadoFinalizado(acta.status);
+  const hayParticipantes =
+    participantesAgrupados.local.length > 0 ||
+    participantesAgrupados.visitante.length > 0 ||
+    participantesAgrupados.otros.length > 0;
 
   return (
     <main className="relative min-h-screen overflow-x-hidden bg-black text-slate-900 print:bg-white">
@@ -682,16 +730,51 @@ function ActaPartidoContent() {
             </section>
 
             <section className="mt-5 rounded-3xl bg-slate-50 p-5 print:border print:border-slate-300 print:bg-white">
-              <h2 className="text-xl font-black">Incidencias</h2>
+              <h2 className="text-xl font-black">Jugadores participantes</h2>
 
-              {acta.incidents && acta.incidents.trim() !== "" ? (
-                <p className="mt-3 whitespace-pre-wrap text-sm font-bold leading-relaxed text-slate-700">
-                  {acta.incidents}
+              {!hayParticipantes ? (
+                <p className="mt-3 text-sm font-bold text-slate-500">
+                  No hay jugadores participantes registrados.
                 </p>
               ) : (
-                <p className="mt-3 text-sm font-bold text-slate-500">
-                  No hay incidencias registradas.
-                </p>
+                <div className="mt-4 space-y-4">
+                  {renderParticipantesEquipo(
+                    "Local",
+                    acta.home_name,
+                    participantesAgrupados.local
+                  )}
+
+                  {renderParticipantesEquipo(
+                    "Visitante",
+                    acta.away_name,
+                    participantesAgrupados.visitante
+                  )}
+
+                  {participantesAgrupados.otros.length > 0 && (
+                    <div className="rounded-2xl bg-white p-4 print:border print:border-slate-200">
+                      <p className="text-xs font-black uppercase tracking-widest text-red-600">
+                        Otros
+                      </p>
+
+                      <div className="mt-3 space-y-2">
+                        {participantesAgrupados.otros.map((row) => (
+                          <div
+                            key={`${row.player_id}-${row.team_id}`}
+                            className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-3 print:border print:border-slate-100 print:bg-white"
+                          >
+                            <p className="font-black">
+                              {nombreJugador(playerById(row.player_id))}
+                            </p>
+
+                            <p className="text-right text-xs font-bold text-slate-500">
+                              {teamName(row.team_id)}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </section>
 
@@ -808,6 +891,20 @@ function ActaPartidoContent() {
             </section>
 
             <section className="mt-5 rounded-3xl bg-slate-50 p-5 print:border print:border-slate-300 print:bg-white">
+              <h2 className="text-xl font-black">Incidencias</h2>
+
+              {acta.incidents && acta.incidents.trim() !== "" ? (
+                <p className="mt-3 whitespace-pre-wrap text-sm font-bold leading-relaxed text-slate-700">
+                  {acta.incidents}
+                </p>
+              ) : (
+                <p className="mt-3 text-sm font-bold text-slate-500">
+                  No hay incidencias registradas.
+                </p>
+              )}
+            </section>
+
+            <section className="mt-5 rounded-3xl bg-slate-50 p-5 print:border print:border-slate-300 print:bg-white">
               <h2 className="text-xl font-black">Sanciones generadas</h2>
 
               {sancionesOrdenadas.length === 0 ? (
@@ -837,33 +934,6 @@ function ActaPartidoContent() {
                         {suspension.games} partido
                         {suspension.games === 1 ? "" : "s"} de sanción · Estado:{" "}
                         {suspension.status}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <section className="mt-5 rounded-3xl bg-slate-50 p-5 print:border print:border-slate-300 print:bg-white">
-              <h2 className="text-xl font-black">Jugadores participantes</h2>
-
-              {participantesOrdenados.length === 0 ? (
-                <p className="mt-3 text-sm font-bold text-slate-500">
-                  No hay jugadores participantes registrados.
-                </p>
-              ) : (
-                <div className="mt-4 space-y-2">
-                  {participantesOrdenados.map((row) => (
-                    <div
-                      key={`${row.player_id}-${row.team_id}`}
-                      className="flex items-center justify-between gap-3 rounded-2xl bg-white p-3 print:border print:border-slate-200"
-                    >
-                      <p className="font-black">
-                        {nombreJugador(playerById(row.player_id))}
-                      </p>
-
-                      <p className="text-right text-xs font-bold text-slate-500">
-                        {teamName(row.team_id)}
                       </p>
                     </div>
                   ))}

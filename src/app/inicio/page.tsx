@@ -16,6 +16,8 @@ type Match = {
   field: string | null;
   home_score: number | null;
   away_score: number | null;
+  status: string | null;
+  sort_order?: number | null;
   home_team: { name: string } | null;
   away_team: { name: string } | null;
 };
@@ -28,6 +30,7 @@ type RawMatch = {
   field: string | null;
   home_score: number | null;
   away_score: number | null;
+  status: string | null;
   home_team: { name: string }[] | { name: string } | null;
   away_team: { name: string }[] | { name: string } | null;
 };
@@ -43,6 +46,7 @@ type FinalMatch = {
   field: string | null;
   home_score: number | null;
   away_score: number | null;
+  status: string | null;
   sort_order: number;
 };
 
@@ -52,6 +56,10 @@ function normalizarEquipo(
   if (!equipo) return null;
   if (Array.isArray(equipo)) return equipo[0] ?? null;
   return equipo;
+}
+
+function normalizarTexto(texto: string | null | undefined) {
+  return (texto ?? "").trim().toLowerCase();
 }
 
 function fechaLocalHoy() {
@@ -71,19 +79,31 @@ function horaLocalActual() {
   return `${hours}:${minutes}`;
 }
 
+function horaCorta(hora: string | null) {
+  if (!hora) return null;
+  return hora.slice(0, 5);
+}
+
 function esPartidoProximo(partido: Match) {
-  if (!partido.match_date || !partido.match_time) return false;
+  if (!partido.match_date) return false;
+
+  const estado = normalizarTexto(partido.status);
+
+  if (estado === "finalizado" || estado === "cerrado") {
+    return false;
+  }
 
   const hoy = fechaLocalHoy();
   const horaActual = horaLocalActual();
+  const horaPartido = horaCorta(partido.match_time);
 
   if (partido.match_date > hoy) return true;
+  if (partido.match_date < hoy) return false;
 
-  if (partido.match_date === hoy && partido.match_time >= horaActual) {
-    return true;
-  }
+  // Si es hoy y no hay hora, lo mantenemos visible porque sigue programado.
+  if (!horaPartido) return true;
 
-  return false;
+  return horaPartido >= horaActual;
 }
 
 function ordenarPartidos(partidos: Match[]) {
@@ -93,10 +113,12 @@ function ordenarPartidos(partidos: Match[]) {
 
     if (fechaA !== fechaB) return fechaA.localeCompare(fechaB);
 
-    const horaA = a.match_time ?? "99:99";
-    const horaB = b.match_time ?? "99:99";
+    const horaA = horaCorta(a.match_time) ?? "99:99";
+    const horaB = horaCorta(b.match_time) ?? "99:99";
 
-    return horaA.localeCompare(horaB);
+    if (horaA !== horaB) return horaA.localeCompare(horaB);
+
+    return (a.sort_order ?? 9999) - (b.sort_order ?? 9999);
   });
 }
 
@@ -118,11 +140,14 @@ export default function InicioPage() {
   const [partidos, setPartidos] = useState<Match[]>([]);
   const [indicePartido, setIndicePartido] = useState(0);
   const [toquesAdmin, setToquesAdmin] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   const partido = partidos[indicePartido] ?? null;
 
   useEffect(() => {
     async function cargarProximos() {
+      setLoading(true);
+
       const { data: matchesData, error: matchesError } = await supabase
         .from("matches")
         .select(`
@@ -133,6 +158,7 @@ export default function InicioPage() {
           field,
           home_score,
           away_score,
+          status,
           home_team:teams!matches_home_team_id_fkey(name),
           away_team:teams!matches_away_team_id_fkey(name)
         `)
@@ -152,51 +178,60 @@ export default function InicioPage() {
           field,
           home_score,
           away_score,
+          status,
           sort_order
         `)
+        .order("match_date", { ascending: true })
+        .order("match_time", { ascending: true })
         .order("sort_order", { ascending: true });
 
-      if (matchesError || finalError) {
-        setPartidos([]);
-        setIndicePartido(0);
-        return;
+      if (matchesError) {
+        console.error("Error cargando próximos partidos:", matchesError);
       }
 
-      const partidosGrupo: Match[] = (
-        (matchesData as unknown as RawMatch[]) || []
-      ).map((match) => ({
-        id: match.id,
-        tipo: "grupo",
-        group_name: match.group_name,
-        match_date: match.match_date,
-        match_time: match.match_time,
-        field: match.field,
-        home_score: match.home_score,
-        away_score: match.away_score,
-        home_team: normalizarEquipo(match.home_team),
-        away_team: normalizarEquipo(match.away_team),
-      }));
+      if (finalError) {
+        console.error("Error cargando próximas eliminatorias:", finalError);
+      }
 
-      const partidosFinales: Match[] = ((finalData ?? []) as FinalMatch[]).map(
-        (match) => ({
-          id: match.id,
-          tipo: "final",
-          phase: match.phase,
-          title: match.title,
-          group_name: null,
-          match_date: match.match_date,
-          match_time: match.match_time,
-          field: match.field,
-          home_score: match.home_score,
-          away_score: match.away_score,
-          home_team: match.home_ref
-            ? { name: match.home_ref }
-            : { name: "Local" },
-          away_team: match.away_ref
-            ? { name: match.away_ref }
-            : { name: "Visitante" },
-        })
-      );
+      const partidosGrupo: Match[] = matchesError
+        ? []
+        : (((matchesData as unknown as RawMatch[]) || []).map((match, index) => ({
+            id: match.id,
+            tipo: "grupo" as const,
+            group_name: match.group_name,
+            match_date: match.match_date,
+            match_time: match.match_time,
+            field: match.field,
+            home_score: match.home_score,
+            away_score: match.away_score,
+            status: match.status,
+            sort_order: index + 1,
+            home_team: normalizarEquipo(match.home_team),
+            away_team: normalizarEquipo(match.away_team),
+          })));
+
+      const partidosFinales: Match[] = finalError
+        ? []
+        : (((finalData ?? []) as FinalMatch[]).map((match) => ({
+            id: match.id,
+            tipo: "final" as const,
+            phase: match.phase,
+            title: match.title,
+            group_name: null,
+            match_date: match.match_date,
+            match_time: match.match_time,
+            field: match.field,
+            home_score: match.home_score,
+            away_score: match.away_score,
+            status: match.status,
+            sort_order: match.sort_order,
+            home_team: match.home_ref
+              ? { name: match.home_ref }
+              : { name: "Local" },
+            away_team: match.away_ref
+              ? { name: match.away_ref }
+              : { name: "Visitante" },
+          })));
 
       const proximos = ordenarPartidos([
         ...partidosGrupo,
@@ -205,6 +240,7 @@ export default function InicioPage() {
 
       setPartidos(proximos.slice(0, 20));
       setIndicePartido(0);
+      setLoading(false);
     }
 
     cargarProximos();
@@ -264,7 +300,11 @@ export default function InicioPage() {
             </p>
           </div>
 
-          {partido ? (
+          {loading ? (
+            <p className="p-5 text-center text-sm font-bold text-slate-500">
+              Cargando próximos partidos...
+            </p>
+          ) : partido ? (
             <div className="p-4">
               <div className="rounded-3xl bg-slate-50 p-3 shadow-inner">
                 <div className="mb-3 rounded-2xl bg-slate-950 px-4 py-2.5 text-center text-white shadow">
@@ -313,13 +353,19 @@ export default function InicioPage() {
                   </p>
 
                   <p className="text-3xl font-black leading-none">
-                    {partido.match_time ?? "--:--"}
+                    {horaCorta(partido.match_time) ?? "--:--"}
                   </p>
 
                   <p className="mt-1 text-xs font-bold text-slate-300">
                     {partido.field ?? "Campo pendiente"}
                   </p>
                 </div>
+
+                {partidos.length > 1 && (
+                  <p className="mt-3 text-center text-xs font-bold text-slate-500">
+                    {indicePartido + 1} de {partidos.length} próximos partidos
+                  </p>
+                )}
               </div>
             </div>
           ) : (

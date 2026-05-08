@@ -192,6 +192,16 @@ function estadoCuentaComoCumplido(status: string | null | undefined) {
   );
 }
 
+function estadoCerradoPartido(status: string | null | undefined) {
+  return normalizarTexto(status) === "cerrado";
+}
+
+function estadoFinalizadoPartido(status: string | null | undefined) {
+  const limpio = normalizarTexto(status);
+
+  return limpio === "finalizado" || limpio === "cerrado";
+}
+
 function formatearFechaSegura(fecha: string | null) {
   if (!fecha) return "Fecha pendiente";
   return formatearFecha(fecha);
@@ -349,6 +359,7 @@ export default function AdminFichasPartidoPage() {
 
   const [rows, setRows] = useState<FichaRow[]>([]);
   const [estado, setEstado] = useState("Pendiente");
+  const [estadoGuardado, setEstadoGuardado] = useState("Pendiente");
   const [mvpOpen, setMvpOpen] = useState(false);
 
   const [homeScore, setHomeScore] = useState("");
@@ -389,6 +400,14 @@ export default function AdminFichasPartidoPage() {
       : player.name;
   }
 
+  function cambiarEstadoPartido(nuevoEstado: string) {
+    setEstado(nuevoEstado);
+
+    if (estadoCerradoPartido(nuevoEstado)) {
+      setMvpOpen(false);
+    }
+  }
+
   function limpiarFicha() {
     setHomeTeam(null);
     setAwayTeam(null);
@@ -397,6 +416,7 @@ export default function AdminFichasPartidoPage() {
     setFichaAviso("");
     setRows([]);
     setEstado("Pendiente");
+    setEstadoGuardado("Pendiente");
     setMvpOpen(false);
     setHomeScore("");
     setAwayScore("");
@@ -663,7 +683,8 @@ export default function AdminFichasPartidoPage() {
     setHomeTeam(contexto.local);
     setAwayTeam(contexto.visitante);
     setEstado(contexto.estadoFicha);
-    setMvpOpen(contexto.mvpFicha);
+    setEstadoGuardado(contexto.estadoFicha);
+    setMvpOpen(contexto.estadoFicha === "Cerrado" ? false : contexto.mvpFicha);
     setHomeScore(contexto.scoreLocal);
     setAwayScore(contexto.scoreVisitante);
     setHomePenalties(contexto.penLocal);
@@ -885,27 +906,6 @@ export default function AdminFichasPartidoPage() {
 
     setRows(rowsFicha);
     setLoadingFicha(false);
-  }
-
-  async function cambiarTipo(tipo: MatchType) {
-    const nuevoId =
-      tipo === "grupo" ? groupMatches[0]?.id ?? "" : finalMatches[0]?.id ?? "";
-
-    setMatchType(tipo);
-    setSelectedId(nuevoId);
-    setMensaje("");
-
-    if (nuevoId) {
-      await cargarFicha(tipo, nuevoId);
-    } else {
-      limpiarFicha();
-    }
-  }
-
-  async function cambiarPartido(id: string) {
-    setSelectedId(id);
-    setMensaje("");
-    await cargarFicha(matchType, id);
   }
 
   async function seleccionarPartidoJornada(match: AdminCalendarMatch) {
@@ -1453,6 +1453,13 @@ export default function AdminFichasPartidoPage() {
       return;
     }
 
+    if (estadoCerradoPartido(estadoGuardado)) {
+      setMensaje(
+        "Este partido está cerrado. El acta es definitiva y ya no se puede modificar."
+      );
+      return;
+    }
+
     if (!homeTeam || !awayTeam) {
       setMensaje("El partido todavía no tiene los dos equipos resueltos.");
       return;
@@ -1763,11 +1770,13 @@ export default function AdminFichasPartidoPage() {
       }
     }
 
+    const seCierraPartido = estadoCerradoPartido(estado);
+
     const updatePayload: Record<string, string | number | boolean | null> = {
       home_score: marcadorLocal,
       away_score: marcadorVisitante,
       status: estado,
-      mvp_open: mvpOpen,
+      mvp_open: seCierraPartido ? false : mvpOpen,
     };
 
     if (matchType === "final") {
@@ -1811,17 +1820,22 @@ export default function AdminFichasPartidoPage() {
     });
 
     setMensaje(
-      "Ficha, marcador, tarjetas y sanciones guardados correctamente."
+      seCierraPartido
+        ? "Partido cerrado correctamente. El acta queda como definitiva."
+        : "Ficha, marcador, tarjetas y sanciones guardados correctamente."
     );
     setSaving(false);
   }
 
-  const partidosDisponibles = matchType === "grupo" ? groupMatches : finalMatches;
+  const fichaBloqueada = estadoCerradoPartido(estadoGuardado);
+  const actaDisponible = Boolean(selectedId) && estadoFinalizadoPartido(estadoGuardado);
+  const actaHref = `/admin/acta-partido?match=${selectedId}&type=${matchType}`;
 
   const mensajeCorrecto =
     mensaje.includes("correctamente") ||
     mensaje.includes("guardad") ||
-    mensaje.includes("actualizad");
+    mensaje.includes("actualizad") ||
+    mensaje.includes("cerrado");
 
   return (
     <AdminGuard>
@@ -1945,52 +1959,27 @@ export default function AdminFichasPartidoPage() {
                 </div>
               </div>
 
-              <div className="rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
-                <label className="text-sm font-black uppercase text-slate-500">
-                  Tipo de partido
-                </label>
-
-                <select
-                  value={matchType}
-                  onChange={(event) =>
-                    cambiarTipo(event.target.value as MatchType)
-                  }
-                  className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
+              {actaDisponible && (
+                <Link
+                  href={actaHref}
+                  className="block rounded-2xl bg-slate-950 p-4 text-center text-lg font-black text-white shadow-2xl"
                 >
-                  <option value="grupo">Clasificación</option>
-                  <option value="final">Eliminatorias</option>
-                </select>
+                  Ver acta del partido
+                </Link>
+              )}
 
-                <label className="mt-4 block text-sm font-black uppercase text-slate-500">
-                  Partido
-                </label>
+              {fichaBloqueada && (
+                <div className="rounded-3xl border-2 border-emerald-500 bg-emerald-50 p-5 text-emerald-900 shadow-2xl">
+                  <p className="text-sm font-black uppercase tracking-widest">
+                    Partido cerrado
+                  </p>
 
-                <select
-                  value={selectedId}
-                  onChange={(event) => cambiarPartido(event.target.value)}
-                  className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
-                >
-                  {partidosDisponibles.length === 0 ? (
-                    <option value="">No hay partidos disponibles</option>
-                  ) : matchType === "grupo" ? (
-                    groupMatches.map((match) => (
-                      <option key={match.id} value={match.id}>
-                        {match.home_team?.name ?? "Local"} vs{" "}
-                        {match.away_team?.name ?? "Visitante"} ·{" "}
-                        {formatearFechaSegura(match.match_date)} ·{" "}
-                        {match.match_time ?? "Hora pendiente"}
-                      </option>
-                    ))
-                  ) : (
-                    finalMatches.map((match) => (
-                      <option key={match.id} value={match.id}>
-                        {match.phase} · {match.title} · {match.home_ref} vs{" "}
-                        {match.away_ref}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </div>
+                  <p className="mt-2 text-sm font-bold">
+                    El acta es definitiva. La ficha ya no se puede modificar y
+                    la votación MVP está cerrada.
+                  </p>
+                </div>
+              )}
 
               {loadingFicha ? (
                 <div className="rounded-3xl bg-white/95 p-5 font-bold shadow-2xl">
@@ -2051,22 +2040,24 @@ export default function AdminFichasPartidoPage() {
                             type="number"
                             min="0"
                             value={homeScore}
+                            disabled={fichaBloqueada}
                             onChange={(event) =>
                               setHomeScore(event.target.value)
                             }
                             placeholder="Goles local"
-                            className="rounded-xl border border-slate-300 p-3 text-center text-2xl font-black"
+                            className="rounded-xl border border-slate-300 p-3 text-center text-2xl font-black disabled:bg-slate-200 disabled:text-slate-500"
                           />
 
                           <input
                             type="number"
                             min="0"
                             value={awayScore}
+                            disabled={fichaBloqueada}
                             onChange={(event) =>
                               setAwayScore(event.target.value)
                             }
                             placeholder="Goles visitante"
-                            className="rounded-xl border border-slate-300 p-3 text-center text-2xl font-black"
+                            className="rounded-xl border border-slate-300 p-3 text-center text-2xl font-black disabled:bg-slate-200 disabled:text-slate-500"
                           />
                         </div>
 
@@ -2084,8 +2075,11 @@ export default function AdminFichasPartidoPage() {
 
                         <select
                           value={estado}
-                          onChange={(event) => setEstado(event.target.value)}
-                          className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
+                          disabled={fichaBloqueada}
+                          onChange={(event) =>
+                            cambiarEstadoPartido(event.target.value)
+                          }
+                          className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold disabled:bg-slate-200 disabled:text-slate-500"
                         >
                           <option>Pendiente</option>
                           <option>En juego</option>
@@ -2105,22 +2099,24 @@ export default function AdminFichasPartidoPage() {
                               type="number"
                               min="0"
                               value={homePenalties}
+                              disabled={fichaBloqueada}
                               onChange={(event) =>
                                 setHomePenalties(event.target.value)
                               }
                               placeholder="Pen. local"
-                              className="rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
+                              className="rounded-xl border border-slate-300 p-3 text-center text-xl font-black disabled:bg-slate-200 disabled:text-slate-500"
                             />
 
                             <input
                               type="number"
                               min="0"
                               value={awayPenalties}
+                              disabled={fichaBloqueada}
                               onChange={(event) =>
                                 setAwayPenalties(event.target.value)
                               }
                               placeholder="Pen. visitante"
-                              className="rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
+                              className="rounded-xl border border-slate-300 p-3 text-center text-xl font-black disabled:bg-slate-200 disabled:text-slate-500"
                             />
                           </div>
                         </div>
@@ -2132,8 +2128,11 @@ export default function AdminFichasPartidoPage() {
                         <input
                           type="checkbox"
                           checked={mvpOpen}
+                          disabled={
+                            fichaBloqueada || estadoCerradoPartido(estado)
+                          }
                           onChange={(event) => setMvpOpen(event.target.checked)}
-                          className="h-6 w-6"
+                          className="h-6 w-6 disabled:opacity-40"
                         />
                       </label>
                     </div>
@@ -2152,14 +2151,16 @@ export default function AdminFichasPartidoPage() {
                     <div className="mt-4 grid grid-cols-2 gap-3">
                       <button
                         onClick={marcarTodos}
-                        className="rounded-xl bg-slate-900 py-3 text-sm font-black text-white shadow"
+                        disabled={fichaBloqueada}
+                        className="rounded-xl bg-slate-900 py-3 text-sm font-black text-white shadow disabled:opacity-50"
                       >
                         Marcar todos
                       </button>
 
                       <button
                         onClick={limpiarJugadores}
-                        className="rounded-xl bg-slate-200 py-3 text-sm font-black text-slate-900 shadow"
+                        disabled={fichaBloqueada}
+                        className="rounded-xl bg-slate-200 py-3 text-sm font-black text-slate-900 shadow disabled:opacity-50"
                       >
                         Limpiar ficha
                       </button>
@@ -2201,7 +2202,7 @@ export default function AdminFichasPartidoPage() {
                                 <input
                                   type="checkbox"
                                   checked={row.played}
-                                  disabled={row.suspended}
+                                  disabled={row.suspended || fichaBloqueada}
                                   onChange={(event) =>
                                     actualizarJugo(
                                       row.player.id,
@@ -2235,7 +2236,7 @@ export default function AdminFichasPartidoPage() {
 
                                 <select
                                   value={row.goals}
-                                  disabled={row.suspended}
+                                  disabled={row.suspended || fichaBloqueada}
                                   onChange={(event) =>
                                     actualizarNumero(
                                       row.player.id,
@@ -2260,7 +2261,7 @@ export default function AdminFichasPartidoPage() {
 
                                 <select
                                   value={row.yellow}
-                                  disabled={row.suspended}
+                                  disabled={row.suspended || fichaBloqueada}
                                   onChange={(event) =>
                                     actualizarNumero(
                                       row.player.id,
@@ -2285,7 +2286,7 @@ export default function AdminFichasPartidoPage() {
 
                                 <select
                                   value={row.red}
-                                  disabled={row.suspended}
+                                  disabled={row.suspended || fichaBloqueada}
                                   onChange={(event) =>
                                     actualizarNumero(
                                       row.player.id,
@@ -2311,10 +2312,16 @@ export default function AdminFichasPartidoPage() {
 
                   <button
                     onClick={guardarFichaCompleta}
-                    disabled={saving}
+                    disabled={saving || fichaBloqueada}
                     className="w-full rounded-2xl bg-red-600 py-4 text-lg font-black text-white shadow-2xl disabled:opacity-60"
                   >
-                    {saving ? "Guardando ficha..." : "Guardar ficha y marcador"}
+                    {fichaBloqueada
+                      ? "Partido cerrado"
+                      : saving
+                      ? "Guardando ficha..."
+                      : estadoCerradoPartido(estado)
+                      ? "Cerrar partido y generar acta definitiva"
+                      : "Guardar ficha y marcador"}
                   </button>
                 </div>
               ) : (

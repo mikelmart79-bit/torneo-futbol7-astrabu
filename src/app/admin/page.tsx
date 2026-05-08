@@ -19,6 +19,11 @@ const principales: AdminLink[] = [
     variant: "primary",
   },
   {
+    href: "/admin/sanciones",
+    title: "Gestionar sanciones",
+    description: "Crear sanciones manuales, cumplirlas o reactivarlas.",
+  },
+  {
     href: "/admin/gestionar-partidos",
     title: "Configurar partidos",
     description: "Crear, editar o eliminar partidos de clasificación.",
@@ -107,7 +112,7 @@ export default function AdminPage() {
 
   return (
     <AdminGuard>
-      <main className="relative min-h-screen overflow-hidden bg-black text-slate-900">
+      <main className="relative min-h-screen overflow-x-hidden bg-black text-slate-900">
         <img
           src="/torneo-verano.png"
           alt="Fondo torneo"

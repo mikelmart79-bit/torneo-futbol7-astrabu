@@ -172,18 +172,5 @@ export default function AdminGuard({ children }: AdminGuardProps) {
     );
   }
 
-  return (
-    <>
-      <div className="fixed right-3 top-3 z-50">
-        <button
-          onClick={salir}
-          className="rounded-full bg-black/80 px-3 py-2 text-xs font-black text-white shadow backdrop-blur"
-        >
-          Salir admin
-        </button>
-      </div>
-
-      {children}
-    </>
-  );
+  return <>{children}</>;
 }

@@ -192,7 +192,8 @@ function partidosEquipoParaSancion(
 
   const partidosGrupo: SuspensionMatchRef[] = partidos
     .filter(
-      (match) => match.home_team?.id === teamId || match.away_team?.id === teamId
+      (match) =>
+        match.home_team?.id === teamId || match.away_team?.id === teamId
     )
     .map((match) => ({
       id: match.id,
@@ -939,6 +940,108 @@ export default function AdminFichasPartidoPage() {
     }
   }
 
+  async function crearSancionesPorAcumulacionAmarillas() {
+    if (!selectedId) return null;
+
+    const jugadoresRevisar = rows
+      .filter((row) => !row.suspended)
+      .map((row) => row.player);
+
+    if (jugadoresRevisar.length === 0) return null;
+
+    const playerIds = Array.from(
+      new Set(jugadoresRevisar.map((player) => player.id))
+    );
+
+    const { data: cardsData, error: cardsError } = await supabase
+      .from("match_cards")
+      .select("id, player_id, card_type")
+      .in("player_id", playerIds)
+      .eq("card_type", "yellow");
+
+    if (cardsError) {
+      console.error("Error revisando amarillas acumuladas:", cardsError);
+      return cardsError.message;
+    }
+
+    const { data: existingSuspensionsData, error: suspensionsError } =
+      await supabase
+        .from("suspensions")
+        .select("id, player_id, reason")
+        .in("player_id", playerIds)
+        .eq("reason", "Acumulación de amarillas");
+
+    if (suspensionsError) {
+      console.error("Error revisando sanciones acumuladas:", suspensionsError);
+      return suspensionsError.message;
+    }
+
+    const amarillas = (cardsData ?? []) as Array<{
+      id: string;
+      player_id: string;
+      card_type: string;
+    }>;
+
+    const sancionesExistentes = (existingSuspensionsData ?? []) as Array<{
+      id: string;
+      player_id: string;
+      reason: string;
+    }>;
+
+    const nuevasSanciones: Array<
+      MatchPayload & {
+        player_id: string;
+        team_id: string;
+        reason: string;
+        games: number;
+        served: number;
+        status: string;
+        created_at: string;
+      }
+    > = [];
+
+    jugadoresRevisar.forEach((player) => {
+      const totalAmarillas = amarillas.filter(
+        (card) => card.player_id === player.id
+      ).length;
+
+      const sancionesNecesarias = Math.floor(totalAmarillas / 2);
+
+      const sancionesYaCreadas = sancionesExistentes.filter(
+        (suspension) => suspension.player_id === player.id
+      ).length;
+
+      const sancionesPendientesDeCrear = Math.max(
+        sancionesNecesarias - sancionesYaCreadas,
+        0
+      );
+
+      for (let i = 0; i < sancionesPendientesDeCrear; i++) {
+        nuevasSanciones.push({
+          ...payloadPartido(matchType, selectedId),
+          player_id: player.id,
+          team_id: player.team_id,
+          reason: "Acumulación de amarillas",
+          games: 1,
+          served: 0,
+          status: "Activa",
+          created_at: new Date().toISOString(),
+        });
+      }
+    });
+
+    if (nuevasSanciones.length === 0) return null;
+
+    const { error } = await supabase.from("suspensions").insert(nuevasSanciones);
+
+    if (error) {
+      console.error("Error creando sanciones por acumulación:", error);
+      return error.message;
+    }
+
+    return null;
+  }
+
   async function guardarFichaCompleta() {
     if (!selectedId) {
       setMensaje("Selecciona un partido.");
@@ -1097,6 +1200,24 @@ export default function AdminFichasPartidoPage() {
       return;
     }
 
+    const deleteAutoYellowSuspensions = await supabase
+      .from("suspensions")
+      .delete()
+      .eq(columna, selectedId)
+      .eq("reason", "Acumulación de amarillas");
+
+    if (deleteAutoYellowSuspensions.error) {
+      console.error(
+        "Error borrando sanciones por acumulación:",
+        deleteAutoYellowSuspensions.error
+      );
+      setMensaje(
+        `No se han podido actualizar las sanciones por amarillas: ${deleteAutoYellowSuspensions.error.message}`
+      );
+      setSaving(false);
+      return;
+    }
+
     const filasJugadores = rows
       .filter(
         (row) =>
@@ -1201,6 +1322,16 @@ export default function AdminFichasPartidoPage() {
       }
     }
 
+    const errorAcumulacion = await crearSancionesPorAcumulacionAmarillas();
+
+    if (errorAcumulacion) {
+      setMensaje(
+        `Las tarjetas se guardaron, pero no se pudo revisar la acumulación de amarillas: ${errorAcumulacion}`
+      );
+      setSaving(false);
+      return;
+    }
+
     const filasSanciones = rows
       .filter((row) => !row.suspended && row.red > 0)
       .map((row) => ({
@@ -1211,6 +1342,7 @@ export default function AdminFichasPartidoPage() {
         games: 1,
         served: 0,
         status: "Activa",
+        created_at: new Date().toISOString(),
       }));
 
     if (filasSanciones.length > 0) {

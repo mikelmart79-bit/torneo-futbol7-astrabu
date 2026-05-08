@@ -321,15 +321,36 @@ export default function MvpPage() {
   }
 
   function renderPlayer(player: PlayerRow, index: number) {
+    const esPrimero = index === 0;
+
     return (
-      <div key={player.id} className="rounded-2xl bg-slate-50 p-4 shadow-sm">
+      <div
+        key={player.id}
+        className={`rounded-2xl p-4 shadow-sm ${
+          esPrimero
+            ? "border-2 border-yellow-400 bg-yellow-50"
+            : "bg-slate-50"
+        }`}
+      >
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-600 text-sm font-black text-white">
+            <div
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-black ${
+                esPrimero
+                  ? "bg-yellow-400 text-slate-950 shadow"
+                  : "bg-red-600 text-white"
+              }`}
+            >
               {index + 1}
             </div>
 
             <div className="min-w-0">
+              {esPrimero && (
+                <p className="mb-1 inline-flex rounded-full bg-yellow-400 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-950">
+                  Premio individual
+                </p>
+              )}
+
               <p className="break-words font-black leading-tight">
                 {player.name}
               </p>
@@ -341,7 +362,13 @@ export default function MvpPage() {
           </div>
 
           <div className="shrink-0 text-right">
-            <p className="text-2xl font-black text-red-600">{player.votes}</p>
+            <p
+              className={`text-2xl font-black ${
+                esPrimero ? "text-yellow-500" : "text-red-600"
+              }`}
+            >
+              {player.votes}
+            </p>
 
             <p className="text-xs font-bold text-slate-500">
               {player.percentage}%
@@ -351,7 +378,9 @@ export default function MvpPage() {
 
         <div className="mt-3 h-3 overflow-hidden rounded-full bg-slate-200">
           <div
-            className="h-full rounded-full bg-emerald-600"
+            className={`h-full rounded-full ${
+              esPrimero ? "bg-yellow-400" : "bg-emerald-600"
+            }`}
             style={{ width: `${player.percentage}%` }}
           />
         </div>

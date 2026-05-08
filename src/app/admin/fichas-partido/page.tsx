@@ -675,13 +675,15 @@ export default function AdminFichasPartidoPage() {
           eliminatoriasBase
         );
 
-        const partidosNoPuede = partidosEquipo
+        const partidosPendientesDeSancion = partidosEquipo
           .filter((match) => match.dateValue > origenValor)
-          .slice(0, restantes);
+          .slice(suspension.served, suspension.games);
 
-        const afectaEstePartido = partidosNoPuede.some(
+        const indicePartidoSancion = partidosPendientesDeSancion.findIndex(
           (match) => match.tipo === tipo && match.id === id
         );
+
+        const afectaEstePartido = indicePartidoSancion !== -1;
 
         if (afectaEstePartido) {
           return {
@@ -690,7 +692,10 @@ export default function AdminFichasPartidoPage() {
             games: suspension.games,
             served: suspension.served,
             restantes,
-            partidoActual: Math.min(suspension.served + 1, suspension.games),
+            partidoActual: Math.min(
+              suspension.served + indicePartidoSancion + 1,
+              suspension.games
+            ),
           };
         }
       }
@@ -1080,15 +1085,30 @@ export default function AdminFichasPartidoPage() {
 
     if (sancionadosFicha.length === 0) return null;
 
-    const columna = columnaPartido(matchType);
-
     for (const row of sancionadosFicha) {
-      const { data: alreadyServed, error: checkError } = await supabase
+      const servedPayload =
+        matchType === "grupo"
+          ? {
+              suspension_id: row.suspensionId,
+              match_id: selectedId,
+              final_match_id: null,
+            }
+          : {
+              suspension_id: row.suspensionId,
+              match_id: null,
+              final_match_id: selectedId,
+            };
+
+      const checkQuery = supabase
         .from("suspension_served_matches")
         .select("id")
         .eq("suspension_id", row.suspensionId)
-        .eq(columna, selectedId)
         .limit(1);
+
+      const { data: alreadyServed, error: checkError } =
+        matchType === "grupo"
+          ? await checkQuery.eq("match_id", selectedId)
+          : await checkQuery.eq("final_match_id", selectedId);
 
       if (checkError) {
         console.error("Error comprobando cumplimiento de sanción:", checkError);
@@ -1101,19 +1121,29 @@ export default function AdminFichasPartidoPage() {
 
       const { error: insertError } = await supabase
         .from("suspension_served_matches")
-        .insert({
-          suspension_id: row.suspensionId,
-          ...payloadPartido(matchType, selectedId),
-        });
+        .insert(servedPayload);
 
       if (insertError) {
         console.error("Error registrando partido cumplido:", insertError);
         return insertError.message;
       }
 
-      const nuevoServed = Math.min(row.suspensionServed + 1, row.suspensionGames);
-      const nuevoStatus =
-        nuevoServed >= row.suspensionGames ? "Cumplida" : "Activa";
+      const { data: suspensionActual, error: readError } = await supabase
+        .from("suspensions")
+        .select("games, served")
+        .eq("id", row.suspensionId)
+        .single();
+
+      if (readError || !suspensionActual) {
+        console.error("Error leyendo sanción actual:", readError);
+        return readError?.message ?? "No se ha podido leer la sanción.";
+      }
+
+      const gamesActuales = Number(suspensionActual.games ?? row.suspensionGames);
+      const servedActual = Number(suspensionActual.served ?? 0);
+
+      const nuevoServed = Math.min(servedActual + 1, gamesActuales);
+      const nuevoStatus = nuevoServed >= gamesActuales ? "Cumplida" : "Activa";
 
       const { error: updateError } = await supabase
         .from("suspensions")

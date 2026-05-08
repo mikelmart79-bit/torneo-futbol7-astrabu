@@ -477,7 +477,7 @@ export default function MvpPage() {
                     <p className="text-lg font-black">Votaciones abiertas</p>
 
                     <p className="text-sm font-bold text-red-100">
-                      Partidos disponibles para votar
+                      Partidos que te quedan por votar
                     </p>
                   </div>
 

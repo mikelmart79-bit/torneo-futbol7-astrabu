@@ -255,6 +255,22 @@ export default function MvpPage() {
 
   const totalVotes = votes.length;
 
+  const partidosPendientesVoto = useMemo(() => {
+    return openMatches.filter((match) => {
+      const yaHaVotado = votes.some((vote) => {
+        if (vote.user_id !== userId) return false;
+
+        if (match.tipo === "final") {
+          return vote.final_match_id === match.id;
+        }
+
+        return vote.match_id === match.id;
+      });
+
+      return !yaHaVotado;
+    });
+  }, [openMatches, votes, userId]);
+
   const ranking = useMemo(() => {
     const teamMap = new Map(teams.map((team) => [team.id, team.name]));
 
@@ -284,41 +300,6 @@ export default function MvpPage() {
   const rankingConVotos = ranking.filter((player) => player.votes > 0);
   const equipoIdeal = rankingConVotos.slice(0, 7);
   const restoJugadores = rankingConVotos.slice(7);
-
-  function votosUsuarioDelPartido(match: OpenMatch) {
-    return votes.filter((vote) => {
-      if (vote.user_id !== userId) return false;
-
-      if (match.tipo === "final") {
-        return vote.final_match_id === match.id;
-      }
-
-      return vote.match_id === match.id;
-    });
-  }
-
-  function votoEmitido(match: OpenMatch) {
-    return votosUsuarioDelPartido(match).length > 0;
-  }
-
-  function renderEstadoVoto(match: OpenMatch) {
-    if (votoEmitido(match)) {
-      return (
-        <div className="mt-3 rounded-xl bg-emerald-100 px-3 py-2 text-center text-sm font-black text-emerald-800">
-          ✅ Voto emitido
-        </div>
-      );
-    }
-
-    return (
-      <Link
-        href={`/votar-mvp?match=${match.id}&type=${match.tipo}`}
-        className="mt-3 block rounded-xl bg-red-600 px-3 py-2 text-center text-sm font-black text-white shadow"
-      >
-        Votar MVP
-      </Link>
-    );
-  }
 
   function renderPlayer(player: PlayerRow, index: number) {
     const esPrimero = index === 0;
@@ -428,7 +409,12 @@ export default function MvpPage() {
           {formatearFechaSegura(match.match_date)}
         </p>
 
-        {renderEstadoVoto(match)}
+        <Link
+          href={`/votar-mvp?match=${match.id}&type=${match.tipo}`}
+          className="mt-3 block rounded-xl bg-red-600 px-3 py-2 text-center text-sm font-black text-white shadow"
+        >
+          Votar MVP
+        </Link>
       </div>
     );
   }
@@ -471,12 +457,12 @@ export default function MvpPage() {
           </div>
         ) : (
           <>
-            <div className="mt-5 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
+            <div className="mt-5 rounded-3xl bg-white/95 p-5 text-center shadow-2xl backdrop-blur">
               <p className="text-sm font-black uppercase text-slate-500">
                 Votos totales del torneo
               </p>
 
-              <p className="mt-1 text-4xl font-black text-red-600">
+              <p className="mt-1 text-5xl font-black text-red-600">
                 {totalVotes}
               </p>
             </div>
@@ -485,12 +471,12 @@ export default function MvpPage() {
               <div className="overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
                 <button
                   onClick={() => setAbiertasAbierto(!abiertasAbierto)}
-                  className="flex w-full items-center justify-between bg-slate-950 px-5 py-4 text-left text-white"
+                  className="flex w-full items-center justify-between bg-red-600 px-5 py-4 text-left text-white"
                 >
                   <div>
                     <p className="text-lg font-black">Votaciones abiertas</p>
 
-                    <p className="text-sm font-bold opacity-80">
+                    <p className="text-sm font-bold text-red-100">
                       Partidos disponibles para votar
                     </p>
                   </div>
@@ -502,12 +488,14 @@ export default function MvpPage() {
 
                 {abiertasAbierto && (
                   <div className="space-y-3 p-4">
-                    {openMatches.length === 0 ? (
+                    {partidosPendientesVoto.length === 0 ? (
                       <p className="rounded-2xl bg-slate-50 p-4 font-bold text-slate-500">
-                        No hay votaciones MVP abiertas.
+                        No tienes votaciones pendientes.
                       </p>
                     ) : (
-                      openMatches.map((match) => renderPartidoAbierto(match))
+                      partidosPendientesVoto.map((match) =>
+                        renderPartidoAbierto(match)
+                      )
                     )}
                   </div>
                 )}
@@ -516,14 +504,14 @@ export default function MvpPage() {
               <div className="overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
                 <button
                   onClick={() => setIdealAbierto(!idealAbierto)}
-                  className="flex w-full items-center justify-between bg-red-600 px-5 py-4 text-left text-white"
+                  className="flex w-full items-center justify-between bg-yellow-400 px-5 py-4 text-left text-slate-950"
                 >
                   <div>
                     <p className="text-lg font-black">
                       Equipo ideal provisional
                     </p>
 
-                    <p className="text-sm font-bold opacity-90">
+                    <p className="text-sm font-black text-yellow-900">
                       Los 7 jugadores más votados
                     </p>
                   </div>
@@ -551,12 +539,12 @@ export default function MvpPage() {
               <div className="overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
                 <button
                   onClick={() => setRestoAbierto(!restoAbierto)}
-                  className="flex w-full items-center justify-between bg-slate-950 px-5 py-4 text-left text-white"
+                  className="flex w-full items-center justify-between bg-red-600 px-5 py-4 text-left text-white"
                 >
                   <div>
                     <p className="text-lg font-black">Resto de jugadores</p>
 
-                    <p className="text-sm font-bold opacity-80">
+                    <p className="text-sm font-bold text-red-100">
                       Ordenados por votos
                     </p>
                   </div>

@@ -74,9 +74,7 @@ function normalizarFase(fase: string) {
 
 function ordenarFases(matches: FinalMatch[]) {
   const fasesReales = Array.from(
-    new Set(
-      matches.map((match) => normalizarFase(match.phase)).filter(Boolean)
-    )
+    new Set(matches.map((match) => normalizarFase(match.phase)).filter(Boolean))
   );
 
   return fasesReales.sort((a, b) => {
@@ -141,8 +139,7 @@ export default function FaseFinalPage() {
 
   function votosUsuarioEnEliminatoria(finalMatchId: string) {
     return votes.filter(
-      (vote) =>
-        vote.final_match_id === finalMatchId && vote.user_id === userId
+      (vote) => vote.final_match_id === finalMatchId && vote.user_id === userId
     ).length;
   }
 
@@ -162,7 +159,7 @@ export default function FaseFinalPage() {
     return (
       <Link
         href={`/votar-mvp?match=${match.id}&type=final`}
-        className="mt-3 block rounded-xl bg-red-600 px-3 py-2 text-center text-sm font-black text-white shadow"
+        className="mt-3 block rounded-xl bg-red-700 px-3 py-2 text-center text-sm font-black text-white shadow"
       >
         Votar MVP de este partido
       </Link>
@@ -178,14 +175,14 @@ export default function FaseFinalPage() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-black text-slate-900">
+    <main className="relative min-h-screen overflow-x-hidden bg-black text-slate-900">
       <img
         src="/torneo-verano.png"
         alt="Fondo torneo"
         className="fixed inset-0 h-screen w-screen object-cover opacity-35 blur-sm"
       />
 
-      <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-24">
+      <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-36">
         <div className="rounded-3xl bg-black/60 px-4 py-5 text-white shadow-2xl backdrop-blur">
           <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
             Torneo Fútbol 7 Astrabudua
@@ -233,9 +230,7 @@ export default function FaseFinalPage() {
                 <div
                   key={fase}
                   className={`overflow-hidden rounded-3xl shadow-2xl backdrop-blur ${
-                    esFinal
-                      ? "bg-amber-100/95 ring-2 ring-amber-300"
-                      : "bg-white/95 ring-1 ring-slate-200"
+                    esFinal ? "bg-amber-100/95" : "bg-slate-950/90"
                   }`}
                 >
                   <button
@@ -243,22 +238,12 @@ export default function FaseFinalPage() {
                     className={`flex w-full items-center justify-between gap-3 px-5 py-4 text-left ${
                       esFinal
                         ? "bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 text-slate-950"
-                        : "bg-red-600 text-white"
+                        : "bg-slate-950 text-white"
                     }`}
                   >
-                    <div className="min-w-0">
-                      <p className="break-words text-xl font-black leading-tight">
-                        {esFinal ? "🏆 Final" : fase}
-                      </p>
-
-                      <p
-                        className={`mt-1 text-xs font-black uppercase tracking-widest ${
-                          esFinal ? "text-slate-700" : "text-red-100"
-                        }`}
-                      >
-                        {cruces.length} partido{cruces.length === 1 ? "" : "s"}
-                      </p>
-                    </div>
+                    <p className="break-words text-xl font-black leading-tight">
+                      {esFinal ? "🏆 Final" : fase}
+                    </p>
 
                     <span className="shrink-0 text-2xl font-black">
                       {abierta ? "−" : "+"}
@@ -266,9 +251,13 @@ export default function FaseFinalPage() {
                   </button>
 
                   {abierta && (
-                    <div className="space-y-3 p-3">
+                    <div
+                      className={`space-y-3 p-3 ${
+                        esFinal ? "bg-amber-50" : "bg-slate-100"
+                      }`}
+                    >
                       {cruces.length === 0 ? (
-                        <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">
+                        <p className="rounded-2xl bg-white p-4 text-sm font-bold text-slate-500">
                           Todavía no hay cruces configurados.
                         </p>
                       ) : (
@@ -290,8 +279,8 @@ export default function FaseFinalPage() {
                               key={match.id}
                               className={`rounded-2xl p-3 shadow ${
                                 esFinal
-                                  ? "bg-amber-50 ring-1 ring-amber-200"
-                                  : "bg-slate-50 ring-1 ring-slate-200"
+                                  ? "bg-white ring-1 ring-amber-200"
+                                  : "bg-white"
                               }`}
                             >
                               <div className="flex items-center justify-between gap-3">
@@ -299,7 +288,7 @@ export default function FaseFinalPage() {
                                   className={`break-words text-xs font-black uppercase tracking-wide ${
                                     esFinal
                                       ? "text-amber-700"
-                                      : "text-red-600"
+                                      : "text-slate-500"
                                   }`}
                                 >
                                   {match.title}
@@ -316,7 +305,7 @@ export default function FaseFinalPage() {
                                 </span>
                               </div>
 
-                              <div className="mt-3 rounded-2xl bg-white p-3 shadow-sm">
+                              <div className="mt-3 rounded-2xl bg-slate-50 p-3 shadow-sm">
                                 <div className="grid grid-cols-[1fr_52px] items-center gap-3">
                                   <p className="break-words text-base font-black leading-tight">
                                     {match.home_ref}

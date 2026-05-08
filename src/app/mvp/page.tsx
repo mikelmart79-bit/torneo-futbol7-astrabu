@@ -473,7 +473,7 @@ export default function MvpPage() {
           <>
             <div className="mt-5 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
               <p className="text-sm font-black uppercase text-slate-500">
-                Votos totales
+                Votos totales del torneo
               </p>
 
               <p className="mt-1 text-4xl font-black text-red-600">

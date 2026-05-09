@@ -610,9 +610,7 @@ export default function CalendarioPage() {
 
                                 {estadoPermiteVerActa(match.status) ? (
                                   <Link
-                                    href={`/admin/acta-partido?match=${
-                                      match.id
-                                    }&type=${tipoActa(match)}`}
+                                    href={`/acta-partido?match=${match.id}&type=${tipoActa(match)}`}
                                     className="rounded-xl bg-slate-950 px-4 py-3 text-center text-xs font-black uppercase text-white shadow"
                                   >
                                     Ver acta

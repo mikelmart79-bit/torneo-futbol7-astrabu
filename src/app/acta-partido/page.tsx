@@ -1,8 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { useRouter,useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 type MatchType = "grupo" | "final";
@@ -599,11 +598,11 @@ function ActaPartidoContent() {
             {mensaje || "No se ha podido cargar el acta."}
           </div>
 
-          <Link
+          <button
             onClick={() => router.back()}
-            className="mt-4 block rounded-2xl bg-white/95 p-4 text-center font-black text-slate-900 shadow"
+            className="mt-4 block w-full rounded-2xl bg-white/95 p-4 text-center font-black text-slate-900 shadow"
           >
-            Volver 
+            Volver
           </button>
         </section>
       </main>
@@ -627,11 +626,11 @@ function ActaPartidoContent() {
 
       <section className="relative z-10 mx-auto max-w-3xl px-4 py-6 pb-24 print:max-w-none print:px-0 print:py-0">
         <div className="mb-4 grid grid-cols-2 gap-3 print:hidden">
-          <Link
+          <button
             onClick={() => router.back()}
             className="rounded-2xl bg-white/95 p-4 text-center font-black text-slate-900 shadow"
           >
-            Volver 
+            Volver
           </button>
 
           <button
@@ -983,8 +982,8 @@ function ActaPartidoContent() {
 
 export default function ActaPartidoPage() {
   return (
-      <Suspense fallback={<LoadingActa />}>
-        <ActaPartidoContent />
-      </Suspense>
+    <Suspense fallback={<LoadingActa />}>
+      <ActaPartidoContent />
+    </Suspense>
   );
 }

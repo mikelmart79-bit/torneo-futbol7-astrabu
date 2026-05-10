@@ -334,7 +334,7 @@ export default function AdminFaseFinalPage() {
     }
 
     setMensaje("Eliminatoria guardada correctamente.");
-    await cargarCruces(data?.id ?? selectedId || undefined);
+    await cargarCruces(data?.id ?? selectedId ?? undefined);
     setSaving(false);
   }
 

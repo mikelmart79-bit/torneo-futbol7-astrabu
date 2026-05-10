@@ -627,7 +627,7 @@ function ActaPartidoContent() {
         className="fixed inset-0 h-screen w-screen object-cover opacity-35 blur-sm print:hidden"
       />
 
-      <section className="relative z-10 mx-auto max-w-3xl px-4 py-6 pb-8 print:max-w-none print:px-0 print:py-0">
+      <section className="relative z-10 mx-auto max-w-3xl px-4 py-6 pb-32 print:max-w-none print:px-0 print:py-0">
         <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 print:hidden">
           <button
             onClick={() => router.back()}

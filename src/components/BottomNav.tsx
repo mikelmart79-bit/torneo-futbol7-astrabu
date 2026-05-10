@@ -35,19 +35,12 @@ const items = [
 export default function BottomNav() {
   const pathname = usePathname();
 
-  const ocultarBottomNav =
-    pathname.startsWith("/acta-partido") ||
-    pathname.startsWith("/admin/acta-partido");
-
-  if (ocultarBottomNav) {
-    return null;
-  }
-
   return (
-    <nav className="fixed bottom-0 left-0 z-50 w-full border-t border-white/20 bg-white shadow-2xl">
+    <nav className="fixed bottom-0 left-0 z-[9999] w-full border-t border-white/20 bg-white shadow-2xl print:hidden">
       <div className="mx-auto grid max-w-md grid-cols-5">
         {items.map((item) => {
           const Icon = item.icon;
+
           const active =
             item.href === "/inicio"
               ? pathname === "/inicio" || pathname === "/"

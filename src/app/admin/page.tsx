@@ -18,8 +18,14 @@ type BackupData = {
   tables: Record<string, Array<Record<string, unknown>>>;
 };
 
-type FinalMatchMaintenance = {
+type FinalMatchResetRow = {
   id: string;
+  phase: string | null;
+  title: string;
+  sort_order: number;
+};
+
+type FinalBaseRef = {
   home_ref: string;
   away_ref: string;
   home_source_type: string | null;
@@ -106,6 +112,145 @@ const RESTORE_INSERT_ORDER = [
   "rules",
 ];
 
+const OCTAVOS_BASE_REFS: FinalBaseRef[] = [
+  {
+    home_ref: "1º Clasificación",
+    away_ref: "16º Clasificación",
+    home_source_type: null,
+    home_source_match_title: null,
+    away_source_type: null,
+    away_source_match_title: null,
+  },
+  {
+    home_ref: "8º Clasificación",
+    away_ref: "9º Clasificación",
+    home_source_type: null,
+    home_source_match_title: null,
+    away_source_type: null,
+    away_source_match_title: null,
+  },
+  {
+    home_ref: "5º Clasificación",
+    away_ref: "12º Clasificación",
+    home_source_type: null,
+    home_source_match_title: null,
+    away_source_type: null,
+    away_source_match_title: null,
+  },
+  {
+    home_ref: "4º Clasificación",
+    away_ref: "13º Clasificación",
+    home_source_type: null,
+    home_source_match_title: null,
+    away_source_type: null,
+    away_source_match_title: null,
+  },
+  {
+    home_ref: "3º Clasificación",
+    away_ref: "14º Clasificación",
+    home_source_type: null,
+    home_source_match_title: null,
+    away_source_type: null,
+    away_source_match_title: null,
+  },
+  {
+    home_ref: "6º Clasificación",
+    away_ref: "11º Clasificación",
+    home_source_type: null,
+    home_source_match_title: null,
+    away_source_type: null,
+    away_source_match_title: null,
+  },
+  {
+    home_ref: "7º Clasificación",
+    away_ref: "10º Clasificación",
+    home_source_type: null,
+    home_source_match_title: null,
+    away_source_type: null,
+    away_source_match_title: null,
+  },
+  {
+    home_ref: "2º Clasificación",
+    away_ref: "15º Clasificación",
+    home_source_type: null,
+    home_source_match_title: null,
+    away_source_type: null,
+    away_source_match_title: null,
+  },
+];
+
+const CUARTOS_BASE_REFS: FinalBaseRef[] = [
+  {
+    home_ref: "Ganador Octavo 1",
+    away_ref: "Ganador Octavo 2",
+    home_source_type: "winner",
+    home_source_match_title: "Octavo 1",
+    away_source_type: "winner",
+    away_source_match_title: "Octavo 2",
+  },
+  {
+    home_ref: "Ganador Octavo 3",
+    away_ref: "Ganador Octavo 4",
+    home_source_type: "winner",
+    home_source_match_title: "Octavo 3",
+    away_source_type: "winner",
+    away_source_match_title: "Octavo 4",
+  },
+  {
+    home_ref: "Ganador Octavo 5",
+    away_ref: "Ganador Octavo 6",
+    home_source_type: "winner",
+    home_source_match_title: "Octavo 5",
+    away_source_type: "winner",
+    away_source_match_title: "Octavo 6",
+  },
+  {
+    home_ref: "Ganador Octavo 7",
+    away_ref: "Ganador Octavo 8",
+    home_source_type: "winner",
+    home_source_match_title: "Octavo 7",
+    away_source_type: "winner",
+    away_source_match_title: "Octavo 8",
+  },
+];
+
+const SEMIS_BASE_REFS: FinalBaseRef[] = [
+  {
+    home_ref: "Ganador Cuarto 1",
+    away_ref: "Ganador Cuarto 2",
+    home_source_type: "winner",
+    home_source_match_title: "Cuarto 1",
+    away_source_type: "winner",
+    away_source_match_title: "Cuarto 2",
+  },
+  {
+    home_ref: "Ganador Cuarto 3",
+    away_ref: "Ganador Cuarto 4",
+    home_source_type: "winner",
+    home_source_match_title: "Cuarto 3",
+    away_source_type: "winner",
+    away_source_match_title: "Cuarto 4",
+  },
+];
+
+const TERCER_PUESTO_BASE_REF: FinalBaseRef = {
+  home_ref: "Perdedor Semifinal 1",
+  away_ref: "Perdedor Semifinal 2",
+  home_source_type: "loser",
+  home_source_match_title: "Semifinal 1",
+  away_source_type: "loser",
+  away_source_match_title: "Semifinal 2",
+};
+
+const FINAL_BASE_REF: FinalBaseRef = {
+  home_ref: "Ganador Semifinal 1",
+  away_ref: "Ganador Semifinal 2",
+  home_source_type: "winner",
+  home_source_match_title: "Semifinal 1",
+  away_source_type: "winner",
+  away_source_match_title: "Semifinal 2",
+};
+
 function AdminCard({ item }: { item: AdminLink }) {
   const principal = item.variant === "primary";
 
@@ -161,31 +306,7 @@ function normalizarTexto(texto: string | null | undefined) {
   return (texto ?? "").trim().toLowerCase();
 }
 
-function referenciaOriginalEliminatoria(
-  sourceType: string | null,
-  sourceMatchTitle: string | null,
-  valorActual: string,
-) {
-  const tipo = normalizarTexto(sourceType);
-  const titulo = (sourceMatchTitle ?? "").trim();
-
-  if (!titulo) return valorActual;
-
-  if (tipo === "winner" || tipo === "ganador") {
-    return `Ganador ${titulo}`;
-  }
-
-  if (tipo === "loser" || tipo === "perdedor") {
-    return `Perdedor ${titulo}`;
-  }
-
-  return valorActual;
-}
-
-async function comprobarError(
-  resultado: PromiseLike<{ error: { message: string } | null }>,
-  accion: string,
-) {
+async function comprobarError(resultado: any, accion: string) {
   const { error } = await resultado;
 
   if (error) {
@@ -328,6 +449,114 @@ export default function AdminPage() {
     );
   }
 
+  async function resetearEliminatoriasSinBorrarCruces() {
+    const db = supabase as any;
+
+    await limpiarDatosEliminatorias();
+
+    const { data, error } = await db
+      .from("final_matches")
+      .select("id, phase, title, sort_order")
+      .order("sort_order", { ascending: true });
+
+    if (error) {
+      throw new Error(`Leyendo eliminatorias: ${error.message}`);
+    }
+
+    const cruces = ((data ?? []) as FinalMatchResetRow[]).sort(
+      (a, b) => a.sort_order - b.sort_order,
+    );
+
+    const octavos = cruces.filter(
+      (match) =>
+        normalizarTexto(match.phase).includes("octavo") ||
+        normalizarTexto(match.title).includes("octavo"),
+    );
+
+    const cuartos = cruces.filter(
+      (match) =>
+        normalizarTexto(match.phase).includes("cuarto") &&
+        !normalizarTexto(match.title).includes("tercer"),
+    );
+
+    const semifinales = cruces.filter(
+      (match) =>
+        normalizarTexto(match.phase).includes("semi") ||
+        normalizarTexto(match.title).includes("semifinal"),
+    );
+
+    const tercerPuesto = cruces.find(
+      (match) =>
+        normalizarTexto(match.phase).includes("tercer") ||
+        normalizarTexto(match.title).includes("tercer"),
+    );
+
+    const final = cruces.find(
+      (match) =>
+        normalizarTexto(match.phase) === "final" &&
+        !normalizarTexto(match.title).includes("tercer"),
+    );
+
+    async function actualizarCruce(
+      match: FinalMatchResetRow,
+      base: FinalBaseRef,
+    ) {
+      await comprobarError(
+        db
+          .from("final_matches")
+          .update({
+            home_ref: base.home_ref,
+            away_ref: base.away_ref,
+            home_source_type: base.home_source_type,
+            home_source_match_title: base.home_source_match_title,
+            away_source_type: base.away_source_type,
+            away_source_match_title: base.away_source_match_title,
+            home_score: null,
+            away_score: null,
+            home_penalties: null,
+            away_penalties: null,
+            status: "Pendiente",
+            mvp_open: false,
+            incidents: null,
+          })
+          .eq("id", match.id),
+        `Reseteando ${match.title}`,
+      );
+    }
+
+    for (let index = 0; index < octavos.length; index++) {
+      const base = OCTAVOS_BASE_REFS[index];
+
+      if (base) {
+        await actualizarCruce(octavos[index], base);
+      }
+    }
+
+    for (let index = 0; index < cuartos.length; index++) {
+      const base = CUARTOS_BASE_REFS[index];
+
+      if (base) {
+        await actualizarCruce(cuartos[index], base);
+      }
+    }
+
+    for (let index = 0; index < semifinales.length; index++) {
+      const base = SEMIS_BASE_REFS[index];
+
+      if (base) {
+        await actualizarCruce(semifinales[index], base);
+      }
+    }
+
+    if (tercerPuesto) {
+      await actualizarCruce(tercerPuesto, TERCER_PUESTO_BASE_REF);
+    }
+
+    if (final) {
+      await actualizarCruce(final, FINAL_BASE_REF);
+    }
+  }
+
   async function borrarResultadosClasificacion() {
     const db = supabase as any;
 
@@ -346,65 +575,12 @@ export default function AdminPage() {
         .neq("id", "00000000-0000-0000-0000-000000000000"),
       "Quitando resultados de clasificación",
     );
+
+    await resetearEliminatoriasSinBorrarCruces();
   }
 
   async function borrarResultadosEliminatorias() {
-    const db = supabase as any;
-
-    await limpiarDatosEliminatorias();
-
-    const { data, error } = await db
-      .from("final_matches")
-      .select(
-        `
-        id,
-        home_ref,
-        away_ref,
-        home_source_type,
-        home_source_match_title,
-        away_source_type,
-        away_source_match_title
-      `,
-      )
-      .order("sort_order", { ascending: true });
-
-    if (error) {
-      throw new Error(`Leyendo eliminatorias: ${error.message}`);
-    }
-
-    const eliminatorias = (data ?? []) as FinalMatchMaintenance[];
-
-    for (const eliminatoria of eliminatorias) {
-      const homeRefOriginal = referenciaOriginalEliminatoria(
-        eliminatoria.home_source_type,
-        eliminatoria.home_source_match_title,
-        eliminatoria.home_ref,
-      );
-
-      const awayRefOriginal = referenciaOriginalEliminatoria(
-        eliminatoria.away_source_type,
-        eliminatoria.away_source_match_title,
-        eliminatoria.away_ref,
-      );
-
-      await comprobarError(
-        db
-          .from("final_matches")
-          .update({
-            home_ref: homeRefOriginal,
-            away_ref: awayRefOriginal,
-            home_score: null,
-            away_score: null,
-            home_penalties: null,
-            away_penalties: null,
-            status: "Pendiente",
-            mvp_open: false,
-            incidents: null,
-          })
-          .eq("id", eliminatoria.id),
-        `Quitando resultado de ${eliminatoria.id}`,
-      );
-    }
+    await resetearEliminatoriasSinBorrarCruces();
   }
 
   async function borrarActasYFichas() {
@@ -881,7 +1057,7 @@ export default function AdminPage() {
                     onClick={() =>
                       ejecutarOperacion(
                         "Quitar resultados de clasificación",
-                        "Se pondrán a cero los marcadores, estados, MVP, incidencias, fichas, goles, tarjetas, sanciones y votos de los partidos de clasificación. No se eliminará el calendario.",
+                        "Se pondrán a cero los marcadores, estados, MVP, incidencias, fichas, goles, tarjetas, sanciones y votos de los partidos de clasificación. También se restaurarán las eliminatorias a referencias iniciales.",
                         borrarResultadosClasificacion,
                       )
                     }
@@ -895,7 +1071,7 @@ export default function AdminPage() {
                     onClick={() =>
                       ejecutarOperacion(
                         "Quitar resultados de eliminatorias",
-                        "Se pondrán a cero los marcadores, penaltis, estados, MVP, incidencias, fichas, goles, tarjetas, sanciones y votos de eliminatorias. No se eliminarán los cruces.",
+                        "Se pondrán a cero los marcadores, penaltis, estados, MVP, incidencias, fichas, goles, tarjetas, sanciones y votos de eliminatorias. También se restaurarán los cruces a referencias iniciales.",
                         borrarResultadosEliminatorias,
                       )
                     }

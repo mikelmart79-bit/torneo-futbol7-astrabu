@@ -578,12 +578,6 @@ export default function AdminPage() {
                   partes.
                 </p>
 
-                <p className="mt-2 text-xs font-bold text-red-700">
-                  Las actas no se guardan como PDF: se generan al vuelo desde
-                  fichas, goles, tarjetas, incidencias y sanciones. Por eso
-                  “borrar actas” limpia esos datos asociados.
-                </p>
-
                 {mensajeMantenimiento && (
                   <div
                     className={`mt-4 rounded-xl p-3 text-sm font-bold ${

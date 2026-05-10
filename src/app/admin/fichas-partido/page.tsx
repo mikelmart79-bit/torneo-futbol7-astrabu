@@ -172,6 +172,139 @@ function normalizarTexto(texto: string | null | undefined) {
   return (texto ?? "").trim().toLowerCase();
 }
 
+function buscarEquipoPorNombre(
+  equipos: Team[],
+  nombre: string | null | undefined,
+): TeamRef | null {
+  const equipo = equipos.find(
+    (team) => normalizarTexto(team.name) === normalizarTexto(nombre),
+  );
+
+  return equipo ? { id: equipo.id, name: equipo.name } : null;
+}
+
+function tipoReferenciaEliminatoria(
+  sourceType: string | null | undefined,
+  referencia: string | null | undefined,
+): "winner" | "loser" | null {
+  const tipo = normalizarTexto(sourceType);
+  const ref = normalizarTexto(referencia);
+
+  if (tipo === "winner" || tipo === "ganador") return "winner";
+  if (tipo === "loser" || tipo === "perdedor") return "loser";
+
+  if (ref.startsWith("ganador ")) return "winner";
+  if (ref.startsWith("perdedor ")) return "loser";
+
+  return null;
+}
+
+function tituloReferenciaEliminatoria(
+  sourceMatchTitle: string | null | undefined,
+  referencia: string | null | undefined,
+) {
+  if (sourceMatchTitle && sourceMatchTitle.trim() !== "") {
+    return sourceMatchTitle.trim();
+  }
+
+  const ref = (referencia ?? "").trim();
+
+  const ganador = ref.match(/^ganador\s+(.+)$/i);
+  if (ganador?.[1]) return ganador[1].trim();
+
+  const perdedor = ref.match(/^perdedor\s+(.+)$/i);
+  if (perdedor?.[1]) return perdedor[1].trim();
+
+  return "";
+}
+
+function resolverEquipoDesdeReferencia(
+  referencia: string | null | undefined,
+  sourceType: string | null | undefined,
+  sourceMatchTitle: string | null | undefined,
+  equipos: Team[],
+  eliminatorias: FinalMatch[],
+  visitados = new Set<string>(),
+): TeamRef | null {
+  const directo = buscarEquipoPorNombre(equipos, referencia);
+
+  if (directo) return directo;
+
+  const tipo = tipoReferenciaEliminatoria(sourceType, referencia);
+  const tituloOrigen = tituloReferenciaEliminatoria(
+    sourceMatchTitle,
+    referencia,
+  );
+
+  if (!tipo || !tituloOrigen) return null;
+
+  const origen = eliminatorias.find(
+    (match) => normalizarTexto(match.title) === normalizarTexto(tituloOrigen),
+  );
+
+  if (!origen) return null;
+  if (visitados.has(origen.id)) return null;
+
+  visitados.add(origen.id);
+
+  if (origen.home_score === null || origen.away_score === null) {
+    return null;
+  }
+
+  let ganaLocal: boolean | null = null;
+
+  if (origen.home_score > origen.away_score) {
+    ganaLocal = true;
+  } else if (origen.home_score < origen.away_score) {
+    ganaLocal = false;
+  } else if (
+    origen.home_penalties !== null &&
+    origen.away_penalties !== null &&
+    origen.home_penalties !== origen.away_penalties
+  ) {
+    ganaLocal = origen.home_penalties > origen.away_penalties;
+  }
+
+  if (ganaLocal === null) return null;
+
+  const usarLocal = tipo === "winner" ? ganaLocal : !ganaLocal;
+
+  const siguienteReferencia = usarLocal ? origen.home_ref : origen.away_ref;
+  const siguienteSourceType = usarLocal
+    ? origen.home_source_type
+    : origen.away_source_type;
+  const siguienteSourceMatchTitle = usarLocal
+    ? origen.home_source_match_title
+    : origen.away_source_match_title;
+
+  return resolverEquipoDesdeReferencia(
+    siguienteReferencia,
+    siguienteSourceType,
+    siguienteSourceMatchTitle,
+    equipos,
+    eliminatorias,
+    visitados,
+  );
+}
+
+function nombreResueltoOReferencia(
+  referencia: string,
+  sourceType: string | null | undefined,
+  sourceMatchTitle: string | null | undefined,
+  equipos: Team[],
+  eliminatorias: FinalMatch[],
+) {
+  return (
+    resolverEquipoDesdeReferencia(
+      referencia,
+      sourceType,
+      sourceMatchTitle,
+      equipos,
+      eliminatorias,
+    )?.name ?? referencia
+  );
+}
+
 function estadoPendiente(status: string | null | undefined) {
   const limpio = normalizarTexto(status);
 
@@ -286,11 +419,30 @@ function partidosEquipoParaSancion(
     }));
 
   const partidosFinales: SuspensionMatchRef[] = eliminatorias
-    .filter(
-      (match) =>
+    .filter((match) => {
+      const local = resolverEquipoDesdeReferencia(
+        match.home_ref,
+        match.home_source_type,
+        match.home_source_match_title,
+        [{ id: teamId, name: teamName, group_name: null }],
+        eliminatorias,
+      );
+
+      const visitante = resolverEquipoDesdeReferencia(
+        match.away_ref,
+        match.away_source_type,
+        match.away_source_match_title,
+        [{ id: teamId, name: teamName, group_name: null }],
+        eliminatorias,
+      );
+
+      return (
+        local?.id === teamId ||
+        visitante?.id === teamId ||
         normalizarTexto(match.home_ref) === nombreNormalizado ||
-        normalizarTexto(match.away_ref) === nombreNormalizado,
-    )
+        normalizarTexto(match.away_ref) === nombreNormalizado
+      );
+    })
     .map((match) => ({
       id: match.id,
       tipo: "final" as MatchType,
@@ -644,31 +796,40 @@ export default function AdminFichasPartidoPage() {
       };
     }
 
-    const local = equipos.find(
-      (team) =>
-        normalizarTexto(team.name) === normalizarTexto(eliminatoria.home_ref),
+    const local = resolverEquipoDesdeReferencia(
+      eliminatoria.home_ref,
+      eliminatoria.home_source_type,
+      eliminatoria.home_source_match_title,
+      equipos,
+      eliminatorias,
     );
 
-    const visitante = equipos.find(
-      (team) =>
-        normalizarTexto(team.name) === normalizarTexto(eliminatoria.away_ref),
+    const visitante = resolverEquipoDesdeReferencia(
+      eliminatoria.away_ref,
+      eliminatoria.away_source_type,
+      eliminatoria.away_source_match_title,
+      equipos,
+      eliminatorias,
     );
+
+    const nombreLocal = local?.name ?? eliminatoria.home_ref;
+    const nombreVisitante = visitante?.name ?? eliminatoria.away_ref;
 
     const aviso =
       !local || !visitante
-        ? "Esta eliminatoria todavía no tiene los dos equipos resueltos. Cuando aparezcan los nombres reales, podrás completar la ficha."
+        ? "Esta eliminatoria todavía no tiene los dos equipos resueltos. Cuando se guarden los resultados de las eliminatorias anteriores, se cargarán automáticamente los equipos reales."
         : "";
 
     return {
-      titulo: `${eliminatoria.home_ref} vs ${eliminatoria.away_ref}`,
+      titulo: `${nombreLocal} vs ${nombreVisitante}`,
       subtitulo: `${eliminatoria.phase} · ${
         eliminatoria.title
       } · ${formatearFechaSegura(eliminatoria.match_date)} · ${
         eliminatoria.match_time ?? "Hora pendiente"
       } · ${eliminatoria.field ?? "Campo pendiente"}`,
       aviso,
-      local: local ? { id: local.id, name: local.name } : null,
-      visitante: visitante ? { id: visitante.id, name: visitante.name } : null,
+      local,
+      visitante,
       estadoFicha: eliminatoria.status ?? "Pendiente",
       mvpFicha: Boolean(eliminatoria.mvp_open),
       scoreLocal: eliminatoria.home_score?.toString() ?? "",
@@ -1068,14 +1229,28 @@ export default function AdminFichasPartidoPage() {
         match_date: match.match_date as string,
         match_time: match.match_time,
         field: match.field,
-        home_name: match.home_ref || "Local",
-        away_name: match.away_ref || "Visitante",
+        home_name:
+          nombreResueltoOReferencia(
+            match.home_ref,
+            match.home_source_type,
+            match.home_source_match_title,
+            teams,
+            finalMatches,
+          ) || "Local",
+        away_name:
+          nombreResueltoOReferencia(
+            match.away_ref,
+            match.away_source_type,
+            match.away_source_match_title,
+            teams,
+            finalMatches,
+          ) || "Visitante",
         status: match.status,
         sort_order: match.sort_order,
       }));
 
     return ordenarCalendario([...partidosGrupo, ...partidosFinales]);
-  }, [groupMatches, finalMatches]);
+  }, [groupMatches, finalMatches, teams]);
 
   const matchesByDate = useMemo(() => {
     const grouped: Record<string, AdminCalendarMatch[]> = {};
@@ -2175,7 +2350,9 @@ export default function AdminFichasPartidoPage() {
 
                                 <div className="mt-3 grid grid-cols-2 gap-3">
                                   <button
-                                    onClick={() => scrollToElement("ficha-edicion")}
+                                    onClick={() =>
+                                      scrollToElement("ficha-edicion")
+                                    }
                                     disabled={cerrado}
                                     className={`rounded-xl py-3 text-sm font-black shadow ${
                                       cerrado

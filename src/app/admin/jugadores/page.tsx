@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import AdminGuard from "@/components/AdminGuard";
 import { supabase } from "@/lib/supabase";
 
-type PlayerType = "M" | "F";
+type PlayerType = "M" | "F" | "-";
 
 type Team = {
   id: string;
@@ -30,7 +30,7 @@ export default function AdminJugadoresPage() {
 
   const [nombre, setNombre] = useState("");
   const [dorsal, setDorsal] = useState("");
-  const [tipoJugador, setTipoJugador] = useState<PlayerType>("M");
+  const [tipoJugador, setTipoJugador] = useState<PlayerType>("-");
 
   const [mensaje, setMensaje] = useState("");
   const [loading, setLoading] = useState(true);
@@ -39,6 +39,7 @@ export default function AdminJugadoresPage() {
 
   useEffect(() => {
     cargarDatos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function cargarDatos(mantenerTeamId?: string) {
@@ -95,7 +96,7 @@ export default function AdminJugadoresPage() {
     setPlayerId("");
     setNombre("");
     setDorsal("");
-    setTipoJugador("M");
+    setTipoJugador("-");
     setMensaje("");
 
     if (id) {
@@ -105,11 +106,16 @@ export default function AdminJugadoresPage() {
     }
   }
 
+  function normalizarTipoJugador(tipo: PlayerType | null | undefined): PlayerType {
+    if (tipo === "M" || tipo === "F" || tipo === "-") return tipo;
+    return "-";
+  }
+
   function seleccionarJugador(player: Player) {
     setPlayerId(player.id);
     setNombre(player.name);
     setDorsal(player.number.toString());
-    setTipoJugador(player.player_type === "F" ? "F" : "M");
+    setTipoJugador(normalizarTipoJugador(player.player_type));
     setMensaje("");
   }
 
@@ -117,7 +123,7 @@ export default function AdminJugadoresPage() {
     setPlayerId("");
     setNombre("");
     setDorsal("");
-    setTipoJugador("M");
+    setTipoJugador("-");
     setMensaje("");
   }
 
@@ -240,7 +246,9 @@ export default function AdminJugadoresPage() {
   async function eliminarJugador() {
     if (!playerId) return;
 
-    const jugadorActual = jugadoresEquipo.find((player) => player.id === playerId);
+    const jugadorActual = jugadoresEquipo.find(
+      (player) => player.id === playerId
+    );
 
     if (!jugadorActual) {
       setMensaje("No se ha encontrado el jugador seleccionado.");
@@ -275,7 +283,14 @@ export default function AdminJugadoresPage() {
   }
 
   function textoTipo(tipo: PlayerType | null) {
-    return tipo === "F" ? "Federado" : "Municipio";
+    if (tipo === "M") return "Municipio";
+    if (tipo === "F") return "Federado";
+    return "Sin tipo";
+  }
+
+  function letraTipo(tipo: PlayerType | null) {
+    if (tipo === "M" || tipo === "F") return tipo;
+    return "-";
   }
 
   const mensajeCorrecto =
@@ -394,7 +409,7 @@ export default function AdminJugadoresPage() {
                                   : "text-slate-500"
                               }`}
                             >
-                              {player.player_type === "F" ? "F" : "M"} ·{" "}
+                              {letraTipo(player.player_type)} ·{" "}
                               {textoTipo(player.player_type)}
                             </p>
                           </div>
@@ -452,6 +467,7 @@ export default function AdminJugadoresPage() {
                 }
                 className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
               >
+                <option value="-">- · Sin tipo</option>
                 <option value="M">M · Municipio</option>
                 <option value="F">F · Federado</option>
               </select>

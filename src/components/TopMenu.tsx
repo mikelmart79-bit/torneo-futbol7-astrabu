@@ -34,7 +34,7 @@ type MenuGroup = {
 
 const menuGroups: MenuGroup[] = [
   {
-    title: "Torneo",
+    title: "",
     items: [
       {
         href: "/inicio",
@@ -173,11 +173,13 @@ export default function TopMenu() {
             </div>
 
             <div className="space-y-5 px-5 py-5 pb-24">
-              {menuGroups.map((group) => (
-                <section key={group.title}>
-                  <p className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-red-300">
-                    {group.title}
-                  </p>
+              {menuGroups.map((group, groupIndex) => (
+                <section key={`${group.title}-${groupIndex}`}>
+                  {group.title && (
+                    <p className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-red-300">
+                      {group.title}
+                    </p>
+                  )}
 
                   <div className="space-y-2">
                     {group.items.map((item) => {

@@ -145,7 +145,10 @@ function estadoFinalizado(status: string | null | undefined) {
 
 function nombreJugador(player: Player | undefined) {
   if (!player) return "Jugador";
-  return player.number !== null ? `${player.number} · ${player.name}` : player.name;
+
+  return player.number !== null
+    ? `${player.number} · ${player.name}`
+    : player.name;
 }
 
 function tipoJugador(player: Player | undefined): PlayerType {
@@ -447,9 +450,9 @@ function ActaPartidoContent() {
     return 2;
   }
 
-  function ordenarPorEquipoYJugador<T extends { player_id: string; team_id: string }>(
-    lista: T[]
-  ) {
+  function ordenarPorEquipoYJugador<
+    T extends { player_id: string; team_id: string }
+  >(lista: T[]) {
     return [...lista].sort((a, b) => {
       const ordenA = ordenEquipo(a.team_id);
       const ordenB = ordenEquipo(b.team_id);
@@ -476,7 +479,8 @@ function ActaPartidoContent() {
       visitante: ordenados.filter((row) => row.team_id === acta?.away_team_id),
       otros: ordenados.filter(
         (row) =>
-          row.team_id !== acta?.home_team_id && row.team_id !== acta?.away_team_id
+          row.team_id !== acta?.home_team_id &&
+          row.team_id !== acta?.away_team_id
       ),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -625,8 +629,8 @@ function ActaPartidoContent() {
         className="fixed inset-0 h-screen w-screen object-cover opacity-35 blur-sm print:hidden"
       />
 
-      <section className="relative z-10 mx-auto max-w-3xl px-4 py-6 pb-24 print:max-w-none print:px-0 print:py-0">
-        <div className="mb-4 grid grid-cols-2 gap-3 print:hidden">
+      <section className="relative z-10 mx-auto max-w-3xl px-4 py-6 pb-28 print:max-w-none print:px-0 print:py-0">
+        <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 print:hidden">
           <Link
             href="/admin/fichas-partido"
             className="rounded-2xl bg-white/95 p-4 text-center font-black text-slate-900 shadow"
@@ -680,12 +684,13 @@ function ActaPartidoContent() {
               </p>
 
               <div className="mt-5 rounded-[2rem] bg-white p-4 shadow-sm print:border print:border-slate-200 print:shadow-none">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="rounded-2xl bg-slate-100 p-4 text-center print:border print:border-slate-200 print:bg-white">
                     <p className="text-xs font-black uppercase tracking-widest text-slate-400">
                       Local
                     </p>
-                    <p className="mt-2 break-words text-xl font-black leading-tight text-slate-950">
+
+                    <p className="mt-2 break-words text-2xl font-black leading-tight text-slate-950 sm:text-xl">
                       {acta.home_name}
                     </p>
                   </div>
@@ -694,7 +699,8 @@ function ActaPartidoContent() {
                     <p className="text-xs font-black uppercase tracking-widest text-slate-400">
                       Visitante
                     </p>
-                    <p className="mt-2 break-words text-xl font-black leading-tight text-slate-950">
+
+                    <p className="mt-2 break-words text-2xl font-black leading-tight text-slate-950 sm:text-xl">
                       {acta.away_name}
                     </p>
                   </div>
@@ -837,7 +843,8 @@ function ActaPartidoContent() {
             <section className="mt-5 rounded-3xl bg-slate-50 p-5 print:border print:border-slate-300 print:bg-white">
               <h2 className="text-xl font-black">Tarjetas</h2>
 
-              {amarillasAgrupadas.length === 0 && rojasAgrupadas.length === 0 ? (
+              {amarillasAgrupadas.length === 0 &&
+              rojasAgrupadas.length === 0 ? (
                 <p className="mt-3 text-sm font-bold text-slate-500">
                   No hay tarjetas registradas.
                 </p>
@@ -981,7 +988,7 @@ function ActaPartidoContent() {
   );
 }
 
-export default function ActaPartidoPage() {
+export default function AdminActaPartidoPage() {
   return (
     <AdminGuard>
       <Suspense fallback={<LoadingActa />}>

@@ -135,7 +135,7 @@ function partidoCard(match: FinalMatch) {
 function bracketBox(match: FinalMatch | undefined, destacado = false) {
   if (!match) {
     return (
-      <div className="min-h-[96px] rounded-2xl border border-dashed border-slate-300 bg-white/80 p-3 text-sm font-bold text-slate-400">
+      <div className="h-[120px] rounded-2xl border border-dashed border-slate-300 bg-white/80 p-3 text-sm font-bold text-slate-400">
         Pendiente
       </div>
     );
@@ -145,13 +145,13 @@ function bracketBox(match: FinalMatch | undefined, destacado = false) {
 
   return (
     <div
-      className={`min-h-[96px] rounded-2xl p-3 shadow ${
+      className={`h-[120px] overflow-hidden rounded-2xl p-3 shadow ${
         destacado ? "bg-yellow-50 ring-2 ring-yellow-300" : "bg-white"
       }`}
     >
       <div className="flex items-center justify-between gap-2">
         <p
-          className={`text-[10px] font-black uppercase ${
+          className={`truncate text-[10px] font-black uppercase ${
             destacado ? "text-yellow-700" : "text-red-600"
           }`}
         >
@@ -159,7 +159,7 @@ function bracketBox(match: FinalMatch | undefined, destacado = false) {
         </p>
 
         <span
-          className={`rounded-full px-2 py-0.5 text-[10px] font-black ${estadoColor(
+          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black ${estadoColor(
             match.status
           )}`}
         >
@@ -170,7 +170,7 @@ function bracketBox(match: FinalMatch | undefined, destacado = false) {
       <div className="mt-2 space-y-1 text-xs">
         <div className="flex items-center justify-between gap-2">
           <p
-            className={`min-w-0 break-words font-black ${
+            className={`min-w-0 truncate font-black ${
               ganadorNombre === match.home_ref ? "text-emerald-700" : ""
             }`}
           >
@@ -182,7 +182,7 @@ function bracketBox(match: FinalMatch | undefined, destacado = false) {
 
         <div className="flex items-center justify-between gap-2">
           <p
-            className={`min-w-0 break-words font-black ${
+            className={`min-w-0 truncate font-black ${
               ganadorNombre === match.away_ref ? "text-emerald-700" : ""
             }`}
           >
@@ -194,13 +194,13 @@ function bracketBox(match: FinalMatch | undefined, destacado = false) {
       </div>
 
       {(match.home_penalties !== null || match.away_penalties !== null) && (
-        <p className="mt-2 text-[10px] font-bold text-slate-500">
+        <p className="mt-1 truncate text-[10px] font-bold text-slate-500">
           Penaltis: {match.home_penalties ?? "-"} -{" "}
           {match.away_penalties ?? "-"}
         </p>
       )}
 
-      <p className="mt-2 text-[10px] font-bold text-slate-500">
+      <p className="mt-2 truncate text-[10px] font-bold text-slate-500">
         {formatearFechaSegura(match.match_date)} ·{" "}
         {match.match_time ?? "Hora pendiente"}
       </p>
@@ -208,45 +208,102 @@ function bracketBox(match: FinalMatch | undefined, destacado = false) {
   );
 }
 
-function ConnectorFourToTwo() {
+function StageTitle({ children }: { children: ReactNode }) {
   return (
-    <div className="pt-[34px]">
-      <div className="space-y-[122px]">
-        {[0, 1].map((item) => (
-          <div key={item} className="relative h-[98px]">
-            <div className="absolute left-0 top-[24px] h-px w-full bg-slate-300" />
-            <div className="absolute left-0 bottom-[24px] h-px w-full bg-slate-300" />
-            <div className="absolute right-0 top-[24px] h-[50px] w-px bg-slate-300" />
-            <div className="absolute right-0 top-[49px] h-px w-full bg-slate-300" />
-          </div>
-        ))}
-      </div>
-    </div>
+    <p className="mb-3 h-8 text-center text-xs font-black uppercase text-slate-500">
+      {children}
+    </p>
   );
 }
 
-function ConnectorTwoToOne() {
-  return (
-    <div className="pt-[84px]">
-      <div className="relative h-[220px]">
-        <div className="absolute left-0 top-[24px] h-px w-full bg-slate-300" />
-        <div className="absolute left-0 bottom-[24px] h-px w-full bg-slate-300" />
-        <div className="absolute right-0 top-[24px] h-[172px] w-px bg-slate-300" />
-        <div className="absolute right-0 top-[110px] h-px w-full bg-slate-300" />
-      </div>
-    </div>
-  );
+function EmptyStageTitle() {
+  return <div className="mb-3 h-8" />;
 }
 
-function ConnectorSemiToFinal({ side }: { side: "left" | "right" }) {
+function ConnectorFourToTwo({ side }: { side: "left" | "right" }) {
+  const left = side === "left";
+
   return (
-    <div className="pt-[178px]">
-      <div className="relative h-[120px]">
+    <div>
+      <EmptyStageTitle />
+
+      <div className="relative h-[528px]">
+        {/* Primera pareja */}
         <div
-          className={`absolute top-[56px] h-px w-full bg-slate-300 ${
-            side === "left" ? "left-0" : "right-0"
+          className={`absolute top-[60px] h-px bg-slate-300 ${
+            left ? "left-0 w-1/2" : "left-1/2 w-1/2"
           }`}
         />
+        <div
+          className={`absolute top-[196px] h-px bg-slate-300 ${
+            left ? "left-0 w-1/2" : "left-1/2 w-1/2"
+          }`}
+        />
+        <div className="absolute left-1/2 top-[60px] h-[136px] w-px bg-slate-300" />
+        <div
+          className={`absolute top-[128px] h-px bg-slate-300 ${
+            left ? "left-1/2 w-1/2" : "left-0 w-1/2"
+          }`}
+        />
+
+        {/* Segunda pareja */}
+        <div
+          className={`absolute top-[332px] h-px bg-slate-300 ${
+            left ? "left-0 w-1/2" : "left-1/2 w-1/2"
+          }`}
+        />
+        <div
+          className={`absolute top-[468px] h-px bg-slate-300 ${
+            left ? "left-0 w-1/2" : "left-1/2 w-1/2"
+          }`}
+        />
+        <div className="absolute left-1/2 top-[332px] h-[136px] w-px bg-slate-300" />
+        <div
+          className={`absolute top-[400px] h-px bg-slate-300 ${
+            left ? "left-1/2 w-1/2" : "left-0 w-1/2"
+          }`}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ConnectorTwoToOne({ side }: { side: "left" | "right" }) {
+  const left = side === "left";
+
+  return (
+    <div>
+      <EmptyStageTitle />
+
+      <div className="relative h-[528px]">
+        <div
+          className={`absolute top-[128px] h-px bg-slate-300 ${
+            left ? "left-0 w-1/2" : "left-1/2 w-1/2"
+          }`}
+        />
+        <div
+          className={`absolute top-[400px] h-px bg-slate-300 ${
+            left ? "left-0 w-1/2" : "left-1/2 w-1/2"
+          }`}
+        />
+        <div className="absolute left-1/2 top-[128px] h-[272px] w-px bg-slate-300" />
+        <div
+          className={`absolute top-[264px] h-px bg-slate-300 ${
+            left ? "left-1/2 w-1/2" : "left-0 w-1/2"
+          }`}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ConnectorOneToOne() {
+  return (
+    <div>
+      <EmptyStageTitle />
+
+      <div className="relative h-[528px]">
+        <div className="absolute left-0 top-[264px] h-px w-full bg-slate-300" />
       </div>
     </div>
   );
@@ -456,87 +513,88 @@ export default function FaseFinalPage() {
               variant="green"
             >
               <div className="overflow-x-auto pb-2">
-                <div className="grid min-w-[1180px] grid-cols-[1.25fr_44px_1.05fr_44px_1.05fr_44px_1.15fr_44px_1.05fr_44px_1.05fr_44px_1.25fr] items-start gap-0">
-                  <div className="space-y-3">
-                    <p className="text-center text-xs font-black uppercase text-slate-500">
-                      Octavos
-                    </p>
-                    {Array.from({ length: 4 }).map((_, index) => (
-                      <div key={`oct-left-${index}`}>
-                        {bracketBox(octavosIzquierda[index])}
-                      </div>
-                    ))}
+                <div className="grid min-w-[1320px] grid-cols-[1.2fr_54px_1.05fr_54px_1.05fr_54px_1.15fr_54px_1.05fr_54px_1.05fr_54px_1.2fr] items-start gap-0">
+                  <div>
+                    <StageTitle>Octavos</StageTitle>
+                    <div className="space-y-4">
+                      {Array.from({ length: 4 }).map((_, index) => (
+                        <div key={`oct-left-${index}`}>
+                          {bracketBox(octavosIzquierda[index])}
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
-                  <ConnectorFourToTwo />
+                  <ConnectorFourToTwo side="left" />
 
-                  <div className="space-y-[122px] pt-[49px]">
-                    <p className="text-center text-xs font-black uppercase text-slate-500">
-                      Cuartos
-                    </p>
-                    {Array.from({ length: 2 }).map((_, index) => (
-                      <div key={`cua-left-${index}`}>
-                        {bracketBox(cuartosIzquierda[index])}
-                      </div>
-                    ))}
+                  <div>
+                    <StageTitle>Cuartos</StageTitle>
+                    <div className="h-[528px] space-y-[152px] pt-[68px]">
+                      {Array.from({ length: 2 }).map((_, index) => (
+                        <div key={`cua-left-${index}`}>
+                          {bracketBox(cuartosIzquierda[index])}
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
-                  <ConnectorTwoToOne />
+                  <ConnectorTwoToOne side="left" />
 
-                  <div className="pt-[210px]">
-                    <p className="mb-3 text-center text-xs font-black uppercase text-slate-500">
-                      Semis
-                    </p>
-                    {bracketBox(semiIzquierda)}
+                  <div>
+                    <StageTitle>Semis</StageTitle>
+                    <div className="h-[528px] pt-[204px]">
+                      {bracketBox(semiIzquierda)}
+                    </div>
                   </div>
 
-                  <ConnectorSemiToFinal side="left" />
+                  <ConnectorOneToOne />
 
-                  <div className="pt-[168px]">
-                    <p className="mb-3 text-center text-xs font-black uppercase text-slate-500">
-                      Final
-                    </p>
-                    {bracketBox(finalMatch, true)}
+                  <div>
+                    <StageTitle>Final</StageTitle>
+                    <div className="h-[528px] pt-[204px]">
+                      {bracketBox(finalMatch, true)}
 
-                    <p className="mb-3 mt-10 text-center text-xs font-black uppercase text-slate-500">
-                      3er / 4º puesto
-                    </p>
-                    {bracketBox(tercerPuestoMatch)}
+                      <p className="mb-3 mt-8 text-center text-xs font-black uppercase text-slate-500">
+                        3er / 4º puesto
+                      </p>
+
+                      {bracketBox(tercerPuestoMatch)}
+                    </div>
                   </div>
 
-                  <ConnectorSemiToFinal side="right" />
+                  <ConnectorOneToOne />
 
-                  <div className="pt-[210px]">
-                    <p className="mb-3 text-center text-xs font-black uppercase text-slate-500">
-                      Semis
-                    </p>
-                    {bracketBox(semiDerecha)}
+                  <div>
+                    <StageTitle>Semis</StageTitle>
+                    <div className="h-[528px] pt-[204px]">
+                      {bracketBox(semiDerecha)}
+                    </div>
                   </div>
 
-                  <ConnectorTwoToOne />
+                  <ConnectorTwoToOne side="right" />
 
-                  <div className="space-y-[122px] pt-[49px]">
-                    <p className="text-center text-xs font-black uppercase text-slate-500">
-                      Cuartos
-                    </p>
-                    {Array.from({ length: 2 }).map((_, index) => (
-                      <div key={`cua-right-${index}`}>
-                        {bracketBox(cuartosDerecha[index])}
-                      </div>
-                    ))}
+                  <div>
+                    <StageTitle>Cuartos</StageTitle>
+                    <div className="h-[528px] space-y-[152px] pt-[68px]">
+                      {Array.from({ length: 2 }).map((_, index) => (
+                        <div key={`cua-right-${index}`}>
+                          {bracketBox(cuartosDerecha[index])}
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
-                  <ConnectorFourToTwo />
+                  <ConnectorFourToTwo side="right" />
 
-                  <div className="space-y-3">
-                    <p className="text-center text-xs font-black uppercase text-slate-500">
-                      Octavos
-                    </p>
-                    {Array.from({ length: 4 }).map((_, index) => (
-                      <div key={`oct-right-${index}`}>
-                        {bracketBox(octavosDerecha[index])}
-                      </div>
-                    ))}
+                  <div>
+                    <StageTitle>Octavos</StageTitle>
+                    <div className="space-y-4">
+                      {Array.from({ length: 4 }).map((_, index) => (
+                        <div key={`oct-right-${index}`}>
+                          {bracketBox(octavosDerecha[index])}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>

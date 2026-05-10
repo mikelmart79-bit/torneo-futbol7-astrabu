@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { formatearFecha } from "@/lib/formatDate";
 
 type FinalMatch = {
   id: string;
@@ -21,228 +22,240 @@ type FinalMatch = {
   sort_order: number;
 };
 
-const FASES_ORDENADAS = [
-  "Octavos",
-  "Cuartos",
-  "Semifinales",
-  "Tercer puesto",
-  "Final",
-];
+function formatearFechaSegura(fecha: string | null) {
+  if (!fecha) return "Fecha pendiente";
+  return formatearFecha(fecha);
+}
 
-function normalizarTexto(texto: string | null | undefined) {
+function normalizar(texto: string | null | undefined) {
   return (texto ?? "").trim().toLowerCase();
 }
 
-function estadoPermiteVerActa(status: string | null | undefined) {
-  const estado = normalizarTexto(status);
-  return estado === "finalizado" || estado === "cerrado";
-}
+function estadoColor(estado: string | null) {
+  const valor = normalizar(estado);
 
-function formatearFecha(fecha: string | null) {
-  if (!fecha) return "Fecha pendiente";
-
-  const [year, month, day] = fecha.split("-");
-  return `${day}/${month}/${year}`;
-}
-
-function colorFase(phase: string) {
-  const limpio = normalizarTexto(phase);
-
-  if (limpio === "final") {
-    return "bg-yellow-400 text-slate-950";
+  if (valor === "cerrado") {
+    return "bg-slate-950 text-white";
   }
 
-  if (limpio === "tercer puesto") {
-    return "bg-emerald-600 text-white";
+  if (valor === "finalizado") {
+    return "bg-emerald-100 text-emerald-800";
   }
 
-  return "bg-red-600 text-white";
-}
-
-function nombreFaseVisible(phase: string) {
-  if (normalizarTexto(phase) === "tercer puesto") {
-    return "Tercer y cuarto puesto";
+  if (valor === "en juego") {
+    return "bg-red-100 text-red-700";
   }
 
-  return phase;
+  return "bg-slate-100 text-slate-600";
 }
 
-function ordenarFases(a: string, b: string) {
-  const indexA = FASES_ORDENADAS.indexOf(a);
-  const indexB = FASES_ORDENADAS.indexOf(b);
-
-  const valorA = indexA === -1 ? 999 : indexA;
-  const valorB = indexB === -1 ? 999 : indexB;
-
-  return valorA - valorB;
+function tieneResultado(match: FinalMatch) {
+  return match.home_score !== null && match.away_score !== null;
 }
 
-function resultadoTexto(match: FinalMatch) {
-  const base = `${match.home_score ?? "-"} - ${match.away_score ?? "-"}`;
+function textoResultado(match: FinalMatch) {
+  if (!tieneResultado(match)) return "-";
+
+  const resultado = `${match.home_score} - ${match.away_score}`;
 
   if (
     match.home_penalties !== null &&
-    match.away_penalties !== null &&
-    (normalizarTexto(match.phase) === "final" ||
-      normalizarTexto(match.phase) === "semifinales" ||
-      normalizarTexto(match.phase) === "cuartos" ||
-      normalizarTexto(match.phase) === "octavos")
+    match.away_penalties !== null
   ) {
-    return `${base} · Pen. ${match.home_penalties}-${match.away_penalties}`;
+    return `${resultado} · pen. ${match.home_penalties}-${match.away_penalties}`;
   }
 
-  return base;
+  return resultado;
 }
 
-function BracketCard({
-  match,
-  compact = false,
-}: {
-  match?: FinalMatch;
-  compact?: boolean;
-}) {
-  if (!match) {
-    return (
-      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-3 text-slate-400 shadow-sm">
-        <p className="text-[11px] font-black uppercase tracking-widest">
-          Pendiente
-        </p>
-        <p className="mt-2 text-sm font-bold">Cruce sin definir</p>
-      </div>
-    );
+function ganador(match: FinalMatch) {
+  if (match.home_score === null || match.away_score === null) return "";
+
+  if (match.home_score > match.away_score) return match.home_ref;
+  if (match.away_score > match.home_score) return match.away_ref;
+
+  if (
+    match.home_penalties !== null &&
+    match.away_penalties !== null
+  ) {
+    if (match.home_penalties > match.away_penalties) return match.home_ref;
+    if (match.away_penalties > match.home_penalties) return match.away_ref;
   }
 
-  return (
-    <div className="rounded-2xl bg-white p-3 shadow-md ring-1 ring-slate-200">
-      <p className="text-[11px] font-black uppercase tracking-widest text-red-600">
-        {match.title}
-      </p>
+  return "";
+}
 
-      <div className="mt-2 space-y-2">
-        <div className="rounded-xl bg-slate-50 px-3 py-2">
-          <p className="break-words text-sm font-black text-slate-900">
-            {match.home_ref || "Por definir"}
+function partidoCard(match: FinalMatch, compacto = false) {
+  const ganadorNombre = ganador(match);
+
+  return (
+    <div
+      key={match.id}
+      className={`rounded-2xl bg-slate-50 shadow-sm ${
+        compacto ? "p-3" : "p-4"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-black uppercase text-red-600">
+            {match.title}
           </p>
+
+          <div className="mt-2 space-y-1">
+            <p
+              className={`break-words font-black leading-tight ${
+                ganadorNombre === match.home_ref ? "text-emerald-700" : ""
+              }`}
+            >
+              {match.home_ref}
+            </p>
+
+            <p
+              className={`break-words font-black leading-tight ${
+                ganadorNombre === match.away_ref ? "text-emerald-700" : ""
+              }`}
+            >
+              {match.away_ref}
+            </p>
+          </div>
         </div>
 
-        <div className="rounded-xl bg-slate-50 px-3 py-2">
-          <p className="break-words text-sm font-black text-slate-900">
-            {match.away_ref || "Por definir"}
-          </p>
+        <div className="shrink-0 rounded-xl bg-slate-950 px-3 py-2 text-center text-white">
+          <p className="text-lg font-black">{textoResultado(match)}</p>
         </div>
       </div>
 
-      <div className="mt-3 flex items-center justify-between gap-2">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <span
-          className={`rounded-full px-3 py-1 text-xs font-black ${
-            estadoPermiteVerActa(match.status)
-              ? "bg-emerald-100 text-emerald-800"
-              : "bg-slate-100 text-slate-600"
-          }`}
+          className={`rounded-full px-3 py-1 text-xs font-black ${estadoColor(
+            match.status
+          )}`}
         >
-          {match.home_score !== null || match.away_score !== null
-            ? resultadoTexto(match)
-            : "Pendiente"}
+          {match.status ?? "Pendiente"}
         </span>
 
-        {!compact && (
-          <span className="text-[11px] font-bold text-slate-500">
-            {formatearFecha(match.match_date)}
-          </span>
-        )}
+        <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-500 shadow-sm">
+          {formatearFechaSegura(match.match_date)}
+        </span>
+
+        <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-500 shadow-sm">
+          {match.match_time ?? "Hora pendiente"}
+        </span>
+
+        <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-500 shadow-sm">
+          {match.field ?? "Campo pendiente"}
+        </span>
       </div>
     </div>
   );
 }
 
-function PartidoCard({ match }: { match: FinalMatch }) {
+function bracketBox(match: FinalMatch | undefined) {
+  if (!match) {
+    return (
+      <div className="min-h-[96px] rounded-2xl border border-dashed border-slate-300 bg-white/80 p-3 text-sm font-bold text-slate-400">
+        Pendiente
+      </div>
+    );
+  }
+
+  const ganadorNombre = ganador(match);
+
   return (
-    <div className="rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <span
-            className={`inline-flex rounded-full px-3 py-1 text-xs font-black uppercase ${colorFase(
-              match.phase
-            )}`}
+    <div className="min-h-[96px] rounded-2xl bg-white p-3 shadow">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[10px] font-black uppercase text-red-600">
+          {match.title}
+        </p>
+
+        <span
+          className={`rounded-full px-2 py-0.5 text-[10px] font-black ${estadoColor(
+            match.status
+          )}`}
+        >
+          {match.status ?? "Pendiente"}
+        </span>
+      </div>
+
+      <div className="mt-2 space-y-1 text-xs">
+        <div className="flex items-center justify-between gap-2">
+          <p
+            className={`min-w-0 break-words font-black ${
+              ganadorNombre === match.home_ref ? "text-emerald-700" : ""
+            }`}
           >
-            {match.phase}
+            {match.home_ref}
+          </p>
+
+          <span className="font-black">
+            {match.home_score ?? "-"}
           </span>
-
-          <h3 className="mt-3 text-xl font-black text-slate-950">
-            {match.title}
-          </h3>
         </div>
 
-        <div className="rounded-2xl bg-slate-950 px-4 py-3 text-center text-white shadow">
-          <p className="text-lg font-black text-red-400">
-            {match.home_score ?? "-"} - {match.away_score ?? "-"}
-          </p>
-
-          {match.home_penalties !== null && match.away_penalties !== null && (
-            <p className="mt-1 text-[11px] font-bold text-slate-300">
-              Pen. {match.home_penalties}-{match.away_penalties}
-            </p>
-          )}
-        </div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="rounded-2xl bg-slate-100 p-4">
-          <p className="text-xs font-black uppercase tracking-widest text-slate-400">
-            Local
-          </p>
-          <p className="mt-2 break-words text-lg font-black text-slate-950">
-            {match.home_ref || "Por definir"}
-          </p>
-        </div>
-
-        <div className="rounded-2xl bg-slate-100 p-4">
-          <p className="text-xs font-black uppercase tracking-widest text-slate-400">
-            Visitante
-          </p>
-          <p className="mt-2 break-words text-lg font-black text-slate-950">
-            {match.away_ref || "Por definir"}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 gap-3 text-center sm:grid-cols-3">
-        <div className="rounded-2xl bg-slate-50 p-3">
-          <p className="text-xs font-black uppercase text-slate-500">Fecha</p>
-          <p className="mt-1 text-sm font-black text-slate-900">
-            {formatearFecha(match.match_date)}
-          </p>
-        </div>
-
-        <div className="rounded-2xl bg-slate-50 p-3">
-          <p className="text-xs font-black uppercase text-slate-500">Hora</p>
-          <p className="mt-1 text-sm font-black text-slate-900">
-            {match.match_time ?? "--:--"}
-          </p>
-        </div>
-
-        <div className="rounded-2xl bg-slate-50 p-3">
-          <p className="text-xs font-black uppercase text-slate-500">Campo</p>
-          <p className="mt-1 text-sm font-black text-slate-900">
-            {match.field ?? "Pendiente"}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-        {estadoPermiteVerActa(match.status) && (
-          <Link
-            href={`/acta-partido?match=${match.id}&type=final`}
-            className="flex-1 rounded-2xl bg-slate-950 px-4 py-3 text-center text-sm font-black uppercase text-white shadow"
+        <div className="flex items-center justify-between gap-2">
+          <p
+            className={`min-w-0 break-words font-black ${
+              ganadorNombre === match.away_ref ? "text-emerald-700" : ""
+            }`}
           >
-            Ver acta
-          </Link>
-        )}
+            {match.away_ref}
+          </p>
 
-        <div className="flex-1 rounded-2xl bg-slate-100 px-4 py-3 text-center text-sm font-black text-slate-700">
-          Estado: {match.status ?? "Pendiente"}
+          <span className="font-black">
+            {match.away_score ?? "-"}
+          </span>
         </div>
       </div>
+
+      {(match.home_penalties !== null || match.away_penalties !== null) && (
+        <p className="mt-2 text-[10px] font-bold text-slate-500">
+          Penaltis: {match.home_penalties ?? "-"} -{" "}
+          {match.away_penalties ?? "-"}
+        </p>
+      )}
+
+      <p className="mt-2 text-[10px] font-bold text-slate-500">
+        {formatearFechaSegura(match.match_date)} ·{" "}
+        {match.match_time ?? "Hora pendiente"}
+      </p>
+    </div>
+  );
+}
+
+function Accordion({
+  title,
+  subtitle,
+  abierto,
+  onToggle,
+  children,
+  variant = "dark",
+}: {
+  title: string;
+  subtitle: string;
+  abierto: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+  variant?: "dark" | "red";
+}) {
+  return (
+    <div className="overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
+      <button
+        onClick={onToggle}
+        className={`flex w-full items-center justify-between px-5 py-4 text-left text-white ${
+          variant === "red" ? "bg-red-600" : "bg-slate-950"
+        }`}
+      >
+        <div>
+          <p className="text-lg font-black">{title}</p>
+          <p className="text-sm font-bold opacity-80">{subtitle}</p>
+        </div>
+
+        <span className="text-3xl font-black">
+          {abierto ? "−" : "+"}
+        </span>
+      </button>
+
+      {abierto && <div className="space-y-3 p-4">{children}</div>}
     </div>
   );
 }
@@ -252,6 +265,13 @@ export default function FaseFinalPage() {
   const [loading, setLoading] = useState(true);
   const [errorCarga, setErrorCarga] = useState("");
 
+  const [cuadroAbierto, setCuadroAbierto] = useState(false);
+  const [octavosAbierto, setOctavosAbierto] = useState(false);
+  const [cuartosAbierto, setCuartosAbierto] = useState(false);
+  const [semisAbierto, setSemisAbierto] = useState(false);
+  const [tercerAbierto, setTercerAbierto] = useState(false);
+  const [finalAbierto, setFinalAbierto] = useState(false);
+
   useEffect(() => {
     async function cargarEliminatorias() {
       setLoading(true);
@@ -260,7 +280,22 @@ export default function FaseFinalPage() {
       const { data, error } = await supabase
         .from("final_matches")
         .select(
-          "id, phase, title, home_ref, away_ref, match_date, match_time, field, home_score, away_score, home_penalties, away_penalties, status, sort_order"
+          `
+          id,
+          phase,
+          title,
+          home_ref,
+          away_ref,
+          match_date,
+          match_time,
+          field,
+          home_score,
+          away_score,
+          home_penalties,
+          away_penalties,
+          status,
+          sort_order
+        `
         )
         .order("sort_order", { ascending: true });
 
@@ -278,51 +313,55 @@ export default function FaseFinalPage() {
     cargarEliminatorias();
   }, []);
 
-  const agrupados = useMemo(() => {
-    const mapa = new Map<string, FinalMatch[]>();
+  const octavos = useMemo(
+    () => matches.filter((match) => normalizar(match.phase) === "octavos"),
+    [matches]
+  );
 
-    matches.forEach((match) => {
-      const fase = match.phase || "Otros";
+  const cuartos = useMemo(
+    () => matches.filter((match) => normalizar(match.phase) === "cuartos"),
+    [matches]
+  );
 
-      if (!mapa.has(fase)) {
-        mapa.set(fase, []);
-      }
+  const semifinales = useMemo(
+    () =>
+      matches.filter(
+        (match) =>
+          normalizar(match.phase) === "semifinales" ||
+          normalizar(match.phase) === "semis"
+      ),
+    [matches]
+  );
 
-      mapa.get(fase)!.push(match);
-    });
+  const tercerPuesto = useMemo(
+    () =>
+      matches.filter(
+        (match) =>
+          normalizar(match.phase) === "tercer puesto" ||
+          normalizar(match.title).includes("tercer")
+      ),
+    [matches]
+  );
 
-    return Array.from(mapa.entries()).sort((a, b) => ordenarFases(a[0], b[0]));
-  }, [matches]);
+  const final = useMemo(
+    () =>
+      matches.filter(
+        (match) =>
+          normalizar(match.phase) === "final" &&
+          !normalizar(match.title).includes("tercer")
+      ),
+    [matches]
+  );
 
-  const matchByTitle = useMemo(() => {
-    const map = new Map<string, FinalMatch>();
+  const octavosIzquierda = octavos.slice(0, 4);
+  const octavosDerecha = octavos.slice(4, 8);
 
-    matches.forEach((match) => {
-      map.set(match.title, match);
-    });
+  const cuartosIzquierda = cuartos.slice(0, 2);
+  const cuartosDerecha = cuartos.slice(2, 4);
 
-    return map;
-  }, [matches]);
-
-  const oct1 = matchByTitle.get("Octavo 1");
-  const oct2 = matchByTitle.get("Octavo 2");
-  const oct3 = matchByTitle.get("Octavo 3");
-  const oct4 = matchByTitle.get("Octavo 4");
-  const oct5 = matchByTitle.get("Octavo 5");
-  const oct6 = matchByTitle.get("Octavo 6");
-  const oct7 = matchByTitle.get("Octavo 7");
-  const oct8 = matchByTitle.get("Octavo 8");
-
-  const cua1 = matchByTitle.get("Cuarto 1");
-  const cua2 = matchByTitle.get("Cuarto 2");
-  const cua3 = matchByTitle.get("Cuarto 3");
-  const cua4 = matchByTitle.get("Cuarto 4");
-
-  const semi1 = matchByTitle.get("Semifinal 1");
-  const semi2 = matchByTitle.get("Semifinal 2");
-
-  const tercerPuesto = matchByTitle.get("Tercer y cuarto puesto");
-  const final = matchByTitle.get("Final");
+  const semiIzquierda = semifinales[0];
+  const semiDerecha = semifinales[1];
+  const finalMatch = final[0];
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-black text-slate-900">
@@ -332,7 +371,7 @@ export default function FaseFinalPage() {
         className="fixed inset-0 h-screen w-screen object-cover opacity-35 blur-sm"
       />
 
-      <section className="relative z-10 mx-auto max-w-6xl px-4 py-6 pb-24">
+      <section className="relative z-10 mx-auto max-w-md px-4 py-6 pb-24">
         <div className="rounded-3xl bg-black/60 px-4 py-5 text-white shadow-2xl backdrop-blur">
           <p className="text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100">
             Torneo Fútbol 7 Astrabudua
@@ -343,7 +382,7 @@ export default function FaseFinalPage() {
           </h1>
 
           <p className="mt-2 text-center text-sm font-bold text-emerald-100">
-            Cuadro final del torneo
+            Octavos, cuartos, semifinales y final
           </p>
         </div>
 
@@ -363,135 +402,157 @@ export default function FaseFinalPage() {
             {errorCarga}
           </div>
         ) : matches.length === 0 ? (
-          <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl">
-            <p className="font-bold text-slate-500">
-              Todavía no hay eliminatorias creadas.
-            </p>
+          <div className="mt-6 rounded-3xl bg-white/95 p-5 font-bold text-slate-500 shadow-2xl">
+            Todavía no hay eliminatorias configuradas.
           </div>
         ) : (
-          <>
-            {/* CUADRO VISUAL */}
-            <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-black uppercase tracking-widest text-red-600">
-                    Cuadro de eliminatorias
-                  </p>
-                  <p className="mt-1 text-sm font-bold text-slate-600">
-                    Vista tipo Mundial hasta la final
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-5 overflow-x-auto pb-2">
-                <div className="min-w-[1320px]">
-                  <div className="grid grid-cols-7 gap-4">
-                    {/* Columna 1 - Octavos izquierda */}
-                    <div>
-                      <p className="mb-3 text-center text-xs font-black uppercase tracking-widest text-slate-500">
-                        Octavos
-                      </p>
-                      <div className="space-y-4">
-                        <BracketCard match={oct1} compact />
-                        <BracketCard match={oct2} compact />
-                        <BracketCard match={oct3} compact />
-                        <BracketCard match={oct4} compact />
-                      </div>
-                    </div>
-
-                    {/* Columna 2 - Cuartos izquierda */}
-                    <div className="pt-12">
-                      <p className="mb-3 text-center text-xs font-black uppercase tracking-widest text-slate-500">
-                        Cuartos
-                      </p>
-                      <div className="space-y-20">
-                        <BracketCard match={cua1} compact />
-                        <BracketCard match={cua2} compact />
-                      </div>
-                    </div>
-
-                    {/* Columna 3 - Semi izquierda */}
-                    <div className="pt-32">
-                      <p className="mb-3 text-center text-xs font-black uppercase tracking-widest text-slate-500">
-                        Semifinal
-                      </p>
-                      <BracketCard match={semi1} compact />
-                    </div>
-
-                    {/* Columna 4 - Centro */}
-                    <div className="pt-20">
-                      <p className="mb-3 text-center text-xs font-black uppercase tracking-widest text-slate-500">
-                        Final
-                      </p>
-                      <BracketCard match={final} />
-
-                      <p className="mb-3 mt-8 text-center text-xs font-black uppercase tracking-widest text-slate-500">
-                        3er puesto
-                      </p>
-                      <BracketCard match={tercerPuesto} />
-                    </div>
-
-                    {/* Columna 5 - Semi derecha */}
-                    <div className="pt-32">
-                      <p className="mb-3 text-center text-xs font-black uppercase tracking-widest text-slate-500">
-                        Semifinal
-                      </p>
-                      <BracketCard match={semi2} compact />
-                    </div>
-
-                    {/* Columna 6 - Cuartos derecha */}
-                    <div className="pt-12">
-                      <p className="mb-3 text-center text-xs font-black uppercase tracking-widest text-slate-500">
-                        Cuartos
-                      </p>
-                      <div className="space-y-20">
-                        <BracketCard match={cua3} compact />
-                        <BracketCard match={cua4} compact />
-                      </div>
-                    </div>
-
-                    {/* Columna 7 - Octavos derecha */}
-                    <div>
-                      <p className="mb-3 text-center text-xs font-black uppercase tracking-widest text-slate-500">
-                        Octavos
-                      </p>
-                      <div className="space-y-4">
-                        <BracketCard match={oct5} compact />
-                        <BracketCard match={oct6} compact />
-                        <BracketCard match={oct7} compact />
-                        <BracketCard match={oct8} compact />
-                      </div>
-                    </div>
+          <div className="mt-6 space-y-4">
+            <Accordion
+              title="Cuadro de eliminatorias"
+              subtitle="Vista completa hasta la final"
+              abierto={cuadroAbierto}
+              onToggle={() => setCuadroAbierto(!cuadroAbierto)}
+              variant="red"
+            >
+              <div className="overflow-x-auto pb-2">
+                <div className="grid min-w-[900px] grid-cols-[1.2fr_1fr_1fr_1.1fr_1fr_1fr_1.2fr] items-center gap-3">
+                  <div className="space-y-3">
+                    <p className="text-center text-xs font-black uppercase text-slate-500">
+                      Octavos
+                    </p>
+                    {Array.from({ length: 4 }).map((_, index) =>
+                      bracketBox(octavosIzquierda[index])
+                    )}
                   </div>
-                </div>
-              </div>
-            </div>
 
-            {/* LISTADO POR FASES */}
-            <div className="mt-6 space-y-6">
-              {agrupados.map(([fase, partidos]) => (
-                <div key={fase}>
-                  <div className="mb-4 flex items-center gap-3">
-                    <div
-                      className={`rounded-full px-4 py-2 text-sm font-black uppercase ${colorFase(
-                        fase
-                      )}`}
-                    >
-                      {nombreFaseVisible(fase)}
-                    </div>
+                  <div className="space-y-10">
+                    <p className="text-center text-xs font-black uppercase text-slate-500">
+                      Cuartos
+                    </p>
+                    {Array.from({ length: 2 }).map((_, index) =>
+                      bracketBox(cuartosIzquierda[index])
+                    )}
+                  </div>
 
-                    <div className="h-px flex-1 bg-white/30" />
+                  <div className="space-y-24">
+                    <p className="text-center text-xs font-black uppercase text-slate-500">
+                      Semis
+                    </p>
+                    {bracketBox(semiIzquierda)}
                   </div>
 
                   <div className="space-y-4">
-                    {partidos.map((match) => (
-                      <PartidoCard key={match.id} match={match} />
-                    ))}
+                    <p className="text-center text-xs font-black uppercase text-slate-500">
+                      Final
+                    </p>
+                    {bracketBox(finalMatch)}
+                  </div>
+
+                  <div className="space-y-24">
+                    <p className="text-center text-xs font-black uppercase text-slate-500">
+                      Semis
+                    </p>
+                    {bracketBox(semiDerecha)}
+                  </div>
+
+                  <div className="space-y-10">
+                    <p className="text-center text-xs font-black uppercase text-slate-500">
+                      Cuartos
+                    </p>
+                    {Array.from({ length: 2 }).map((_, index) =>
+                      bracketBox(cuartosDerecha[index])
+                    )}
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="text-center text-xs font-black uppercase text-slate-500">
+                      Octavos
+                    </p>
+                    {Array.from({ length: 4 }).map((_, index) =>
+                      bracketBox(octavosDerecha[index])
+                    )}
                   </div>
                 </div>
-              ))}
-            </div>
-          </>
+              </div>
+            </Accordion>
+
+            <Accordion
+              title="Octavos"
+              subtitle={`${octavos.length} partidos`}
+              abierto={octavosAbierto}
+              onToggle={() => setOctavosAbierto(!octavosAbierto)}
+            >
+              {octavos.length === 0 ? (
+                <p className="rounded-2xl bg-slate-50 p-4 font-bold text-slate-500">
+                  Todavía no hay octavos configurados.
+                </p>
+              ) : (
+                octavos.map((match) => partidoCard(match))
+              )}
+            </Accordion>
+
+            <Accordion
+              title="Cuartos"
+              subtitle={`${cuartos.length} partidos`}
+              abierto={cuartosAbierto}
+              onToggle={() => setCuartosAbierto(!cuartosAbierto)}
+              variant="red"
+            >
+              {cuartos.length === 0 ? (
+                <p className="rounded-2xl bg-slate-50 p-4 font-bold text-slate-500">
+                  Todavía no hay cuartos configurados.
+                </p>
+              ) : (
+                cuartos.map((match) => partidoCard(match))
+              )}
+            </Accordion>
+
+            <Accordion
+              title="Semifinales"
+              subtitle={`${semifinales.length} partidos`}
+              abierto={semisAbierto}
+              onToggle={() => setSemisAbierto(!semisAbierto)}
+            >
+              {semifinales.length === 0 ? (
+                <p className="rounded-2xl bg-slate-50 p-4 font-bold text-slate-500">
+                  Todavía no hay semifinales configuradas.
+                </p>
+              ) : (
+                semifinales.map((match) => partidoCard(match))
+              )}
+            </Accordion>
+
+            <Accordion
+              title="Tercer puesto"
+              subtitle={`${tercerPuesto.length} partido`}
+              abierto={tercerAbierto}
+              onToggle={() => setTercerAbierto(!tercerAbierto)}
+            >
+              {tercerPuesto.length === 0 ? (
+                <p className="rounded-2xl bg-slate-50 p-4 font-bold text-slate-500">
+                  Todavía no hay partido de tercer puesto configurado.
+                </p>
+              ) : (
+                tercerPuesto.map((match) => partidoCard(match))
+              )}
+            </Accordion>
+
+            <Accordion
+              title="Final"
+              subtitle={`${final.length} partido`}
+              abierto={finalAbierto}
+              onToggle={() => setFinalAbierto(!finalAbierto)}
+              variant="red"
+            >
+              {final.length === 0 ? (
+                <p className="rounded-2xl bg-slate-50 p-4 font-bold text-slate-500">
+                  Todavía no hay final configurada.
+                </p>
+              ) : (
+                final.map((match) => partidoCard(match))
+              )}
+            </Accordion>
+          </div>
         )}
       </section>
     </main>

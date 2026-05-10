@@ -18,6 +18,16 @@ type BackupData = {
   tables: Record<string, Array<Record<string, unknown>>>;
 };
 
+type FinalMatchMaintenance = {
+  id: string;
+  home_ref: string;
+  away_ref: string;
+  home_source_type: string | null;
+  home_source_match_title: string | null;
+  away_source_type: string | null;
+  away_source_match_title: string | null;
+};
+
 const principales: AdminLink[] = [
   {
     href: "/admin/fichas-partido",
@@ -147,6 +157,42 @@ function descargarJson(data: BackupData) {
   URL.revokeObjectURL(url);
 }
 
+function normalizarTexto(texto: string | null | undefined) {
+  return (texto ?? "").trim().toLowerCase();
+}
+
+function referenciaOriginalEliminatoria(
+  sourceType: string | null,
+  sourceMatchTitle: string | null,
+  valorActual: string,
+) {
+  const tipo = normalizarTexto(sourceType);
+  const titulo = (sourceMatchTitle ?? "").trim();
+
+  if (!titulo) return valorActual;
+
+  if (tipo === "winner" || tipo === "ganador") {
+    return `Ganador ${titulo}`;
+  }
+
+  if (tipo === "loser" || tipo === "perdedor") {
+    return `Perdedor ${titulo}`;
+  }
+
+  return valorActual;
+}
+
+async function comprobarError(
+  resultado: PromiseLike<{ error: { message: string } | null }>,
+  accion: string,
+) {
+  const { error } = await resultado;
+
+  if (error) {
+    throw new Error(`${accion}: ${error.message}`);
+  }
+}
+
 export default function AdminPage() {
   const [mostrarZonaPeligrosa, setMostrarZonaPeligrosa] = useState(false);
   const [trabajando, setTrabajando] = useState(false);
@@ -170,13 +216,13 @@ export default function AdminPage() {
 
   function confirmarOperacion(titulo: string, detalle: string) {
     const confirmar1 = window.confirm(
-      `⚠️ ${titulo}\n\n${detalle}\n\n¿Quieres continuar?`
+      `⚠️ ${titulo}\n\n${detalle}\n\n¿Quieres continuar?`,
     );
 
     if (!confirmar1) return false;
 
     const confirmar2 = window.confirm(
-      `🚨 Última confirmación.\n\nEsta acción no se puede deshacer.\n\n¿Confirmas "${titulo}"?`
+      `🚨 Última confirmación.\n\nEsta acción no se puede deshacer.\n\n¿Confirmas "${titulo}"?`,
     );
 
     return confirmar2;
@@ -185,7 +231,7 @@ export default function AdminPage() {
   async function ejecutarOperacion(
     titulo: string,
     detalle: string,
-    callback: () => Promise<void>
+    callback: () => Promise<void>,
   ) {
     if (trabajando) return;
     if (!confirmarOperacion(titulo, detalle)) return;
@@ -201,7 +247,7 @@ export default function AdminPage() {
       setMensajeMantenimiento(
         `No se ha podido completar la operación: ${
           error instanceof Error ? error.message : "error desconocido"
-        }`
+        }`,
       );
     } finally {
       setTrabajando(false);
@@ -211,102 +257,248 @@ export default function AdminPage() {
   async function limpiarDatosPartidosGrupo() {
     const db = supabase as any;
 
-    await db.from("mvp_votes").delete().not("match_id", "is", null);
-    await db.from("suspension_served_matches").delete().not("match_id", "is", null);
-    await db.from("suspensions").delete().not("match_id", "is", null);
-    await db.from("match_cards").delete().not("match_id", "is", null);
-    await db.from("match_goals").delete().not("match_id", "is", null);
-    await db.from("match_players").delete().not("match_id", "is", null);
+    await comprobarError(
+      db.from("mvp_votes").delete().not("match_id", "is", null),
+      "Borrando votos MVP de clasificación",
+    );
+
+    await comprobarError(
+      db
+        .from("suspension_served_matches")
+        .delete()
+        .not("match_id", "is", null),
+      "Borrando partidos de sanción cumplidos de clasificación",
+    );
+
+    await comprobarError(
+      db.from("suspensions").delete().not("match_id", "is", null),
+      "Borrando sanciones de clasificación",
+    );
+
+    await comprobarError(
+      db.from("match_cards").delete().not("match_id", "is", null),
+      "Borrando tarjetas de clasificación",
+    );
+
+    await comprobarError(
+      db.from("match_goals").delete().not("match_id", "is", null),
+      "Borrando goles de clasificación",
+    );
+
+    await comprobarError(
+      db.from("match_players").delete().not("match_id", "is", null),
+      "Borrando jugadores de fichas de clasificación",
+    );
   }
 
   async function limpiarDatosEliminatorias() {
     const db = supabase as any;
 
-    await db.from("mvp_votes").delete().not("final_match_id", "is", null);
-    await db
-      .from("suspension_served_matches")
-      .delete()
-      .not("final_match_id", "is", null);
-    await db.from("suspensions").delete().not("final_match_id", "is", null);
-    await db.from("match_cards").delete().not("final_match_id", "is", null);
-    await db.from("match_goals").delete().not("final_match_id", "is", null);
-    await db.from("match_players").delete().not("final_match_id", "is", null);
+    await comprobarError(
+      db.from("mvp_votes").delete().not("final_match_id", "is", null),
+      "Borrando votos MVP de eliminatorias",
+    );
+
+    await comprobarError(
+      db
+        .from("suspension_served_matches")
+        .delete()
+        .not("final_match_id", "is", null),
+      "Borrando partidos de sanción cumplidos de eliminatorias",
+    );
+
+    await comprobarError(
+      db.from("suspensions").delete().not("final_match_id", "is", null),
+      "Borrando sanciones de eliminatorias",
+    );
+
+    await comprobarError(
+      db.from("match_cards").delete().not("final_match_id", "is", null),
+      "Borrando tarjetas de eliminatorias",
+    );
+
+    await comprobarError(
+      db.from("match_goals").delete().not("final_match_id", "is", null),
+      "Borrando goles de eliminatorias",
+    );
+
+    await comprobarError(
+      db.from("match_players").delete().not("final_match_id", "is", null),
+      "Borrando jugadores de fichas de eliminatorias",
+    );
   }
 
   async function borrarResultadosClasificacion() {
     const db = supabase as any;
 
-    await db
-      .from("matches")
-      .update({
-        home_score: null,
-        away_score: null,
-        status: "Pendiente",
-        mvp_open: false,
-        incidents: null,
-      })
-      .neq("id", "00000000-0000-0000-0000-000000000000");
+    await limpiarDatosPartidosGrupo();
+
+    await comprobarError(
+      db
+        .from("matches")
+        .update({
+          home_score: null,
+          away_score: null,
+          status: "Pendiente",
+          mvp_open: false,
+          incidents: null,
+        })
+        .neq("id", "00000000-0000-0000-0000-000000000000"),
+      "Quitando resultados de clasificación",
+    );
   }
 
   async function borrarResultadosEliminatorias() {
     const db = supabase as any;
 
-    await db
+    await limpiarDatosEliminatorias();
+
+    const { data, error } = await db
       .from("final_matches")
-      .update({
-        home_score: null,
-        away_score: null,
-        home_penalties: null,
-        away_penalties: null,
-        status: "Pendiente",
-        mvp_open: false,
-        incidents: null,
-      })
-      .neq("id", "00000000-0000-0000-0000-000000000000");
+      .select(
+        `
+        id,
+        home_ref,
+        away_ref,
+        home_source_type,
+        home_source_match_title,
+        away_source_type,
+        away_source_match_title
+      `,
+      )
+      .order("sort_order", { ascending: true });
+
+    if (error) {
+      throw new Error(`Leyendo eliminatorias: ${error.message}`);
+    }
+
+    const eliminatorias = (data ?? []) as FinalMatchMaintenance[];
+
+    for (const eliminatoria of eliminatorias) {
+      const homeRefOriginal = referenciaOriginalEliminatoria(
+        eliminatoria.home_source_type,
+        eliminatoria.home_source_match_title,
+        eliminatoria.home_ref,
+      );
+
+      const awayRefOriginal = referenciaOriginalEliminatoria(
+        eliminatoria.away_source_type,
+        eliminatoria.away_source_match_title,
+        eliminatoria.away_ref,
+      );
+
+      await comprobarError(
+        db
+          .from("final_matches")
+          .update({
+            home_ref: homeRefOriginal,
+            away_ref: awayRefOriginal,
+            home_score: null,
+            away_score: null,
+            home_penalties: null,
+            away_penalties: null,
+            status: "Pendiente",
+            mvp_open: false,
+            incidents: null,
+          })
+          .eq("id", eliminatoria.id),
+        `Quitando resultado de ${eliminatoria.id}`,
+      );
+    }
   }
 
   async function borrarActasYFichas() {
     const db = supabase as any;
 
-    await db.from("mvp_votes").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    await db
-      .from("suspension_served_matches")
-      .delete()
-      .neq("id", "00000000-0000-0000-0000-000000000000");
-    await db.from("suspensions").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    await db.from("match_cards").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    await db.from("match_goals").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    await db.from("match_players").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    await comprobarError(
+      db
+        .from("mvp_votes")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000"),
+      "Borrando votos MVP",
+    );
 
-    await db
-      .from("matches")
-      .update({
-        incidents: null,
-        mvp_open: false,
-      })
-      .neq("id", "00000000-0000-0000-0000-000000000000");
+    await comprobarError(
+      db
+        .from("suspension_served_matches")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000"),
+      "Borrando partidos de sanción cumplidos",
+    );
 
-    await db
-      .from("final_matches")
-      .update({
-        incidents: null,
-        mvp_open: false,
-      })
-      .neq("id", "00000000-0000-0000-0000-000000000000");
+    await comprobarError(
+      db
+        .from("suspensions")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000"),
+      "Borrando sanciones",
+    );
+
+    await comprobarError(
+      db
+        .from("match_cards")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000"),
+      "Borrando tarjetas",
+    );
+
+    await comprobarError(
+      db
+        .from("match_goals")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000"),
+      "Borrando goles",
+    );
+
+    await comprobarError(
+      db
+        .from("match_players")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000"),
+      "Borrando jugadores de fichas",
+    );
+
+    await comprobarError(
+      db
+        .from("matches")
+        .update({
+          incidents: null,
+          mvp_open: false,
+        })
+        .neq("id", "00000000-0000-0000-0000-000000000000"),
+      "Limpiando incidencias de clasificación",
+    );
+
+    await comprobarError(
+      db
+        .from("final_matches")
+        .update({
+          incidents: null,
+          mvp_open: false,
+        })
+        .neq("id", "00000000-0000-0000-0000-000000000000"),
+      "Limpiando incidencias de eliminatorias",
+    );
   }
 
   async function borrarSanciones() {
     const db = supabase as any;
 
-    await db
-      .from("suspension_served_matches")
-      .delete()
-      .neq("id", "00000000-0000-0000-0000-000000000000");
+    await comprobarError(
+      db
+        .from("suspension_served_matches")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000"),
+      "Borrando partidos de sanción cumplidos",
+    );
 
-    await db
-      .from("suspensions")
-      .delete()
-      .neq("id", "00000000-0000-0000-0000-000000000000");
+    await comprobarError(
+      db
+        .from("suspensions")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000"),
+      "Borrando sanciones",
+    );
   }
 
   async function borrarCalendarioClasificacion() {
@@ -314,10 +506,13 @@ export default function AdminPage() {
 
     await limpiarDatosPartidosGrupo();
 
-    await db
-      .from("matches")
-      .delete()
-      .neq("id", "00000000-0000-0000-0000-000000000000");
+    await comprobarError(
+      db
+        .from("matches")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000"),
+      "Borrando calendario",
+    );
   }
 
   async function borrarEliminatorias() {
@@ -325,10 +520,13 @@ export default function AdminPage() {
 
     await limpiarDatosEliminatorias();
 
-    await db
-      .from("final_matches")
-      .delete()
-      .neq("id", "00000000-0000-0000-0000-000000000000");
+    await comprobarError(
+      db
+        .from("final_matches")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000"),
+      "Borrando eliminatorias",
+    );
   }
 
   async function borrarJugadores() {
@@ -336,10 +534,13 @@ export default function AdminPage() {
 
     await borrarActasYFichas();
 
-    await db
-      .from("players")
-      .delete()
-      .neq("id", "00000000-0000-0000-0000-000000000000");
+    await comprobarError(
+      db
+        .from("players")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000"),
+      "Borrando jugadores",
+    );
   }
 
   async function borrarEquipos() {
@@ -349,15 +550,21 @@ export default function AdminPage() {
     await borrarCalendarioClasificacion();
     await borrarEliminatorias();
 
-    await db
-      .from("players")
-      .delete()
-      .neq("id", "00000000-0000-0000-0000-000000000000");
+    await comprobarError(
+      db
+        .from("players")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000"),
+      "Borrando jugadores",
+    );
 
-    await db
-      .from("teams")
-      .delete()
-      .neq("id", "00000000-0000-0000-0000-000000000000");
+    await comprobarError(
+      db
+        .from("teams")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000"),
+      "Borrando equipos",
+    );
   }
 
   async function borrarDatosTorneo() {
@@ -372,7 +579,7 @@ export default function AdminPage() {
         }
 
         sessionStorage.removeItem("zonaPeligrosaAdmin");
-      }
+      },
     );
 
     window.location.reload();
@@ -382,7 +589,7 @@ export default function AdminPage() {
     if (trabajando) return;
 
     const confirmar = window.confirm(
-      "Se descargará una copia de seguridad en formato JSON con los datos principales del torneo.\n\n¿Continuar?"
+      "Se descargará una copia de seguridad en formato JSON con los datos principales del torneo.\n\n¿Continuar?",
     );
 
     if (!confirmar) return;
@@ -416,7 +623,7 @@ export default function AdminPage() {
       setMensajeMantenimiento(
         `No se ha podido crear la copia: ${
           error instanceof Error ? error.message : "error desconocido"
-        }`
+        }`,
       );
     } finally {
       setTrabajando(false);
@@ -435,13 +642,13 @@ export default function AdminPage() {
     if (!file) return;
 
     const confirmar1 = window.confirm(
-      "⚠️ Restaurar una copia sustituirá los datos actuales del torneo.\n\nAntes de restaurar, es recomendable descargar una copia de seguridad del estado actual.\n\n¿Quieres continuar?"
+      "⚠️ Restaurar una copia sustituirá los datos actuales del torneo.\n\nAntes de restaurar, es recomendable descargar una copia de seguridad del estado actual.\n\n¿Quieres continuar?",
     );
 
     if (!confirmar1) return;
 
     const confirmar2 = window.confirm(
-      "🚨 Última confirmación.\n\nSe borrarán los datos actuales y se cargarán los del archivo seleccionado.\n\n¿Restaurar copia?"
+      "🚨 Última confirmación.\n\nSe borrarán los datos actuales y se cargarán los del archivo seleccionado.\n\n¿Restaurar copia?",
     );
 
     if (!confirmar2) return;
@@ -463,20 +670,29 @@ export default function AdminPage() {
       await borrarCalendarioClasificacion();
       await borrarEliminatorias();
 
-      await db
-        .from("rules")
-        .delete()
-        .neq("id", "00000000-0000-0000-0000-000000000000");
+      await comprobarError(
+        db
+          .from("rules")
+          .delete()
+          .neq("id", "00000000-0000-0000-0000-000000000000"),
+        "Borrando normativa",
+      );
 
-      await db
-        .from("players")
-        .delete()
-        .neq("id", "00000000-0000-0000-0000-000000000000");
+      await comprobarError(
+        db
+          .from("players")
+          .delete()
+          .neq("id", "00000000-0000-0000-0000-000000000000"),
+        "Borrando jugadores",
+      );
 
-      await db
-        .from("teams")
-        .delete()
-        .neq("id", "00000000-0000-0000-0000-000000000000");
+      await comprobarError(
+        db
+          .from("teams")
+          .delete()
+          .neq("id", "00000000-0000-0000-0000-000000000000"),
+        "Borrando equipos",
+      );
 
       for (const tableName of RESTORE_INSERT_ORDER) {
         const rows = backup.tables[tableName] ?? [];
@@ -497,7 +713,7 @@ export default function AdminPage() {
       setMensajeMantenimiento(
         `No se ha podido restaurar la copia: ${
           error instanceof Error ? error.message : "error desconocido"
-        }`
+        }`,
       );
     } finally {
       setTrabajando(false);
@@ -638,7 +854,7 @@ export default function AdminPage() {
                       ejecutarOperacion(
                         "Borrar equipos",
                         "Se borrarán equipos, jugadores, calendario, eliminatorias, fichas, resultados, sanciones y votos asociados.",
-                        borrarEquipos
+                        borrarEquipos,
                       )
                     }
                     disabled={trabajando}
@@ -652,7 +868,7 @@ export default function AdminPage() {
                       ejecutarOperacion(
                         "Borrar jugadores",
                         "Se borrarán jugadores y todos sus datos asociados: fichas, goles, tarjetas, sanciones y votos.",
-                        borrarJugadores
+                        borrarJugadores,
                       )
                     }
                     disabled={trabajando}
@@ -665,8 +881,8 @@ export default function AdminPage() {
                     onClick={() =>
                       ejecutarOperacion(
                         "Quitar resultados de clasificación",
-                        "Se pondrán a cero los marcadores, estados, MVP e incidencias de los partidos de clasificación. No se eliminará el calendario.",
-                        borrarResultadosClasificacion
+                        "Se pondrán a cero los marcadores, estados, MVP, incidencias, fichas, goles, tarjetas, sanciones y votos de los partidos de clasificación. No se eliminará el calendario.",
+                        borrarResultadosClasificacion,
                       )
                     }
                     disabled={trabajando}
@@ -679,8 +895,8 @@ export default function AdminPage() {
                     onClick={() =>
                       ejecutarOperacion(
                         "Quitar resultados de eliminatorias",
-                        "Se pondrán a cero los marcadores, penaltis, estados, MVP e incidencias de las eliminatorias. No se eliminarán los cruces.",
-                        borrarResultadosEliminatorias
+                        "Se pondrán a cero los marcadores, penaltis, estados, MVP, incidencias, fichas, goles, tarjetas, sanciones y votos de eliminatorias. No se eliminarán los cruces.",
+                        borrarResultadosEliminatorias,
                       )
                     }
                     disabled={trabajando}
@@ -694,7 +910,7 @@ export default function AdminPage() {
                       ejecutarOperacion(
                         "Borrar calendario",
                         "Se borrarán todos los partidos de clasificación y sus datos asociados.",
-                        borrarCalendarioClasificacion
+                        borrarCalendarioClasificacion,
                       )
                     }
                     disabled={trabajando}
@@ -708,7 +924,7 @@ export default function AdminPage() {
                       ejecutarOperacion(
                         "Borrar eliminatorias",
                         "Se borrarán todos los cruces de eliminatorias y sus datos asociados.",
-                        borrarEliminatorias
+                        borrarEliminatorias,
                       )
                     }
                     disabled={trabajando}
@@ -722,7 +938,7 @@ export default function AdminPage() {
                       ejecutarOperacion(
                         "Borrar actas y fichas",
                         "Se borrarán participantes, goles, tarjetas, incidencias, sanciones y votos MVP asociados a las fichas.",
-                        borrarActasYFichas
+                        borrarActasYFichas,
                       )
                     }
                     disabled={trabajando}
@@ -736,7 +952,7 @@ export default function AdminPage() {
                       ejecutarOperacion(
                         "Borrar sanciones",
                         "Se borrarán sanciones y partidos de sanción cumplidos.",
-                        borrarSanciones
+                        borrarSanciones,
                       )
                     }
                     disabled={trabajando}

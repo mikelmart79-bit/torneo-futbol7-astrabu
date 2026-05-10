@@ -78,14 +78,14 @@ type NewFinalMatch = {
 };
 
 const OCTAVOS_PAIRS = [
-  [1, 16], // O1
-  [8, 9], // O2
-  [4, 13], // O3
-  [5, 12], // O4
-  [2, 15], // O5
-  [7, 10], // O6
-  [3, 14], // O7
-  [6, 11], // O8
+  [1, 16],
+  [8, 9],
+  [4, 13],
+  [5, 12],
+  [2, 15],
+  [7, 10],
+  [3, 14],
+  [6, 11],
 ];
 
 const OCTAVOS_DATES = [
@@ -126,6 +126,7 @@ export default function AdminFaseFinalPage() {
   const [mensaje, setMensaje] = useState("");
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [filling, setFilling] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [phase, setPhase] = useState("Octavos");
@@ -286,16 +287,8 @@ export default function AdminFaseFinalPage() {
     const payloadBase = {
       phase,
       title: title.trim(),
-      home_ref: referenciaLado(
-        homeSourceType,
-        homeSourceMatchTitle,
-        homeRef
-      ),
-      away_ref: referenciaLado(
-        awaySourceType,
-        awaySourceMatchTitle,
-        awayRef
-      ),
+      home_ref: referenciaLado(homeSourceType, homeSourceMatchTitle, homeRef),
+      away_ref: referenciaLado(awaySourceType, awaySourceMatchTitle, awayRef),
       home_source_type: homeSourceType,
       home_source_match_title:
         homeSourceType === "winner" || homeSourceType === "loser"
@@ -312,20 +305,26 @@ export default function AdminFaseFinalPage() {
       sort_order: Number(sortOrder) || 1,
     };
 
-    const { error } = selectedId
+    const { data, error } = selectedId
       ? await supabase
           .from("final_matches")
           .update(payloadBase)
           .eq("id", selectedId)
-      : await supabase.from("final_matches").insert({
-          ...payloadBase,
-          home_score: null,
-          away_score: null,
-          home_penalties: null,
-          away_penalties: null,
-          status: "Pendiente",
-          mvp_open: false,
-        });
+          .select("id")
+          .single()
+      : await supabase
+          .from("final_matches")
+          .insert({
+            ...payloadBase,
+            home_score: null,
+            away_score: null,
+            home_penalties: null,
+            away_penalties: null,
+            status: "Pendiente",
+            mvp_open: false,
+          })
+          .select("id")
+          .single();
 
     if (error) {
       console.error("Error guardando eliminatoria:", error);
@@ -335,7 +334,7 @@ export default function AdminFaseFinalPage() {
     }
 
     setMensaje("Eliminatoria guardada correctamente.");
-    await cargarCruces(selectedId || undefined);
+    await cargarCruces(data?.id ?? selectedId || undefined);
     setSaving(false);
   }
 
@@ -433,6 +432,42 @@ export default function AdminFaseFinalPage() {
     });
   }
 
+  async function obtenerTop16Clasificacion() {
+    const { data: teamsData, error: teamsError } = await supabase
+      .from("teams")
+      .select("id, name, group_name")
+      .order("name", { ascending: true });
+
+    if (teamsError) {
+      console.error("Error cargando equipos:", teamsError);
+      setMensaje("No se han podido cargar los equipos.");
+      return null;
+    }
+
+    const { data: matchesData, error: matchesError } = await supabase
+      .from("matches")
+      .select("id, home_team_id, away_team_id, home_score, away_score");
+
+    if (matchesError) {
+      console.error("Error cargando partidos:", matchesError);
+      setMensaje("No se han podido cargar los partidos.");
+      return null;
+    }
+
+    const teams = (teamsData ?? []) as Team[];
+    const groupMatches = (matchesData ?? []) as GroupMatch[];
+    const clasificacion = calcularClasificacionGeneral(teams, groupMatches);
+
+    if (clasificacion.length < 16) {
+      setMensaje(
+        `Solo hay ${clasificacion.length} equipos. Necesitas al menos 16 para rellenar octavos.`
+      );
+      return null;
+    }
+
+    return clasificacion.slice(0, 16);
+  }
+
   function crearCruce(
     phaseName: string,
     titleName: string,
@@ -467,9 +502,9 @@ export default function AdminFaseFinalPage() {
     };
   }
 
-  async function generarEliminatoriasAutomaticas() {
+  async function generarSoloCuadroEliminatorias() {
     const confirmar = window.confirm(
-      "Esto borrará las eliminatorias actuales y generará el cuadro completo desde la clasificación general.\n\nOctavos: 1º-16º, 8º-9º, 4º-13º, 5º-12º, 2º-15º, 7º-10º, 3º-14º y 6º-11º.\n\n¿Continuar?"
+      "Esto borrará las eliminatorias actuales y generará SOLO el cuadro completo.\n\nLos octavos quedarán como 1º Clasificación vs 16º Clasificación, 8º vs 9º, etc.\n\nDespués podrás rellenar los equipos desde la clasificación cuando esté cerrada.\n\n¿Continuar?"
     );
 
     if (!confirmar) return;
@@ -477,56 +512,17 @@ export default function AdminFaseFinalPage() {
     setGenerating(true);
     setMensaje("");
 
-    const { data: teamsData, error: teamsError } = await supabase
-      .from("teams")
-      .select("id, name, group_name")
-      .order("name", { ascending: true });
-
-    if (teamsError) {
-      console.error("Error cargando equipos:", teamsError);
-      setMensaje("No se han podido cargar los equipos.");
-      setGenerating(false);
-      return;
-    }
-
-    const { data: matchesData, error: matchesError } = await supabase
-      .from("matches")
-      .select("id, home_team_id, away_team_id, home_score, away_score");
-
-    if (matchesError) {
-      console.error("Error cargando partidos:", matchesError);
-      setMensaje("No se han podido cargar los partidos.");
-      setGenerating(false);
-      return;
-    }
-
-    const teams = (teamsData ?? []) as Team[];
-    const groupMatches = (matchesData ?? []) as GroupMatch[];
-
-    const clasificacion = calcularClasificacionGeneral(teams, groupMatches);
-
-    if (clasificacion.length < 16) {
-      setMensaje(
-        `Solo hay ${clasificacion.length} equipos. Necesitas al menos 16 para generar octavos.`
-      );
-      setGenerating(false);
-      return;
-    }
-
-    const clasificados = clasificacion.slice(0, 16);
     const nuevosCruces: NewFinalMatch[] = [];
 
     OCTAVOS_PAIRS.forEach(([homePosition, awayPosition], index) => {
-      const local = clasificados[homePosition - 1];
-      const visitante = clasificados[awayPosition - 1];
       const titleName = `Octavo ${index + 1}`;
 
       nuevosCruces.push(
         crearCruce(
           "Octavos",
           titleName,
-          local.teamName,
-          visitante.teamName,
+          `${homePosition}º Clasificación`,
+          `${awayPosition}º Clasificación`,
           nuevosCruces.length + 1,
           OCTAVOS_DATES[index] ?? null,
           "manual",
@@ -633,25 +629,104 @@ export default function AdminFaseFinalPage() {
       .insert(nuevosCruces);
 
     if (insertError) {
-      console.error("Error generando eliminatorias:", insertError);
-      setMensaje("No se han podido generar las eliminatorias.");
+      console.error("Error generando cuadro:", insertError);
+      setMensaje("No se ha podido generar el cuadro de eliminatorias.");
       setGenerating(false);
       return;
     }
 
-    setMensaje(
-      "Eliminatorias generadas correctamente con el cuadro de octavos definido."
-    );
+    setMensaje("Cuadro de eliminatorias generado correctamente.");
     setSelectedId("");
     await cargarCruces();
     setGenerating(false);
+  }
+
+  async function rellenarEquiposDesdeClasificacion() {
+    const confirmar = window.confirm(
+      "Esto rellenará los equipos de octavos usando los 16 primeros de la clasificación general.\n\nNo borrará cuartos, semifinales, tercer puesto ni final.\n\n¿Continuar?"
+    );
+
+    if (!confirmar) return;
+
+    setFilling(true);
+    setMensaje("");
+
+    const clasificados = await obtenerTop16Clasificacion();
+
+    if (!clasificados) {
+      setFilling(false);
+      return;
+    }
+
+    const { data: octavosData, error: octavosError } = await supabase
+      .from("final_matches")
+      .select("*")
+      .eq("phase", "Octavos")
+      .order("sort_order", { ascending: true });
+
+    if (octavosError) {
+      console.error("Error cargando octavos:", octavosError);
+      setMensaje("No se han podido cargar los octavos.");
+      setFilling(false);
+      return;
+    }
+
+    const octavos = (octavosData ?? []) as FinalMatch[];
+
+    if (octavos.length < 8) {
+      setMensaje(
+        "No hay 8 octavos creados. Primero pulsa 'Generar solo cuadro de eliminatorias'."
+      );
+      setFilling(false);
+      return;
+    }
+
+    for (let index = 0; index < OCTAVOS_PAIRS.length; index++) {
+      const [homePosition, awayPosition] = OCTAVOS_PAIRS[index];
+      const octavo = octavos.find(
+        (match) => match.title === `Octavo ${index + 1}`
+      );
+
+      if (!octavo) {
+        setMensaje(`No se ha encontrado Octavo ${index + 1}.`);
+        setFilling(false);
+        return;
+      }
+
+      const local = clasificados[homePosition - 1];
+      const visitante = clasificados[awayPosition - 1];
+
+      const { error: updateError } = await supabase
+        .from("final_matches")
+        .update({
+          home_ref: local.teamName,
+          away_ref: visitante.teamName,
+          home_source_type: "manual",
+          home_source_match_title: null,
+          away_source_type: "manual",
+          away_source_match_title: null,
+        })
+        .eq("id", octavo.id);
+
+      if (updateError) {
+        console.error("Error rellenando octavo:", updateError);
+        setMensaje(`No se ha podido actualizar Octavo ${index + 1}.`);
+        setFilling(false);
+        return;
+      }
+    }
+
+    setMensaje("Equipos de octavos añadidos desde la clasificación.");
+    await cargarCruces(selectedId || undefined);
+    setFilling(false);
   }
 
   const opcionesCrucesFuente = matches.filter((match) => match.id !== selectedId);
 
   const mensajeCorrecto =
     mensaje.includes("correctamente") ||
-    mensaje.includes("generadas") ||
+    mensaje.includes("generado") ||
+    mensaje.includes("añadidos") ||
     mensaje.includes("eliminada");
 
   return (
@@ -674,7 +749,7 @@ export default function AdminFaseFinalPage() {
             </h1>
 
             <p className="mt-2 text-center text-sm font-bold text-emerald-100">
-              Cuadro automático desde octavos y edición manual
+              Cuadro desde octavos y edición manual
             </p>
           </div>
 
@@ -709,9 +784,8 @@ export default function AdminFaseFinalPage() {
                 </p>
 
                 <p className="mt-2 text-sm font-bold text-slate-600">
-                  Genera el cuadro completo con los 16 primeros de la
-                  clasificación general. Después podrás modificar cualquier
-                  eliminatoria manualmente.
+                  Primero puedes generar el cuadro vacío. Cuando la clasificación
+                  esté cerrada, añade los equipos reales a octavos.
                 </p>
 
                 <div className="mt-4 rounded-2xl bg-slate-100 p-4 text-xs font-black leading-relaxed text-slate-700">
@@ -722,13 +796,23 @@ export default function AdminFaseFinalPage() {
                 </div>
 
                 <button
-                  onClick={generarEliminatoriasAutomaticas}
-                  disabled={generating || saving}
-                  className="mt-4 w-full rounded-xl bg-red-600 py-3 font-black text-white shadow disabled:opacity-60"
+                  onClick={generarSoloCuadroEliminatorias}
+                  disabled={generating || filling || saving}
+                  className="mt-4 w-full rounded-xl bg-slate-950 py-3 font-black text-white shadow disabled:opacity-60"
                 >
                   {generating
-                    ? "Generando eliminatorias..."
-                    : "Generar eliminatorias desde clasificación"}
+                    ? "Generando cuadro..."
+                    : "Generar solo cuadro de eliminatorias"}
+                </button>
+
+                <button
+                  onClick={rellenarEquiposDesdeClasificacion}
+                  disabled={generating || filling || saving}
+                  className="mt-3 w-full rounded-xl bg-red-600 py-3 font-black text-white shadow disabled:opacity-60"
+                >
+                  {filling
+                    ? "Añadiendo equipos..."
+                    : "Añadir equipos desde clasificación"}
                 </button>
               </div>
 
@@ -956,7 +1040,7 @@ export default function AdminFaseFinalPage() {
 
                 <button
                   onClick={guardarCruce}
-                  disabled={saving || generating}
+                  disabled={saving || generating || filling}
                   className="mt-6 w-full rounded-xl bg-red-600 py-3 font-black text-white shadow disabled:opacity-60"
                 >
                   {saving ? "Guardando..." : "Guardar eliminatoria"}
@@ -965,7 +1049,7 @@ export default function AdminFaseFinalPage() {
                 {selectedId && (
                   <button
                     onClick={eliminarCruce}
-                    disabled={saving || generating}
+                    disabled={saving || generating || filling}
                     className="mt-3 w-full rounded-xl bg-slate-900 py-3 font-black text-white shadow disabled:opacity-60"
                   >
                     Eliminar eliminatoria

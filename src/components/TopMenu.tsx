@@ -155,9 +155,13 @@ export default function TopMenu() {
             <div className="sticky top-0 z-10 border-b border-white/10 bg-slate-950/95 px-5 py-5 backdrop-blur">
               <div className="flex items-center justify-between gap-4">
                 <div className="min-w-0">
-                  <h2 className="text-2xl font-black leading-tight">
-                    Menú
-                  </h2>
+                  <div className="inline-flex max-w-[165px] rounded-2xl bg-white/10 px-3 py-2 shadow">
+                    <img
+                      src="/logo-menu.png"
+                      alt="Torneo Astrabudua"
+                      className="h-10 w-auto object-contain"
+                    />
+                  </div>
                 </div>
 
                 <button

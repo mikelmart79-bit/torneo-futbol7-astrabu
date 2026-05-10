@@ -58,10 +58,7 @@ function textoResultado(match: FinalMatch) {
 
   const resultado = `${match.home_score} - ${match.away_score}`;
 
-  if (
-    match.home_penalties !== null &&
-    match.away_penalties !== null
-  ) {
+  if (match.home_penalties !== null && match.away_penalties !== null) {
     return `${resultado} · pen. ${match.home_penalties}-${match.away_penalties}`;
   }
 
@@ -74,10 +71,7 @@ function ganador(match: FinalMatch) {
   if (match.home_score > match.away_score) return match.home_ref;
   if (match.away_score > match.home_score) return match.away_ref;
 
-  if (
-    match.home_penalties !== null &&
-    match.away_penalties !== null
-  ) {
+  if (match.home_penalties !== null && match.away_penalties !== null) {
     if (match.home_penalties > match.away_penalties) return match.home_ref;
     if (match.away_penalties > match.home_penalties) return match.away_ref;
   }
@@ -85,16 +79,11 @@ function ganador(match: FinalMatch) {
   return "";
 }
 
-function partidoCard(match: FinalMatch, compacto = false) {
+function partidoCard(match: FinalMatch) {
   const ganadorNombre = ganador(match);
 
   return (
-    <div
-      key={match.id}
-      className={`rounded-2xl bg-slate-50 shadow-sm ${
-        compacto ? "p-3" : "p-4"
-      }`}
-    >
+    <div key={match.id} className="rounded-2xl bg-slate-50 p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-xs font-black uppercase text-red-600">
@@ -187,9 +176,7 @@ function bracketBox(match: FinalMatch | undefined) {
             {match.home_ref}
           </p>
 
-          <span className="font-black">
-            {match.home_score ?? "-"}
-          </span>
+          <span className="font-black">{match.home_score ?? "-"}</span>
         </div>
 
         <div className="flex items-center justify-between gap-2">
@@ -201,9 +188,7 @@ function bracketBox(match: FinalMatch | undefined) {
             {match.away_ref}
           </p>
 
-          <span className="font-black">
-            {match.away_score ?? "-"}
-          </span>
+          <span className="font-black">{match.away_score ?? "-"}</span>
         </div>
       </div>
 
@@ -228,31 +213,40 @@ function Accordion({
   abierto,
   onToggle,
   children,
-  variant = "dark",
+  variant = "red",
 }: {
   title: string;
-  subtitle: string;
+  subtitle?: string;
   abierto: boolean;
   onToggle: () => void;
   children: React.ReactNode;
-  variant?: "dark" | "red";
+  variant?: "red" | "green" | "gold";
 }) {
+  const colorClass =
+    variant === "green"
+      ? "bg-emerald-600 text-white"
+      : variant === "gold"
+      ? "bg-yellow-400 text-slate-950"
+      : "bg-red-600 text-white";
+
+  const subtitleClass =
+    variant === "gold" ? "text-yellow-900" : "text-white/85";
+
   return (
     <div className="overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
       <button
         onClick={onToggle}
-        className={`flex w-full items-center justify-between px-5 py-4 text-left text-white ${
-          variant === "red" ? "bg-red-600" : "bg-slate-950"
-        }`}
+        className={`flex w-full items-center justify-between px-5 py-4 text-left ${colorClass}`}
       >
         <div>
           <p className="text-lg font-black">{title}</p>
-          <p className="text-sm font-bold opacity-80">{subtitle}</p>
+
+          {subtitle && (
+            <p className={`text-sm font-bold ${subtitleClass}`}>{subtitle}</p>
+          )}
         </div>
 
-        <span className="text-3xl font-black">
-          {abierto ? "−" : "+"}
-        </span>
+        <span className="text-3xl font-black">{abierto ? "−" : "+"}</span>
       </button>
 
       {abierto && <div className="space-y-3 p-4">{children}</div>}
@@ -412,7 +406,7 @@ export default function FaseFinalPage() {
               subtitle="Vista completa hasta la final"
               abierto={cuadroAbierto}
               onToggle={() => setCuadroAbierto(!cuadroAbierto)}
-              variant="red"
+              variant="green"
             >
               <div className="overflow-x-auto pb-2">
                 <div className="grid min-w-[900px] grid-cols-[1.2fr_1fr_1fr_1.1fr_1fr_1fr_1.2fr] items-center gap-3">
@@ -478,9 +472,9 @@ export default function FaseFinalPage() {
 
             <Accordion
               title="Octavos"
-              subtitle={`${octavos.length} partidos`}
               abierto={octavosAbierto}
               onToggle={() => setOctavosAbierto(!octavosAbierto)}
+              variant="red"
             >
               {octavos.length === 0 ? (
                 <p className="rounded-2xl bg-slate-50 p-4 font-bold text-slate-500">
@@ -493,7 +487,6 @@ export default function FaseFinalPage() {
 
             <Accordion
               title="Cuartos"
-              subtitle={`${cuartos.length} partidos`}
               abierto={cuartosAbierto}
               onToggle={() => setCuartosAbierto(!cuartosAbierto)}
               variant="red"
@@ -509,9 +502,9 @@ export default function FaseFinalPage() {
 
             <Accordion
               title="Semifinales"
-              subtitle={`${semifinales.length} partidos`}
               abierto={semisAbierto}
               onToggle={() => setSemisAbierto(!semisAbierto)}
+              variant="red"
             >
               {semifinales.length === 0 ? (
                 <p className="rounded-2xl bg-slate-50 p-4 font-bold text-slate-500">
@@ -524,9 +517,9 @@ export default function FaseFinalPage() {
 
             <Accordion
               title="Tercer puesto"
-              subtitle={`${tercerPuesto.length} partido`}
               abierto={tercerAbierto}
               onToggle={() => setTercerAbierto(!tercerAbierto)}
+              variant="red"
             >
               {tercerPuesto.length === 0 ? (
                 <p className="rounded-2xl bg-slate-50 p-4 font-bold text-slate-500">
@@ -539,10 +532,9 @@ export default function FaseFinalPage() {
 
             <Accordion
               title="Final"
-              subtitle={`${final.length} partido`}
               abierto={finalAbierto}
               onToggle={() => setFinalAbierto(!finalAbierto)}
-              variant="red"
+              variant="gold"
             >
               {final.length === 0 ? (
                 <p className="rounded-2xl bg-slate-50 p-4 font-bold text-slate-500">

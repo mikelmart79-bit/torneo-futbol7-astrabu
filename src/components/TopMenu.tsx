@@ -154,19 +154,17 @@ export default function TopMenu() {
           <aside className="absolute right-0 top-0 h-full w-[58%] min-w-[230px] max-w-[300px] overflow-y-auto bg-slate-950 text-white shadow-2xl sm:w-1/2">
             <div className="sticky top-0 z-10 border-b border-white/10 bg-slate-950/95 px-5 py-5 backdrop-blur">
               <div className="flex items-center justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="inline-flex max-w-[165px] rounded-2xl bg-white/10 px-3 py-2 shadow">
-                    <img
-                      src="/logo-menu.png"
-                      alt="Torneo Astrabudua"
-                      className="h-10 w-auto object-contain"
-                    />
-                  </div>
+                <div className="min-w-0 flex-1">
+                  <img
+                    src="/logo-menu.png"
+                    alt="Torneo Astrabudua"
+                    className="h-16 w-auto max-w-[190px] object-contain"
+                  />
                 </div>
 
                 <button
                   onClick={closeMenu}
-                  className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-white"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-white"
                   aria-label="Cerrar menú"
                 >
                   <X size={28} strokeWidth={3} />

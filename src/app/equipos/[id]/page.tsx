@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
-type PlayerType = "M" | "F";
+type PlayerType = "M" | "F" | "-";
 
 type Team = {
   id: string;
@@ -80,6 +80,17 @@ function crearStatsVacias(): PlayerStats {
     red: 0,
     suspensions: 0,
   };
+}
+
+function normalizarTipoJugador(tipo: PlayerType | null | undefined): PlayerType {
+  if (tipo === "M" || tipo === "F" || tipo === "-") return tipo;
+  return "-";
+}
+
+function claseTipoJugador(tipo: PlayerType) {
+  if (tipo === "F") return "bg-emerald-100 text-emerald-700";
+  if (tipo === "M") return "bg-slate-200 text-slate-700";
+  return "bg-white text-slate-500";
 }
 
 export default function EquipoDetalle() {
@@ -417,7 +428,7 @@ export default function EquipoDetalle() {
           ) : (
             <div className="mt-5 space-y-3">
               {jugadores.map((player) => {
-                const tipo = player.player_type === "F" ? "F" : "M";
+                const tipo = normalizarTipoJugador(player.player_type);
                 const esJugadorFavorito = jugadoresFavoritos.includes(
                   player.id
                 );
@@ -457,11 +468,9 @@ export default function EquipoDetalle() {
                       </button>
 
                       <div
-                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-black shadow ${
-                          tipo === "F"
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-slate-200 text-slate-700"
-                        }`}
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-black shadow ${claseTipoJugador(
+                          tipo
+                        )}`}
                       >
                         {tipo}
                       </div>

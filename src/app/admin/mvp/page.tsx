@@ -310,6 +310,9 @@ export default function AdminMvpPage() {
   const [selectedMatchId, setSelectedMatchId] = useState("");
   const [candidateDraftIds, setCandidateDraftIds] = useState<string[]>([]);
 
+  const [localAbierto, setLocalAbierto] = useState(false);
+  const [visitanteAbierto, setVisitanteAbierto] = useState(false);
+
   const [mensaje, setMensaje] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -347,6 +350,11 @@ export default function AdminMvpPage() {
     setCandidateDraftIds(selectedNominees.map((nominee) => nominee.player_id));
   }, [selectedMatchId, selectedNominees]);
 
+  useEffect(() => {
+    setLocalAbierto(false);
+    setVisitanteAbierto(false);
+  }, [selectedMatchId]);
+
   const votosPartido = useMemo(() => {
     if (!selectedMatch) return [];
 
@@ -383,6 +391,7 @@ export default function AdminMvpPage() {
   }, [players, selectedMatch]);
 
   const totalCandidatos = candidateDraftIds.length;
+
   const hayCambiosCandidatos =
     candidateDraftIds.slice().sort().join("|") !==
     selectedNominees
@@ -670,7 +679,7 @@ export default function AdminMvpPage() {
     });
   }
 
-  async function guardarCandidatos() {
+  async function guardarCandidatosBase(abrirDespues: boolean) {
     if (!selectedMatch) {
       setMensaje("Selecciona un partido.");
       return;
@@ -688,6 +697,11 @@ export default function AdminMvpPage() {
     const candidatosValidos = candidateDraftIds
       .map((id) => playerMap.get(id))
       .filter(Boolean) as Player[];
+
+    if (abrirDespues && candidatosValidos.length === 0) {
+      setMensaje("Selecciona al menos un candidato MVP antes de abrir la votación.");
+      return;
+    }
 
     const idsValidos = candidatosValidos.map((player) => player.id);
 
@@ -735,7 +749,9 @@ export default function AdminMvpPage() {
 
         if (error) {
           console.error("Error borrando votos fuera de candidatos:", error);
-          setMensaje("Candidatos actualizados, pero no se han podido limpiar todos los votos antiguos.");
+          setMensaje(
+            "Candidatos actualizados, pero no se han podido limpiar todos los votos antiguos.",
+          );
           setSaving(false);
           return;
         }
@@ -762,23 +778,39 @@ export default function AdminMvpPage() {
       }
     }
 
-    setMensaje("Candidatos MVP guardados correctamente.");
+    if (abrirDespues && !selectedMatch.mvp_open) {
+      const tabla = selectedMatch.tipo === "final" ? "final_matches" : "matches";
+
+      const { error: openError } = await supabase
+        .from(tabla)
+        .update({ mvp_open: true })
+        .eq("id", selectedMatch.id);
+
+      if (openError) {
+        console.error("Error abriendo votación:", openError);
+        setMensaje("Candidatos guardados, pero no se ha podido abrir la votación MVP.");
+        setSaving(false);
+        return;
+      }
+    }
+
+    setMensaje(
+      abrirDespues
+        ? "Candidatos guardados y votación MVP abierta correctamente."
+        : "Candidatos MVP guardados correctamente.",
+    );
+
     await cargarDatos(selectedMatch.id);
     setSaving(false);
   }
 
-  async function cambiarEstadoVotacion() {
+  async function cerrarVotacionMvp() {
     if (!selectedMatch) {
       setMensaje("Selecciona un partido.");
       return;
     }
 
-    if (!selectedMatch.mvp_open && selectedNominees.length === 0) {
-      setMensaje(
-        "Antes de abrir la votación, selecciona y guarda al menos un candidato MVP.",
-      );
-      return;
-    }
+    if (!selectedMatch.mvp_open) return;
 
     setSaving(true);
     setMensaje("");
@@ -787,22 +819,17 @@ export default function AdminMvpPage() {
 
     const { error } = await supabase
       .from(tabla)
-      .update({ mvp_open: !selectedMatch.mvp_open })
+      .update({ mvp_open: false })
       .eq("id", selectedMatch.id);
 
     if (error) {
-      console.error("Error cambiando votación:", error);
-      setMensaje("No se ha podido cambiar el estado de la votación.");
+      console.error("Error cerrando votación:", error);
+      setMensaje("No se ha podido cerrar la votación MVP.");
       setSaving(false);
       return;
     }
 
-    setMensaje(
-      selectedMatch.mvp_open
-        ? "Votación MVP cerrada correctamente."
-        : "Votación MVP abierta correctamente.",
-    );
-
+    setMensaje("Votación MVP cerrada correctamente.");
     await cargarDatos(selectedMatch.id);
     setSaving(false);
   }
@@ -857,7 +884,9 @@ export default function AdminMvpPage() {
       <label
         key={player.id}
         className={`flex items-center justify-between gap-3 rounded-2xl p-3 text-sm font-bold shadow-sm ${
-          checked ? "bg-emerald-100 text-emerald-900" : "bg-slate-100 text-slate-800"
+          checked
+            ? "bg-emerald-100 text-emerald-900"
+            : "bg-slate-100 text-slate-800"
         }`}
       >
         <span className="min-w-0 break-words">
@@ -871,6 +900,53 @@ export default function AdminMvpPage() {
           className="h-6 w-6 shrink-0"
         />
       </label>
+    );
+  }
+
+  function renderEquipoCandidatos(
+    nombreEquipo: string,
+    jugadores: Player[],
+    abierto: boolean,
+    setAbierto: (value: boolean) => void,
+  ) {
+    const seleccionados = jugadores.filter((player) =>
+      candidateDraftIds.includes(player.id),
+    ).length;
+
+    return (
+      <div className="mt-4 overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
+        <button
+          onClick={() => setAbierto(!abierto)}
+          className="flex w-full items-center justify-between gap-3 bg-red-600 px-4 py-4 text-left text-white"
+        >
+          <div className="min-w-0">
+            <p className="break-words text-base font-black leading-tight">
+              {nombreEquipo}
+            </p>
+
+            <p className="mt-1 text-xs font-bold text-red-100">
+              {seleccionados} candidato{seleccionados === 1 ? "" : "s"} seleccionado
+              {seleccionados === 1 ? "" : "s"}
+            </p>
+          </div>
+
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20 text-xl font-black">
+            {abierto ? "−" : "+"}
+          </div>
+        </button>
+
+        {abierto && (
+          <div className="space-y-2 p-3">
+            {jugadores.length === 0 ? (
+              <p className="rounded-2xl bg-slate-100 p-4 text-sm font-bold text-slate-500">
+                No hay jugadores en este equipo.
+              </p>
+            ) : (
+              jugadores.map((player) => renderJugadorCandidato(player))
+            )}
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -1042,21 +1118,20 @@ export default function AdminMvpPage() {
                         </div>
                       </div>
 
-                      <button
-                        onClick={cambiarEstadoVotacion}
-                        disabled={saving || (!selectedMatch.mvp_open && selectedNominees.length === 0)}
-                        className={`mt-4 w-full rounded-xl py-3 font-black text-white shadow disabled:opacity-60 ${
-                          selectedMatch.mvp_open
-                            ? "bg-slate-950"
-                            : "bg-red-600"
-                        }`}
-                      >
-                        {saving
-                          ? "Guardando..."
-                          : selectedMatch.mvp_open
-                            ? "Cerrar votación MVP"
-                            : "Abrir votación MVP"}
-                      </button>
+                      {selectedMatch.mvp_open ? (
+                        <button
+                          onClick={cerrarVotacionMvp}
+                          disabled={saving}
+                          className="mt-4 w-full rounded-xl bg-slate-950 py-3 font-black text-white shadow disabled:opacity-60"
+                        >
+                          {saving ? "Guardando..." : "Cerrar votación MVP"}
+                        </button>
+                      ) : (
+                        <p className="mt-4 rounded-xl bg-slate-100 p-3 text-xs font-bold text-slate-500">
+                          Para abrir la votación, selecciona candidatos abajo y pulsa
+                          “Guardar candidatos y abrir votación MVP”.
+                        </p>
+                      )}
 
                       <Link
                         href={`/votar-mvp?match=${selectedMatch.id}&type=${selectedMatch.tipo}`}
@@ -1089,58 +1164,50 @@ export default function AdminMvpPage() {
                       </p>
                     ) : (
                       <>
-                        <div className="mt-4 rounded-3xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
-                          <p className="mb-3 text-sm font-black uppercase text-slate-500">
-                            {selectedMatch.home_name}
-                          </p>
+                        {renderEquipoCandidatos(
+                          selectedMatch.home_name,
+                          jugadoresLocal,
+                          localAbierto,
+                          setLocalAbierto,
+                        )}
 
-                          {jugadoresLocal.length === 0 ? (
-                            <p className="rounded-2xl bg-slate-100 p-4 text-sm font-bold text-slate-500">
-                              No hay jugadores en este equipo.
-                            </p>
-                          ) : (
-                            <div className="space-y-2">
-                              {jugadoresLocal.map((player) =>
-                                renderJugadorCandidato(player),
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="mt-4 rounded-3xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
-                          <p className="mb-3 text-sm font-black uppercase text-slate-500">
-                            {selectedMatch.away_name}
-                          </p>
-
-                          {jugadoresVisitante.length === 0 ? (
-                            <p className="rounded-2xl bg-slate-100 p-4 text-sm font-bold text-slate-500">
-                              No hay jugadores en este equipo.
-                            </p>
-                          ) : (
-                            <div className="space-y-2">
-                              {jugadoresVisitante.map((player) =>
-                                renderJugadorCandidato(player),
-                              )}
-                            </div>
-                          )}
-                        </div>
+                        {renderEquipoCandidatos(
+                          selectedMatch.away_name,
+                          jugadoresVisitante,
+                          visitanteAbierto,
+                          setVisitanteAbierto,
+                        )}
 
                         <button
-                          onClick={guardarCandidatos}
-                          disabled={saving || !hayCambiosCandidatos}
-                          className="mt-5 w-full rounded-xl bg-slate-950 py-3 font-black text-white shadow disabled:bg-slate-300"
+                          onClick={() =>
+                            guardarCandidatosBase(!selectedMatch.mvp_open)
+                          }
+                          disabled={
+                            saving ||
+                            totalCandidatos === 0 ||
+                            (selectedMatch.mvp_open && !hayCambiosCandidatos)
+                          }
+                          className="mt-5 w-full rounded-xl bg-red-600 py-3 font-black text-white shadow disabled:bg-slate-300"
                         >
                           {saving
-                            ? "Guardando candidatos..."
-                            : hayCambiosCandidatos
-                              ? "Guardar candidatos MVP"
-                              : "Candidatos guardados"}
+                            ? "Guardando..."
+                            : selectedMatch.mvp_open
+                              ? hayCambiosCandidatos
+                                ? "Guardar cambios en candidatos"
+                                : "Candidatos guardados"
+                              : "Guardar candidatos y abrir votación MVP"}
                         </button>
 
                         {selectedMatch.mvp_open && hayCambiosCandidatos && (
                           <p className="mt-3 rounded-xl bg-yellow-100 p-3 text-xs font-bold text-yellow-900">
                             La votación está abierta. Guarda los cambios para que
                             la pantalla pública muestre la lista actualizada.
+                          </p>
+                        )}
+
+                        {!selectedMatch.mvp_open && totalCandidatos === 0 && (
+                          <p className="mt-3 rounded-xl bg-yellow-100 p-3 text-xs font-bold text-yellow-900">
+                            Selecciona al menos un candidato para poder abrir la votación.
                           </p>
                         )}
                       </>

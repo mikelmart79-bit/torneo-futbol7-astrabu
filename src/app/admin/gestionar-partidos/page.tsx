@@ -28,7 +28,6 @@ type Match = {
   home_score: number | null;
   away_score: number | null;
   status: string | null;
-  mvp_open: boolean | null;
   home_team: { name: string } | null;
   away_team: { name: string } | null;
 };
@@ -221,7 +220,6 @@ export default function AdminGestionarPartidosPage() {
   const [hora, setHora] = useState("");
   const [campo, setCampo] = useState("Campo 1");
   const [estado, setEstado] = useState("Pendiente");
-  const [mvpOpen, setMvpOpen] = useState(false);
 
   const [mensaje, setMensaje] = useState("");
   const [loading, setLoading] = useState(true);
@@ -264,7 +262,6 @@ export default function AdminGestionarPartidosPage() {
         home_score,
         away_score,
         status,
-        mvp_open,
         home_team:teams!matches_home_team_id_fkey(name),
         away_team:teams!matches_away_team_id_fkey(name)
       `
@@ -310,7 +307,6 @@ export default function AdminGestionarPartidosPage() {
     setHora("");
     setCampo("Campo 1");
     setEstado("Pendiente");
-    setMvpOpen(false);
     setMensaje("");
   }
 
@@ -322,7 +318,6 @@ export default function AdminGestionarPartidosPage() {
     setHora((match.match_time ?? "").slice(0, 5));
     setCampo(match.field ?? "Campo 1");
     setEstado(match.status ?? "Pendiente");
-    setMvpOpen(Boolean(match.mvp_open));
     setMensaje("");
   }
 
@@ -382,7 +377,6 @@ export default function AdminGestionarPartidosPage() {
       match_time: hora,
       field: campo.trim(),
       status: estado,
-      mvp_open: mvpOpen,
     };
 
     const { error } = selectedId
@@ -391,6 +385,7 @@ export default function AdminGestionarPartidosPage() {
           ...payload,
           home_score: null,
           away_score: null,
+          mvp_open: false,
         });
 
     if (error) {
@@ -471,12 +466,24 @@ export default function AdminGestionarPartidosPage() {
 
     const instrucciones = [
       ["Columna", "Uso"],
-      ["FECHA", "Obligatoria. Formato recomendado: dd/mm/yyyy, por ejemplo 01/07/2026."],
+      [
+        "FECHA",
+        "Obligatoria. Formato recomendado: dd/mm/yyyy, por ejemplo 01/07/2026.",
+      ],
       ["HORA", "Obligatoria. Formato recomendado: HH:mm, por ejemplo 18:00."],
       ["CAMPO", "Obligatoria. Ejemplo: Campo 1."],
-      ["LOCAL", "Obligatoria. Debe coincidir con el nombre exacto de un equipo ya creado."],
-      ["VISITANTE", "Obligatoria. Debe coincidir con el nombre exacto de un equipo ya creado."],
-      ["ESTADO", "Opcional. Pendiente, En juego, Finalizado o Cerrado. Si está vacío se usa Pendiente."],
+      [
+        "LOCAL",
+        "Obligatoria. Debe coincidir con el nombre exacto de un equipo ya creado.",
+      ],
+      [
+        "VISITANTE",
+        "Obligatoria. Debe coincidir con el nombre exacto de un equipo ya creado.",
+      ],
+      [
+        "ESTADO",
+        "Opcional. Pendiente, En juego, Finalizado o Cerrado. Si está vacío se usa Pendiente.",
+      ],
     ];
 
     const workbook = XLSX.utils.book_new();
@@ -923,17 +930,6 @@ export default function AdminGestionarPartidosPage() {
                     <option>Cerrado</option>
                   </select>
                 </div>
-
-                <label className="mt-4 flex items-center justify-between rounded-2xl bg-slate-100 p-4 font-black">
-                  <span>Abrir votación MVP</span>
-
-                  <input
-                    type="checkbox"
-                    checked={mvpOpen}
-                    onChange={(event) => setMvpOpen(event.target.checked)}
-                    className="h-6 w-6"
-                  />
-                </label>
 
                 <button
                   onClick={guardarPartido}

@@ -93,6 +93,12 @@ function claseTipoJugador(tipo: PlayerType) {
   return "bg-white text-slate-500";
 }
 
+function textoTipoJugador(tipo: PlayerType) {
+  if (tipo === "F") return "Federado";
+  if (tipo === "M") return "Municipio";
+  return "Sin tipo";
+}
+
 export default function EquipoDetalle() {
   const params = useParams();
   const idParam = params.id;
@@ -300,7 +306,7 @@ export default function EquipoDetalle() {
 
   if (loading) {
     return (
-      <main className="relative min-h-screen overflow-hidden bg-black text-slate-900">
+      <main className="relative min-h-screen overflow-x-hidden bg-black text-slate-900">
         <img
           src="/torneo-verano.png"
           alt="Fondo torneo"
@@ -318,7 +324,7 @@ export default function EquipoDetalle() {
 
   if (!equipo) {
     return (
-      <main className="relative min-h-screen overflow-hidden bg-black text-slate-900">
+      <main className="relative min-h-screen overflow-x-hidden bg-black text-slate-900">
         <img
           src="/torneo-verano.png"
           alt="Fondo torneo"
@@ -348,7 +354,7 @@ export default function EquipoDetalle() {
   const esFavorito = favoritos.includes(equipo.id);
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-black text-slate-900">
+    <main className="relative min-h-screen overflow-x-hidden bg-black text-slate-900">
       <img
         src="/torneo-verano.png"
         alt="Fondo torneo"
@@ -438,22 +444,28 @@ export default function EquipoDetalle() {
                 return (
                   <div
                     key={player.id}
-                    className="rounded-2xl bg-slate-50 p-4 shadow-sm"
+                    className="rounded-3xl bg-slate-50 p-4 shadow-sm"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-600 text-xl font-black text-white">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-red-600 text-2xl font-black text-white shadow">
                         {player.number ?? "-"}
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <p className="break-words text-lg font-black leading-tight">
+                        <p className="break-words text-[1.15rem] font-black leading-tight text-slate-950">
                           {player.name}
                         </p>
-                      </div>
 
+                        <p className="mt-2 text-xs font-bold text-slate-500">
+                          {tipo} · {textoTipoJugador(tipo)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-3 gap-3">
                       <button
                         onClick={() => toggleJugadorAbierto(player.id)}
-                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl font-black shadow ${
+                        className={`flex h-12 w-full items-center justify-center rounded-2xl text-xl font-black shadow ${
                           abierto
                             ? "bg-red-600 text-white"
                             : "bg-white text-slate-600"
@@ -468,7 +480,7 @@ export default function EquipoDetalle() {
                       </button>
 
                       <div
-                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-black shadow ${claseTipoJugador(
+                        className={`flex h-12 w-full items-center justify-center rounded-2xl text-sm font-black shadow ${claseTipoJugador(
                           tipo
                         )}`}
                       >
@@ -477,7 +489,7 @@ export default function EquipoDetalle() {
 
                       <button
                         onClick={() => toggleJugadorFavorito(player.id)}
-                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl font-black shadow ${
+                        className={`flex h-12 w-full items-center justify-center rounded-2xl text-2xl font-black shadow ${
                           esJugadorFavorito
                             ? "bg-yellow-300 text-slate-950"
                             : "bg-white text-slate-400"

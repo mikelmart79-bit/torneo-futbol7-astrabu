@@ -12,6 +12,11 @@ type Team = {
   name: string;
 };
 
+type TeamRef = {
+  id: string;
+  name: string;
+};
+
 type Match = {
   id: string;
   tipo: MatchType;
@@ -30,8 +35,8 @@ type Match = {
 };
 
 type RawMatch = Omit<Match, "tipo" | "home_team" | "away_team"> & {
-  home_team: { name: string }[] | { name: string } | null;
-  away_team: { name: string }[] | { name: string } | null;
+  home_team: TeamRef[] | TeamRef | null;
+  away_team: TeamRef[] | TeamRef | null;
 };
 
 type FinalMatch = {
@@ -45,7 +50,14 @@ type FinalMatch = {
   field: string | null;
   home_score: number | null;
   away_score: number | null;
+  home_penalties: number | null;
+  away_penalties: number | null;
   mvp_open: boolean | null;
+  sort_order: number;
+  home_source_type: string | null;
+  home_source_match_title: string | null;
+  away_source_type: string | null;
+  away_source_match_title: string | null;
 };
 
 type Player = {
@@ -64,15 +76,19 @@ type Vote = {
   team_id: string | null;
 };
 
-type MatchPlayerRow = {
+type MvpNominee = {
   id: string;
+  match_id: string | null;
+  final_match_id: string | null;
   player_id: string;
-  team_id: string;
+  team_id: string | null;
 };
 
-function normalizarEquipo(
-  equipo: RawMatch["home_team"]
-): { name: string } | null {
+function normalizarTexto(texto: string | null | undefined) {
+  return (texto ?? "").trim().toLowerCase();
+}
+
+function normalizarEquipo(equipo: RawMatch["home_team"]): TeamRef | null {
   if (!equipo) return null;
   if (Array.isArray(equipo)) return equipo[0] ?? null;
   return equipo;
@@ -89,10 +105,119 @@ function getUserId() {
   return userId;
 }
 
-function buscarEquipoPorNombre(nombre: string, equipos: Team[]) {
-  const limpio = nombre.trim().toLowerCase();
+function buscarEquipoPorNombre(
+  equipos: Team[],
+  nombre: string | null | undefined,
+): TeamRef | null {
+  const equipo = equipos.find(
+    (team) => normalizarTexto(team.name) === normalizarTexto(nombre),
+  );
 
-  return equipos.find((team) => team.name.trim().toLowerCase() === limpio);
+  return equipo ? { id: equipo.id, name: equipo.name } : null;
+}
+
+function tipoReferenciaEliminatoria(
+  sourceType: string | null | undefined,
+  referencia: string | null | undefined,
+): "winner" | "loser" | null {
+  const tipo = normalizarTexto(sourceType);
+  const ref = normalizarTexto(referencia);
+
+  if (tipo === "winner" || tipo === "ganador") return "winner";
+  if (tipo === "loser" || tipo === "perdedor") return "loser";
+
+  if (ref.startsWith("ganador ")) return "winner";
+  if (ref.startsWith("perdedor ")) return "loser";
+
+  return null;
+}
+
+function tituloReferenciaEliminatoria(
+  sourceMatchTitle: string | null | undefined,
+  referencia: string | null | undefined,
+) {
+  if (sourceMatchTitle && sourceMatchTitle.trim() !== "") {
+    return sourceMatchTitle.trim();
+  }
+
+  const ref = (referencia ?? "").trim();
+
+  const ganador = ref.match(/^ganador\s+(.+)$/i);
+  if (ganador?.[1]) return ganador[1].trim();
+
+  const perdedor = ref.match(/^perdedor\s+(.+)$/i);
+  if (perdedor?.[1]) return perdedor[1].trim();
+
+  return "";
+}
+
+function resolverEquipoDesdeReferencia(
+  referencia: string | null | undefined,
+  sourceType: string | null | undefined,
+  sourceMatchTitle: string | null | undefined,
+  equipos: Team[],
+  eliminatorias: FinalMatch[],
+  visitados = new Set<string>(),
+): TeamRef | null {
+  const directo = buscarEquipoPorNombre(equipos, referencia);
+
+  if (directo) return directo;
+
+  const tipo = tipoReferenciaEliminatoria(sourceType, referencia);
+  const tituloOrigen = tituloReferenciaEliminatoria(
+    sourceMatchTitle,
+    referencia,
+  );
+
+  if (!tipo || !tituloOrigen) return null;
+
+  const origen = eliminatorias.find(
+    (match) => normalizarTexto(match.title) === normalizarTexto(tituloOrigen),
+  );
+
+  if (!origen) return null;
+  if (visitados.has(origen.id)) return null;
+
+  visitados.add(origen.id);
+
+  if (origen.home_score === null || origen.away_score === null) {
+    return null;
+  }
+
+  let ganaLocal: boolean | null = null;
+
+  if (origen.home_score > origen.away_score) {
+    ganaLocal = true;
+  } else if (origen.home_score < origen.away_score) {
+    ganaLocal = false;
+  } else if (
+    origen.home_penalties !== null &&
+    origen.away_penalties !== null &&
+    origen.home_penalties !== origen.away_penalties
+  ) {
+    ganaLocal = origen.home_penalties > origen.away_penalties;
+  }
+
+  if (ganaLocal === null) return null;
+
+  const usarLocal = tipo === "winner" ? ganaLocal : !ganaLocal;
+
+  const siguienteReferencia = usarLocal ? origen.home_ref : origen.away_ref;
+  const siguienteSourceType = usarLocal
+    ? origen.home_source_type
+    : origen.away_source_type;
+  const siguienteSourceMatchTitle = usarLocal
+    ? origen.home_source_match_title
+    : origen.away_source_match_title;
+
+  return resolverEquipoDesdeReferencia(
+    siguienteReferencia,
+    siguienteSourceType,
+    siguienteSourceMatchTitle,
+    equipos,
+    eliminatorias,
+    visitados,
+  );
 }
 
 function formatearFechaSegura(fecha: string | null) {
@@ -104,12 +229,29 @@ function columnaPartido(tipo: MatchType) {
   return tipo === "final" ? "final_match_id" : "match_id";
 }
 
+function ordenarJugadores(jugadores: Player[], homeTeamId: string) {
+  return [...jugadores].sort((a, b) => {
+    const ordenA = a.team_id === homeTeamId ? 0 : 1;
+    const ordenB = b.team_id === homeTeamId ? 0 : 1;
+
+    if (ordenA !== ordenB) return ordenA - ordenB;
+
+    const dorsalA = a.number ?? 9999;
+    const dorsalB = b.number ?? 9999;
+
+    if (dorsalA !== dorsalB) return dorsalA - dorsalB;
+
+    return a.name.localeCompare(b.name);
+  });
+}
+
 export default function VotarMvpPage() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [selectedGroup, setSelectedGroup] = useState("");
   const [selectedMatchId, setSelectedMatchId] = useState("");
   const [players, setPlayers] = useState<Player[]>([]);
   const [votes, setVotes] = useState<Vote[]>([]);
+  const [nominees, setNominees] = useState<MvpNominee[]>([]);
   const [userId, setUserId] = useState("");
   const [mensaje, setMensaje] = useState("");
   const [loading, setLoading] = useState(true);
@@ -118,7 +260,7 @@ export default function VotarMvpPage() {
   const selectedMatch = matches.find((match) => match.id === selectedMatchId);
 
   const matchesGrupo = matches.filter(
-    (match) => match.group_name === selectedGroup
+    (match) => match.group_name === selectedGroup,
   );
 
   const jugadoresLocal = selectedMatch
@@ -130,9 +272,9 @@ export default function VotarMvpPage() {
     : [];
 
   const votosValidosPartido = useMemo(() => {
-    const jugadoresValidos = new Set(players.map((player) => player.id));
+    const candidatosValidos = new Set(players.map((player) => player.id));
 
-    return votes.filter((vote) => jugadoresValidos.has(vote.player_id));
+    return votes.filter((vote) => candidatosValidos.has(vote.player_id));
   }, [votes, players]);
 
   const totalVotosPartido = votosValidosPartido.length;
@@ -147,7 +289,7 @@ export default function VotarMvpPage() {
 
   const gruposConPartidos = useMemo(() => {
     const nombres = Array.from(
-      new Set(matches.map((match) => match.group_name))
+      new Set(matches.map((match) => match.group_name)),
     );
 
     return nombres.map((name, index) => ({
@@ -188,9 +330,9 @@ export default function VotarMvpPage() {
         away_team_id,
         home_score,
         away_score,
-        home_team:teams!matches_home_team_id_fkey(name),
-        away_team:teams!matches_away_team_id_fkey(name)
-      `
+        home_team:teams!matches_home_team_id_fkey(id, name),
+        away_team:teams!matches_away_team_id_fkey(id, name)
+      `,
       )
       .eq("mvp_open", true)
       .order("group_name", { ascending: true })
@@ -206,18 +348,44 @@ export default function VotarMvpPage() {
 
     const partidosGrupo: Match[] = (
       (matchesData as unknown as RawMatch[]) || []
-    ).map((match) => ({
-      ...match,
-      tipo: "grupo" as const,
-      group_name: match.group_name || "Clasificación",
-      home_team: normalizarEquipo(match.home_team),
-      away_team: normalizarEquipo(match.away_team),
-    }));
+    ).map((match) => {
+      const local = normalizarEquipo(match.home_team);
+      const visitante = normalizarEquipo(match.away_team);
+
+      return {
+        ...match,
+        tipo: "grupo" as const,
+        group_name: match.group_name || "Clasificación",
+        home_team_id: match.home_team_id,
+        away_team_id: match.away_team_id,
+        home_team: local ? { name: local.name } : null,
+        away_team: visitante ? { name: visitante.name } : null,
+      };
+    });
 
     const { data: finalData, error: finalError } = await supabase
       .from("final_matches")
       .select(
-        "id, phase, title, home_ref, away_ref, match_date, match_time, field, home_score, away_score, mvp_open"
+        `
+        id,
+        phase,
+        title,
+        home_ref,
+        away_ref,
+        match_date,
+        match_time,
+        field,
+        home_score,
+        away_score,
+        home_penalties,
+        away_penalties,
+        mvp_open,
+        sort_order,
+        home_source_type,
+        home_source_match_title,
+        away_source_type,
+        away_source_match_title
+      `,
       )
       .eq("mvp_open", true)
       .order("sort_order", { ascending: true });
@@ -229,10 +397,25 @@ export default function VotarMvpPage() {
       return;
     }
 
-    const eliminatorias = ((finalData ?? []) as FinalMatch[])
+    const finalesBase = (finalData ?? []) as FinalMatch[];
+
+    const eliminatorias = finalesBase
       .map((match): Match | null => {
-        const local = buscarEquipoPorNombre(match.home_ref, equipos);
-        const visitante = buscarEquipoPorNombre(match.away_ref, equipos);
+        const local = resolverEquipoDesdeReferencia(
+          match.home_ref,
+          match.home_source_type,
+          match.home_source_match_title,
+          equipos,
+          finalesBase,
+        );
+
+        const visitante = resolverEquipoDesdeReferencia(
+          match.away_ref,
+          match.away_source_type,
+          match.away_source_match_title,
+          equipos,
+          finalesBase,
+        );
 
         if (!local || !visitante) return null;
 
@@ -278,53 +461,53 @@ export default function VotarMvpPage() {
 
       setSelectedGroup(partidoInicial.group_name);
       setSelectedMatchId(partidoInicial.id);
-      await cargarJugadoresYVotos(partidoInicial);
+      await cargarCandidatosYVotos(partidoInicial);
     } else {
       setSelectedGroup("");
       setSelectedMatchId("");
       setPlayers([]);
       setVotes([]);
+      setNominees([]);
     }
 
     setLoading(false);
   }
 
-  async function cargarJugadoresYVotos(match: Match) {
+  async function cargarCandidatosYVotos(match: Match) {
     setMensaje("");
     setPlayers([]);
     setVotes([]);
+    setNominees([]);
 
-    const columnaFicha = columnaPartido(match.tipo);
+    const columna = columnaPartido(match.tipo);
 
-    const { data: participantesData, error: participantesError } =
-      await supabase
-        .from("match_players")
-        .select("id, player_id, team_id")
-        .eq(columnaFicha, match.id);
-
-    const columnaVoto = columnaPartido(match.tipo);
+    const { data: nomineesData, error: nomineesError } = await supabase
+      .from("mvp_nominees")
+      .select("id, match_id, final_match_id, player_id, team_id")
+      .eq(columna, match.id);
 
     const { data: votesData, error: votesError } = await supabase
       .from("mvp_votes")
       .select("id, match_id, final_match_id, player_id, user_id, team_id")
-      .eq(columnaVoto, match.id);
+      .eq(columna, match.id);
 
-    if (participantesError || votesError) {
+    if (nomineesError || votesError) {
       console.error(
-        "Error cargando ficha o votos:",
-        participantesError || votesError
+        "Error cargando candidatos o votos:",
+        nomineesError || votesError,
       );
-      setMensaje("No se han podido cargar los jugadores de la ficha o los votos.");
+      setMensaje("No se han podido cargar los candidatos MVP o los votos.");
       return;
     }
 
-    const participantes = (participantesData ?? []) as MatchPlayerRow[];
+    const candidatos = (nomineesData ?? []) as MvpNominee[];
     const votosPartido = (votesData ?? []) as Vote[];
 
+    setNominees(candidatos);
     setVotes(votosPartido);
 
     const playerIds = Array.from(
-      new Set(participantes.map((row) => row.player_id))
+      new Set(candidatos.map((row) => row.player_id)),
     );
 
     if (playerIds.length === 0) {
@@ -340,24 +523,15 @@ export default function VotarMvpPage() {
       .order("name", { ascending: true });
 
     if (playersError) {
-      console.error("Error cargando jugadores participantes:", playersError);
-      setMensaje("No se han podido cargar los jugadores de este partido.");
+      console.error("Error cargando candidatos MVP:", playersError);
+      setMensaje("No se han podido cargar los candidatos MVP de este partido.");
       return;
     }
 
-    const jugadores = ((playersData ?? []) as Player[]).sort((a, b) => {
-      const ordenA = a.team_id === match.home_team_id ? 0 : 1;
-      const ordenB = b.team_id === match.home_team_id ? 0 : 1;
-
-      if (ordenA !== ordenB) return ordenA - ordenB;
-
-      const dorsalA = a.number ?? 9999;
-      const dorsalB = b.number ?? 9999;
-
-      if (dorsalA !== dorsalB) return dorsalA - dorsalB;
-
-      return a.name.localeCompare(b.name);
-    });
+    const jugadores = ordenarJugadores(
+      (playersData ?? []) as Player[],
+      match.home_team_id,
+    );
 
     setPlayers(jugadores);
   }
@@ -366,16 +540,17 @@ export default function VotarMvpPage() {
     setSelectedGroup(grupo);
 
     const primerPartidoGrupo = matches.find(
-      (match) => match.group_name === grupo
+      (match) => match.group_name === grupo,
     );
 
     if (primerPartidoGrupo) {
       setSelectedMatchId(primerPartidoGrupo.id);
-      await cargarJugadoresYVotos(primerPartidoGrupo);
+      await cargarCandidatosYVotos(primerPartidoGrupo);
     } else {
       setSelectedMatchId("");
       setPlayers([]);
       setVotes([]);
+      setNominees([]);
     }
   }
 
@@ -385,7 +560,7 @@ export default function VotarMvpPage() {
     const match = matches.find((item) => item.id === id);
 
     if (match) {
-      await cargarJugadoresYVotos(match);
+      await cargarCandidatosYVotos(match);
     }
   }
 
@@ -405,7 +580,16 @@ export default function VotarMvpPage() {
     const jugadorPuedeSerVotado = players.some((item) => item.id === player.id);
 
     if (!jugadorPuedeSerVotado) {
-      setMensaje("Este jugador no está registrado en la ficha del partido.");
+      setMensaje("Este jugador no está entre los candidatos MVP del partido.");
+      return;
+    }
+
+    const candidatoExiste = nominees.some(
+      (nominee) => nominee.player_id === player.id,
+    );
+
+    if (!candidatoExiste) {
+      setMensaje("Este jugador ya no está disponible como candidato MVP.");
       return;
     }
 
@@ -441,7 +625,7 @@ export default function VotarMvpPage() {
     }
 
     setMensaje("Voto registrado correctamente.");
-    await cargarJugadoresYVotos(selectedMatch);
+    await cargarCandidatosYVotos(selectedMatch);
   }
 
   function renderEquipo(nombreEquipo: string, jugadores: Player[]) {
@@ -456,7 +640,7 @@ export default function VotarMvpPage() {
         <div className="space-y-3 p-4">
           {jugadores.length === 0 ? (
             <p className="rounded-2xl bg-slate-50 p-4 text-sm font-bold text-slate-500">
-              No hay jugadores registrados en la ficha de este partido.
+              No hay candidatos MVP seleccionados para este equipo.
             </p>
           ) : (
             jugadores.map((player) => {
@@ -624,16 +808,15 @@ export default function VotarMvpPage() {
                   </p>
 
                   <p className="mt-2 text-sm font-bold text-slate-500">
-                    Votos emitidos: {totalVotosPartido}
+                    Candidatos MVP: {players.length} · Votos emitidos:{" "}
+                    {totalVotosPartido}
                   </p>
                 </div>
               )}
 
               {players.length === 0 && selectedMatch && (
                 <div className="mt-4 rounded-xl bg-yellow-100 p-3 text-sm font-bold text-yellow-900">
-                  Todavía no hay jugadores registrados en la ficha de este
-                  partido. Para abrir correctamente la votación, primero hay que
-                  guardar la ficha del partido.
+                  Todavía no hay candidatos MVP seleccionados para este partido.
                 </div>
               )}
 
@@ -654,12 +837,12 @@ export default function VotarMvpPage() {
               <div className="mt-6 space-y-5">
                 {renderEquipo(
                   selectedMatch.home_team?.name ?? "Equipo local",
-                  jugadoresLocal
+                  jugadoresLocal,
                 )}
 
                 {renderEquipo(
                   selectedMatch.away_team?.name ?? "Equipo visitante",
-                  jugadoresVisitante
+                  jugadoresVisitante,
                 )}
               </div>
             )}

@@ -35,7 +35,6 @@ type GroupMatch = {
   home_score: number | null;
   away_score: number | null;
   status: string | null;
-  mvp_open: boolean | null;
   incidents: string | null;
   home_team: TeamRef | null;
   away_team: TeamRef | null;
@@ -61,7 +60,6 @@ type FinalMatch = {
   away_penalties: number | null;
   status: string | null;
   sort_order: number;
-  mvp_open: boolean | null;
   incidents: string | null;
   home_source_type?: string | null;
   home_source_match_title?: string | null;
@@ -574,7 +572,6 @@ export default function AdminFichasPartidoPage() {
   const [rows, setRows] = useState<FichaRow[]>([]);
   const [estado, setEstado] = useState("Pendiente");
   const [estadoGuardado, setEstadoGuardado] = useState("Pendiente");
-  const [mvpOpen, setMvpOpen] = useState(false);
 
   const [homeScore, setHomeScore] = useState("");
   const [awayScore, setAwayScore] = useState("");
@@ -680,10 +677,6 @@ export default function AdminFichasPartidoPage() {
 
   function cambiarEstadoPartido(nuevoEstado: string) {
     setEstado(nuevoEstado);
-
-    if (estadoCerradoPartido(nuevoEstado)) {
-      setMvpOpen(false);
-    }
   }
 
   function limpiarFicha() {
@@ -695,7 +688,6 @@ export default function AdminFichasPartidoPage() {
     setRows([]);
     setEstado("Pendiente");
     setEstadoGuardado("Pendiente");
-    setMvpOpen(false);
     setHomeScore("");
     setAwayScore("");
     setHomePenalties("");
@@ -738,7 +730,6 @@ export default function AdminFichasPartidoPage() {
         home_score,
         away_score,
         status,
-        mvp_open,
         incidents,
         home_team:teams!matches_home_team_id_fkey(id, name),
         away_team:teams!matches_away_team_id_fkey(id, name)
@@ -784,7 +775,6 @@ export default function AdminFichasPartidoPage() {
         away_penalties,
         status,
         sort_order,
-        mvp_open,
         incidents,
         home_source_type,
         home_source_match_title,
@@ -866,7 +856,6 @@ export default function AdminFichasPartidoPage() {
           local: null as TeamRef | null,
           visitante: null as TeamRef | null,
           estadoFicha: "Pendiente",
-          mvpFicha: false,
           scoreLocal: "",
           scoreVisitante: "",
           penLocal: "",
@@ -886,7 +875,6 @@ export default function AdminFichasPartidoPage() {
         local: partido.home_team,
         visitante: partido.away_team,
         estadoFicha: partido.status ?? "Pendiente",
-        mvpFicha: Boolean(partido.mvp_open),
         scoreLocal: partido.home_score?.toString() ?? "",
         scoreVisitante: partido.away_score?.toString() ?? "",
         penLocal: "",
@@ -905,7 +893,6 @@ export default function AdminFichasPartidoPage() {
         local: null as TeamRef | null,
         visitante: null as TeamRef | null,
         estadoFicha: "Pendiente",
-        mvpFicha: false,
         scoreLocal: "",
         scoreVisitante: "",
         penLocal: "",
@@ -949,7 +936,6 @@ export default function AdminFichasPartidoPage() {
       local,
       visitante,
       estadoFicha: eliminatoria.status ?? "Pendiente",
-      mvpFicha: Boolean(eliminatoria.mvp_open),
       scoreLocal: eliminatoria.home_score?.toString() ?? "",
       scoreVisitante: eliminatoria.away_score?.toString() ?? "",
       penLocal: eliminatoria.home_penalties?.toString() ?? "",
@@ -987,7 +973,6 @@ export default function AdminFichasPartidoPage() {
     setAwayTeam(contexto.visitante);
     setEstado(contexto.estadoFicha);
     setEstadoGuardado(contexto.estadoFicha);
-    setMvpOpen(contexto.estadoFicha === "Cerrado" ? false : contexto.mvpFicha);
     setHomeScore(contexto.scoreLocal);
     setAwayScore(contexto.scoreVisitante);
     setHomePenalties(contexto.penLocal);
@@ -2202,11 +2187,10 @@ export default function AdminFichasPartidoPage() {
 
     const seCierraPartido = estadoCerradoPartido(estado);
 
-    const updatePayload: Record<string, string | number | boolean | null> = {
+    const updatePayload: Record<string, string | number | null> = {
       home_score: marcadorLocal,
       away_score: marcadorVisitante,
       status: estado,
-      mvp_open: seCierraPartido ? false : mvpOpen,
       incidents: incidents.trim() === "" ? null : incidents.trim(),
     };
 
@@ -2573,8 +2557,7 @@ export default function AdminFichasPartidoPage() {
 
                                 {cerrado && (
                                   <p className="mt-3 rounded-xl bg-emerald-100 p-3 text-xs font-bold text-emerald-800">
-                                    Partido cerrado: el acta es definitiva y la
-                                    votación MVP está cerrada.
+                                    Partido cerrado: el acta es definitiva.
                                   </p>
                                 )}
                               </>
@@ -2625,8 +2608,7 @@ export default function AdminFichasPartidoPage() {
                   </p>
 
                   <p className="mt-2 text-sm font-bold">
-                    El acta es definitiva. La ficha ya no se puede modificar y
-                    la votación MVP está cerrada.
+                    El acta es definitiva. La ficha ya no se puede modificar.
                   </p>
                 </div>
               )}
@@ -2790,20 +2772,6 @@ export default function AdminFichasPartidoPage() {
                           Este texto aparecerá en el acta del partido.
                         </p>
                       </div>
-
-                      <label className="mt-4 flex items-center justify-between rounded-2xl bg-slate-100 p-4 font-black">
-                        <span>Abrir votación MVP</span>
-
-                        <input
-                          type="checkbox"
-                          checked={mvpOpen}
-                          disabled={
-                            fichaBloqueada || estadoCerradoPartido(estado)
-                          }
-                          onChange={(event) => setMvpOpen(event.target.checked)}
-                          className="h-6 w-6 disabled:opacity-40"
-                        />
-                      </label>
                     </div>
                   </div>
 

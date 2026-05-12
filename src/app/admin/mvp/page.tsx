@@ -428,6 +428,12 @@ export default function AdminMvpPage() {
       .sort()
       .join("|");
 
+  const puedeReiniciarVotacion =
+    totalCandidatos === 0 &&
+    (selectedNominees.length > 0 ||
+      totalVotos > 0 ||
+      Boolean(selectedMatch?.mvp_open));
+
   const matchesByDate = useMemo(() => {
     const grouped: Record<string, AdminMvpMatch[]> = {};
 
@@ -804,7 +810,13 @@ export default function AdminMvpPage() {
       return;
     }
 
-    if (candidateDraftIds.length === 0) {
+    const esReinicioVotacion =
+      candidateDraftIds.length === 0 &&
+      (selectedNominees.length > 0 ||
+        votosPartido.length > 0 ||
+        Boolean(selectedMatch.mvp_open));
+
+    if (candidateDraftIds.length === 0 && !esReinicioVotacion) {
       setMensaje("Selecciona al menos un candidato MVP.");
       return;
     }
@@ -823,7 +835,9 @@ export default function AdminMvpPage() {
 
     if (votosFueraDeCandidatos.length > 0) {
       const confirmar = window.confirm(
-        "Hay votos de jugadores que ya no estarán como candidatos.\n\nSi guardas esta selección, esos votos se borrarán para que el ranking quede limpio.\n\n¿Continuar?"
+        candidatosValidos.length === 0
+          ? "Vas a reiniciar la votación MVP de este partido.\n\nSe borrarán todos los candidatos y todos los votos emitidos.\n\n¿Continuar?"
+          : "Hay votos de jugadores que ya no estarán como candidatos.\n\nSi guardas esta selección, esos votos se borrarán para que el ranking quede limpio.\n\n¿Continuar?"
       );
 
       if (!confirmar) return;
@@ -868,6 +882,33 @@ export default function AdminMvpPage() {
           return;
         }
       }
+    }
+
+    if (candidatosValidos.length === 0) {
+      const tabla = selectedMatch.tipo === "final" ? "final_matches" : "matches";
+
+      const { error: closeError } = await supabase
+        .from(tabla)
+        .update({ mvp_open: false })
+        .eq("id", selectedMatch.id);
+
+      if (closeError) {
+        console.error("Error cerrando votación al reiniciar:", closeError);
+        setMensaje(
+          "Se han borrado candidatos y votos, pero no se ha podido cerrar la votación MVP."
+        );
+        setSaving(false);
+        return;
+      }
+
+      setMensaje(
+        "Votación MVP reiniciada correctamente. Se han borrado candidatos y votos."
+      );
+
+      await cargarDatos(selectedMatch.id);
+      setSelectorCandidatosAbierto(true);
+      setSaving(false);
+      return;
     }
 
     const insertPayload = candidatosValidos.map((player) => ({
@@ -1419,30 +1460,39 @@ export default function AdminMvpPage() {
                       </div>
 
                       <button
-                        onClick={() =>
-                          guardarCandidatos(!selectedMatch.mvp_open)
-                        }
+                        onClick={() => guardarCandidatos(!selectedMatch.mvp_open)}
                         disabled={
                           saving ||
-                          totalCandidatos === 0 ||
+                          (totalCandidatos === 0 && !puedeReiniciarVotacion) ||
                           (Boolean(selectedMatch.mvp_open) &&
-                            !hayCambiosCandidatos)
+                            !hayCambiosCandidatos &&
+                            !puedeReiniciarVotacion)
                         }
                         className="mt-5 w-full rounded-xl bg-red-600 py-3 font-black text-white shadow disabled:bg-slate-300"
                       >
                         {saving
                           ? "Guardando..."
-                          : selectedMatch.mvp_open
-                            ? hayCambiosCandidatos
-                              ? "Guardar cambios en candidatos"
-                              : "Candidatos guardados"
-                            : "Guardar candidatos y abrir votación MVP"}
+                          : puedeReiniciarVotacion
+                            ? "Reiniciar votación MVP"
+                            : selectedMatch.mvp_open
+                              ? hayCambiosCandidatos
+                                ? "Guardar cambios en candidatos"
+                                : "Candidatos guardados"
+                              : "Guardar candidatos y abrir votación MVP"}
                       </button>
 
                       {selectedMatch.mvp_open && hayCambiosCandidatos && (
                         <p className="mt-3 rounded-xl bg-yellow-100 p-3 text-xs font-bold text-yellow-900">
                           La votación está abierta. Guarda los cambios para que
                           la pantalla pública muestre la lista actualizada.
+                        </p>
+                      )}
+
+                      {puedeReiniciarVotacion && (
+                        <p className="mt-3 rounded-xl bg-red-100 p-3 text-xs font-bold text-red-800">
+                          Si reinicias la votación MVP, se borrarán los
+                          candidatos, los votos emitidos y la votación quedará
+                          cerrada.
                         </p>
                       )}
                     </>

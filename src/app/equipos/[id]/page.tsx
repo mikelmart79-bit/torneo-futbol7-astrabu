@@ -93,12 +93,6 @@ function claseTipoJugador(tipo: PlayerType) {
   return "bg-white text-slate-500";
 }
 
-function textoTipoJugador(tipo: PlayerType) {
-  if (tipo === "F") return "Federado";
-  if (tipo === "M") return "Municipio";
-  return "Sin tipo";
-}
-
 export default function EquipoDetalle() {
   const params = useParams();
   const idParam = params.id;
@@ -454,10 +448,6 @@ export default function EquipoDetalle() {
                       <div className="min-w-0 flex-1">
                         <p className="break-words text-[1.15rem] font-black leading-tight text-slate-950">
                           {player.name}
-                        </p>
-
-                        <p className="mt-2 text-xs font-bold text-slate-500">
-                          {tipo} · {textoTipoJugador(tipo)}
                         </p>
                       </div>
                     </div>

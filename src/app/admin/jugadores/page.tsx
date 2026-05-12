@@ -21,6 +21,10 @@ type Player = {
   player_type: PlayerType | null;
 };
 
+type SuspensionRef = {
+  id: string;
+};
+
 export default function AdminJugadoresPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
@@ -34,6 +38,7 @@ export default function AdminJugadoresPage() {
 
   const [mensaje, setMensaje] = useState("");
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const jugadoresEquipo = players.filter((player) => player.team_id === teamId);
 
@@ -106,7 +111,9 @@ export default function AdminJugadoresPage() {
     }
   }
 
-  function normalizarTipoJugador(tipo: PlayerType | null | undefined): PlayerType {
+  function normalizarTipoJugador(
+    tipo: PlayerType | null | undefined,
+  ): PlayerType {
     if (tipo === "M" || tipo === "F" || tipo === "-") return tipo;
     return "-";
   }
@@ -143,53 +150,98 @@ export default function AdminJugadoresPage() {
     });
   }
 
-  async function jugadorTieneDatosAsociados(idJugador: string) {
-    const { data: votos, error: votosError } = await supabase
-      .from("mvp_votes")
-      .select("id")
-      .eq("player_id", idJugador)
-      .limit(1);
+  function errorTablaNoExiste(error: unknown) {
+    if (!error || typeof error !== "object") return false;
 
-    if (votosError) {
-      setMensaje("No se ha podido comprobar si el jugador tiene votos.");
-      return true;
+    const err = error as {
+      code?: string;
+      message?: string;
+      details?: string;
+    };
+
+    const texto = `${err.code ?? ""} ${err.message ?? ""} ${
+      err.details ?? ""
+    }`.toLowerCase();
+
+    return (
+      texto.includes("does not exist") ||
+      texto.includes("schema cache") ||
+      texto.includes("could not find") ||
+      texto.includes("relation") ||
+      err.code === "42P01" ||
+      err.code === "PGRST205"
+    );
+  }
+
+  async function borrarDatosTablaJugador(
+    tableName: string,
+    idJugador: string,
+    opcional = false,
+  ) {
+    const { error } = await supabase
+      .from(tableName)
+      .delete()
+      .eq("player_id", idJugador);
+
+    if (error) {
+      if (opcional && errorTablaNoExiste(error)) return null;
+      return error.message;
     }
 
-    if ((votos ?? []).length > 0) return true;
+    return null;
+  }
 
-    const { data: partidosJugados } = await supabase
-      .from("match_players")
-      .select("id")
-      .eq("player_id", idJugador)
-      .limit(1);
-
-    if ((partidosJugados ?? []).length > 0) return true;
-
-    const { data: goles } = await supabase
-      .from("match_goals")
-      .select("id")
-      .eq("player_id", idJugador)
-      .limit(1);
-
-    if ((goles ?? []).length > 0) return true;
-
-    const { data: tarjetas } = await supabase
-      .from("match_cards")
-      .select("id")
-      .eq("player_id", idJugador)
-      .limit(1);
-
-    if ((tarjetas ?? []).length > 0) return true;
-
-    const { data: sanciones } = await supabase
+  async function borrarDatosAsociadosJugador(idJugador: string) {
+    const { data: suspensionesData, error: suspensionesError } = await supabase
       .from("suspensions")
       .select("id")
-      .eq("player_id", idJugador)
-      .limit(1);
+      .eq("player_id", idJugador);
 
-    if ((sanciones ?? []).length > 0) return true;
+    if (suspensionesError) {
+      return `No se han podido leer las sanciones del jugador: ${suspensionesError.message}`;
+    }
 
-    return false;
+    const suspensiones = (suspensionesData ?? []) as SuspensionRef[];
+    const suspensionIds = suspensiones.map((suspension) => suspension.id);
+
+    if (suspensionIds.length > 0) {
+      const { error: servedError } = await supabase
+        .from("suspension_served_matches")
+        .delete()
+        .in("suspension_id", suspensionIds);
+
+      if (servedError) {
+        return `No se han podido borrar los partidos de sanción cumplidos: ${servedError.message}`;
+      }
+    }
+
+    const tablasObligatorias = [
+      "mvp_votes",
+      "match_players",
+      "match_goals",
+      "match_cards",
+      "suspensions",
+    ];
+
+    for (const tableName of tablasObligatorias) {
+      const error = await borrarDatosTablaJugador(tableName, idJugador);
+
+      if (error) {
+        return `No se han podido borrar los datos de ${tableName}: ${error}`;
+      }
+    }
+
+    const tablasOpcionales = ["mvp_nominees", "mvp_candidates"];
+
+    for (const tableName of tablasOpcionales) {
+      const error = await borrarDatosTablaJugador(tableName, idJugador, true);
+
+      if (error) {
+        return `No se han podido borrar los datos de ${tableName}: ${error}`;
+      }
+    }
+
+    return null;
   }
 
   async function guardarJugador() {
@@ -222,6 +274,9 @@ export default function AdminJugadoresPage() {
       return;
     }
 
+    setSaving(true);
+    setMensaje("");
+
     const payload = {
       team_id: teamId,
       name: nombreLimpio,
@@ -232,6 +287,8 @@ export default function AdminJugadoresPage() {
     const { error } = playerId
       ? await supabase.from("players").update(payload).eq("id", playerId)
       : await supabase.from("players").insert(payload);
+
+    setSaving(false);
 
     if (error) {
       setMensaje(`No se ha podido guardar el jugador: ${error.message}`);
@@ -247,7 +304,7 @@ export default function AdminJugadoresPage() {
     if (!playerId) return;
 
     const jugadorActual = jugadoresEquipo.find(
-      (player) => player.id === playerId
+      (player) => player.id === playerId,
     );
 
     if (!jugadorActual) {
@@ -255,29 +312,39 @@ export default function AdminJugadoresPage() {
       return;
     }
 
-    const tieneDatos = await jugadorTieneDatosAsociados(playerId);
-
-    if (tieneDatos) {
-      setMensaje(
-        "No se puede eliminar este jugador porque ya tiene votos, ficha de partido, goles, tarjetas o sanciones asociadas."
-      );
-      return;
-    }
-
     const confirmar = window.confirm(
-      `¿Seguro que quieres eliminar a "${jugadorActual.name}"?`
+      `¿Seguro que quieres eliminar a "${jugadorActual.name}"?\n\nTambién se borrarán sus votos MVP, goles, tarjetas, ficha de partido y sanciones asociadas.`,
     );
 
     if (!confirmar) return;
 
+    const confirmarFinal = window.confirm(
+      "Última confirmación.\n\nEsta acción no se puede deshacer.\n\n¿Eliminar definitivamente el jugador y todos sus datos asociados?",
+    );
+
+    if (!confirmarFinal) return;
+
+    setSaving(true);
+    setMensaje("");
+
+    const errorBorrandoDatos = await borrarDatosAsociadosJugador(playerId);
+
+    if (errorBorrandoDatos) {
+      setSaving(false);
+      setMensaje(errorBorrandoDatos);
+      return;
+    }
+
     const { error } = await supabase.from("players").delete().eq("id", playerId);
+
+    setSaving(false);
 
     if (error) {
       setMensaje(`No se ha podido eliminar el jugador: ${error.message}`);
       return;
     }
 
-    setMensaje("Jugador eliminado.");
+    setMensaje("Jugador eliminado correctamente.");
     nuevoJugador();
     await cargarJugadores(teamId);
   }
@@ -365,7 +432,8 @@ export default function AdminJugadoresPage() {
 
                     <button
                       onClick={nuevoJugador}
-                      className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black text-white"
+                      disabled={saving}
+                      className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black text-white disabled:opacity-60"
                     >
                       Nuevo
                     </button>
@@ -381,7 +449,8 @@ export default function AdminJugadoresPage() {
                         <button
                           key={player.id}
                           onClick={() => seleccionarJugador(player)}
-                          className={`flex w-full items-center gap-3 rounded-xl p-3 text-left shadow-sm ${
+                          disabled={saving}
+                          className={`flex w-full items-center gap-3 rounded-xl p-3 text-left shadow-sm disabled:opacity-60 ${
                             playerId === player.id
                               ? "bg-red-600 text-white"
                               : "bg-white text-slate-900"
@@ -435,7 +504,8 @@ export default function AdminJugadoresPage() {
               <input
                 value={nombre}
                 onChange={(event) => setNombre(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-300 p-3 font-bold"
+                disabled={saving}
+                className="mt-2 w-full rounded-xl border border-slate-300 p-3 font-bold disabled:bg-slate-200 disabled:text-slate-500"
                 placeholder="Nombre del jugador"
               />
             </div>
@@ -450,7 +520,8 @@ export default function AdminJugadoresPage() {
                 min="0"
                 value={dorsal}
                 onChange={(event) => setDorsal(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
+                disabled={saving}
+                className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-center text-xl font-black disabled:bg-slate-200 disabled:text-slate-500"
                 placeholder="0"
               />
             </div>
@@ -465,7 +536,8 @@ export default function AdminJugadoresPage() {
                 onChange={(event) =>
                   setTipoJugador(event.target.value as PlayerType)
                 }
-                className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold"
+                disabled={saving}
+                className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 font-bold disabled:bg-slate-200 disabled:text-slate-500"
               >
                 <option value="-">- · Sin tipo</option>
                 <option value="M">M · Municipio</option>
@@ -475,18 +547,19 @@ export default function AdminJugadoresPage() {
 
             <button
               onClick={guardarJugador}
-              disabled={teams.length === 0}
+              disabled={teams.length === 0 || saving}
               className="mt-6 w-full rounded-xl bg-red-600 py-3 font-black text-white shadow disabled:bg-slate-300"
             >
-              Guardar jugador
+              {saving ? "Guardando..." : "Guardar jugador"}
             </button>
 
             {playerId && (
               <button
                 onClick={eliminarJugador}
-                className="mt-3 w-full rounded-xl bg-slate-900 py-3 font-black text-white shadow"
+                disabled={saving}
+                className="mt-3 w-full rounded-xl bg-slate-900 py-3 font-black text-white shadow disabled:opacity-60"
               >
-                Eliminar jugador
+                {saving ? "Eliminando..." : "Eliminar jugador"}
               </button>
             )}
 

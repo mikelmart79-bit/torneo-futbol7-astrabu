@@ -93,6 +93,22 @@ type CardRow = {
   card_type: "yellow" | "red";
 };
 
+type YellowCardAccumulationRow = {
+  id: string;
+  player_id: string;
+  card_type: string;
+  match_id: string | null;
+  final_match_id: string | null;
+};
+
+type ExistingAccumulationSuspension = {
+  id: string;
+  player_id: string;
+  reason: string;
+  match_id: string | null;
+  final_match_id: string | null;
+};
+
 type Suspension = {
   id: string;
   player_id: string;
@@ -155,12 +171,37 @@ type AdminCalendarMatch = {
   sort_order: number;
 };
 
+type SanctionSettings = {
+  yellow_cards_classification: number;
+  yellow_cards_final: number;
+  yellow_suspension_games: number;
+  carry_yellows_to_final: boolean;
+  red_card_games: number;
+  double_yellow_as_red: boolean;
+};
+
+const DEFAULT_SANCTION_SETTINGS: SanctionSettings = {
+  yellow_cards_classification: 2,
+  yellow_cards_final: 2,
+  yellow_suspension_games: 1,
+  carry_yellows_to_final: false,
+  red_card_games: 1,
+  double_yellow_as_red: false,
+};
+
 const DEFAULT_MONTHS: CalendarMonth[] = [
   { year: 2026, monthIndex: 6 },
   { year: 2026, monthIndex: 7 },
 ];
 
 const WEEK_DAYS = ["L", "M", "X", "J", "V", "S", "D"];
+
+const AUTO_SUSPENSION_REASONS = [
+  "Tarjeta roja",
+  "Roja directa",
+  "Doble amarilla",
+  "Acumulación de amarillas",
+];
 
 function normalizarEquipo(equipo: RawGroupMatch["home_team"]): TeamRef | null {
   if (!equipo) return null;
@@ -504,6 +545,12 @@ function scrollToElement(elementId: string) {
   }, 120);
 }
 
+function yellowCardKey(card: YellowCardAccumulationRow) {
+  return `${card.player_id}-${card.match_id ?? "grupo-null"}-${
+    card.final_match_id ?? "final-null"
+  }`;
+}
+
 export default function AdminFichasPartidoPage() {
   const [matchType, setMatchType] = useState<MatchType>("grupo");
   const [selectedId, setSelectedId] = useState("");
@@ -511,6 +558,9 @@ export default function AdminFichasPartidoPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [groupMatches, setGroupMatches] = useState<GroupMatch[]>([]);
   const [finalMatches, setFinalMatches] = useState<FinalMatch[]>([]);
+  const [sanctionSettings, setSanctionSettings] = useState<SanctionSettings>(
+    DEFAULT_SANCTION_SETTINGS,
+  );
 
   const [homeTeam, setHomeTeam] = useState<TeamRef | null>(null);
   const [awayTeam, setAwayTeam] = useState<TeamRef | null>(null);
@@ -542,6 +592,48 @@ export default function AdminFichasPartidoPage() {
   useEffect(() => {
     cargarDatos();
   }, []);
+
+  async function cargarConfiguracionSanciones() {
+    const { data, error } = await supabase
+      .from("sanction_settings")
+      .select(
+        "yellow_cards_classification, yellow_cards_final, yellow_suspension_games, carry_yellows_to_final, red_card_games, double_yellow_as_red",
+      )
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Error cargando configuración de sanciones:", error);
+      return DEFAULT_SANCTION_SETTINGS;
+    }
+
+    if (!data) return DEFAULT_SANCTION_SETTINGS;
+
+    const settings = {
+      yellow_cards_classification:
+        Number(data.yellow_cards_classification) > 0
+          ? Number(data.yellow_cards_classification)
+          : DEFAULT_SANCTION_SETTINGS.yellow_cards_classification,
+      yellow_cards_final:
+        Number(data.yellow_cards_final) > 0
+          ? Number(data.yellow_cards_final)
+          : DEFAULT_SANCTION_SETTINGS.yellow_cards_final,
+      yellow_suspension_games:
+        Number(data.yellow_suspension_games) > 0
+          ? Number(data.yellow_suspension_games)
+          : DEFAULT_SANCTION_SETTINGS.yellow_suspension_games,
+      carry_yellows_to_final: Boolean(data.carry_yellows_to_final),
+      red_card_games:
+        Number(data.red_card_games) > 0
+          ? Number(data.red_card_games)
+          : DEFAULT_SANCTION_SETTINGS.red_card_games,
+      double_yellow_as_red: Boolean(data.double_yellow_as_red),
+    };
+
+    setSanctionSettings(settings);
+    return settings;
+  }
 
   function payloadPartido(tipo: MatchType, id: string): MatchPayload {
     return tipo === "grupo"
@@ -593,6 +685,8 @@ export default function AdminFichasPartidoPage() {
     idMantener?: string;
   }) {
     setLoading(true);
+
+    const settings = await cargarConfiguracionSanciones();
 
     const { data: teamsData, error: teamsError } = await supabase
       .from("teams")
@@ -727,6 +821,7 @@ export default function AdminFichasPartidoPage() {
       limpiarFicha();
     }
 
+    setSanctionSettings(settings);
     setLoading(false);
   }
 
@@ -1503,9 +1598,16 @@ export default function AdminFichasPartidoPage() {
       new Set(jugadoresRevisar.map((player) => player.id)),
     );
 
+    const umbral =
+      matchType === "grupo"
+        ? sanctionSettings.yellow_cards_classification
+        : sanctionSettings.yellow_cards_final;
+
+    if (!umbral || umbral <= 0) return null;
+
     const { data: cardsData, error: cardsError } = await supabase
       .from("match_cards")
-      .select("id, player_id, card_type")
+      .select("id, player_id, card_type, match_id, final_match_id")
       .in("player_id", playerIds)
       .eq("card_type", "yellow");
 
@@ -1517,7 +1619,7 @@ export default function AdminFichasPartidoPage() {
     const { data: existingSuspensionsData, error: suspensionsError } =
       await supabase
         .from("suspensions")
-        .select("id, player_id, reason")
+        .select("id, player_id, reason, match_id, final_match_id")
         .in("player_id", playerIds)
         .eq("reason", "Acumulación de amarillas");
 
@@ -1526,17 +1628,52 @@ export default function AdminFichasPartidoPage() {
       return suspensionsError.message;
     }
 
-    const amarillas = (cardsData ?? []) as Array<{
-      id: string;
-      player_id: string;
-      card_type: string;
-    }>;
+    const amarillasBase = (cardsData ?? []) as YellowCardAccumulationRow[];
 
-    const sancionesExistentes = (existingSuspensionsData ?? []) as Array<{
-      id: string;
-      player_id: string;
-      reason: string;
-    }>;
+    const amarillasPorPartido = new Map<string, number>();
+
+    amarillasBase.forEach((card) => {
+      const key = yellowCardKey(card);
+      amarillasPorPartido.set(key, (amarillasPorPartido.get(key) ?? 0) + 1);
+    });
+
+    const amarillasRelevantes = amarillasBase.filter((card) => {
+      if (sanctionSettings.double_yellow_as_red) {
+        const key = yellowCardKey(card);
+        const amarillasEnEsePartido = amarillasPorPartido.get(key) ?? 0;
+
+        if (amarillasEnEsePartido >= 2) {
+          return false;
+        }
+      }
+
+      if (matchType === "grupo") {
+        return card.match_id !== null;
+      }
+
+      if (sanctionSettings.carry_yellows_to_final) {
+        return true;
+      }
+
+      return card.final_match_id !== null;
+    });
+
+    const sancionesExistentesTodas = (existingSuspensionsData ??
+      []) as ExistingAccumulationSuspension[];
+
+    const sancionesExistentes = sancionesExistentesTodas.filter(
+      (suspension) => {
+        if (matchType === "grupo") {
+          return suspension.match_id !== null;
+        }
+
+        if (sanctionSettings.carry_yellows_to_final) {
+          return true;
+        }
+
+        return suspension.final_match_id !== null;
+      },
+    );
 
     const nuevasSanciones: Array<
       MatchPayload & {
@@ -1551,11 +1688,11 @@ export default function AdminFichasPartidoPage() {
     > = [];
 
     jugadoresRevisar.forEach((player) => {
-      const totalAmarillas = amarillas.filter(
+      const totalAmarillas = amarillasRelevantes.filter(
         (card) => card.player_id === player.id,
       ).length;
 
-      const sancionesNecesarias = Math.floor(totalAmarillas / 2);
+      const sancionesNecesarias = Math.floor(totalAmarillas / umbral);
 
       const sancionesYaCreadas = sancionesExistentes.filter(
         (suspension) => suspension.player_id === player.id,
@@ -1572,7 +1709,7 @@ export default function AdminFichasPartidoPage() {
           player_id: player.id,
           team_id: player.team_id,
           reason: "Acumulación de amarillas",
-          games: 1,
+          games: sanctionSettings.yellow_suspension_games,
           served: 0,
           status: "Activa",
           created_at: new Date().toISOString(),
@@ -1680,6 +1817,22 @@ export default function AdminFichasPartidoPage() {
       if (updateError) {
         console.error("Error actualizando sanción cumplida:", updateError);
         return updateError.message;
+      }
+    }
+
+    return null;
+  }
+
+  async function borrarSancionesAutomaticasDelPartido(columna: string) {
+    for (const reason of AUTO_SUSPENSION_REASONS) {
+      const { error } = await supabase
+        .from("suspensions")
+        .delete()
+        .eq(columna, selectedId)
+        .eq("reason", reason);
+
+      if (error) {
+        return error.message;
       }
     }
 
@@ -1833,37 +1986,12 @@ export default function AdminFichasPartidoPage() {
       return;
     }
 
-    const deleteAutoSuspensions = await supabase
-      .from("suspensions")
-      .delete()
-      .eq(columna, selectedId)
-      .eq("reason", "Tarjeta roja");
+    const errorBorrandoSancionesAutomaticas =
+      await borrarSancionesAutomaticasDelPartido(columna);
 
-    if (deleteAutoSuspensions.error) {
-      console.error(
-        "Error borrando sanciones automáticas:",
-        deleteAutoSuspensions.error,
-      );
+    if (errorBorrandoSancionesAutomaticas) {
       setMensaje(
-        `No se han podido actualizar las sanciones: ${deleteAutoSuspensions.error.message}`,
-      );
-      setSaving(false);
-      return;
-    }
-
-    const deleteAutoYellowSuspensions = await supabase
-      .from("suspensions")
-      .delete()
-      .eq(columna, selectedId)
-      .eq("reason", "Acumulación de amarillas");
-
-    if (deleteAutoYellowSuspensions.error) {
-      console.error(
-        "Error borrando sanciones por acumulación:",
-        deleteAutoYellowSuspensions.error,
-      );
-      setMensaje(
-        `No se han podido actualizar las sanciones por amarillas: ${deleteAutoYellowSuspensions.error.message}`,
+        `No se han podido actualizar las sanciones automáticas: ${errorBorrandoSancionesAutomaticas}`,
       );
       setSaving(false);
       return;
@@ -1983,18 +2111,47 @@ export default function AdminFichasPartidoPage() {
       return;
     }
 
-    const filasSanciones = rows
-      .filter((row) => !row.suspended && row.red > 0)
-      .map((row) => ({
-        ...payloadPartido(matchType, selectedId),
-        player_id: row.player.id,
-        team_id: row.player.team_id,
-        reason: "Tarjeta roja",
-        games: 1,
-        served: 0,
-        status: "Activa",
-        created_at: new Date().toISOString(),
-      }));
+    const filasSanciones: Array<
+      MatchPayload & {
+        player_id: string;
+        team_id: string;
+        reason: string;
+        games: number;
+        served: number;
+        status: string;
+        created_at: string;
+      }
+    > = [];
+
+    rows.forEach((row) => {
+      if (row.suspended) return;
+
+      if (row.red > 0) {
+        filasSanciones.push({
+          ...payloadPartido(matchType, selectedId),
+          player_id: row.player.id,
+          team_id: row.player.team_id,
+          reason: "Roja directa",
+          games: sanctionSettings.red_card_games,
+          served: 0,
+          status: "Activa",
+          created_at: new Date().toISOString(),
+        });
+      }
+
+      if (sanctionSettings.double_yellow_as_red && row.yellow >= 2) {
+        filasSanciones.push({
+          ...payloadPartido(matchType, selectedId),
+          player_id: row.player.id,
+          team_id: row.player.team_id,
+          reason: "Doble amarilla",
+          games: sanctionSettings.red_card_games,
+          served: 0,
+          status: "Activa",
+          created_at: new Date().toISOString(),
+        });
+      }
+    });
 
     if (filasSanciones.length > 0) {
       const { error } = await supabase

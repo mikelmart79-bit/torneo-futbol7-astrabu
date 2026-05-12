@@ -80,11 +80,12 @@ type SuspensionRow = {
 type SanctionSettings = {
   id: string;
   yellow_cards_classification: number;
+  yellow_suspension_games_classification: number;
+  red_card_games_classification: number;
   yellow_cards_final: number;
-  yellow_suspension_games: number;
+  yellow_suspension_games_final: number;
+  red_card_games_final: number;
   carry_yellows_to_final: boolean;
-  red_card_games: number;
-  double_yellow_as_red: boolean;
   updated_at: string | null;
 };
 
@@ -150,13 +151,22 @@ export default function AdminSancionesPage() {
   const [finalMatches, setFinalMatches] = useState<FinalMatch[]>([]);
 
   const [settingsId, setSettingsId] = useState("");
+
   const [yellowCardsClassification, setYellowCardsClassification] =
     useState("2");
+  const [
+    yellowSuspensionGamesClassification,
+    setYellowSuspensionGamesClassification,
+  ] = useState("1");
+  const [redCardGamesClassification, setRedCardGamesClassification] =
+    useState("1");
+
   const [yellowCardsFinal, setYellowCardsFinal] = useState("2");
-  const [yellowSuspensionGames, setYellowSuspensionGames] = useState("1");
+  const [yellowSuspensionGamesFinal, setYellowSuspensionGamesFinal] =
+    useState("1");
+  const [redCardGamesFinal, setRedCardGamesFinal] = useState("1");
+
   const [carryYellowsToFinal, setCarryYellowsToFinal] = useState(false);
-  const [redCardGames, setRedCardGames] = useState("1");
-  const [doubleYellowAsRed, setDoubleYellowAsRed] = useState(false);
   const [guardandoConfig, setGuardandoConfig] = useState(false);
 
   const [teamId, setTeamId] = useState("");
@@ -178,7 +188,17 @@ export default function AdminSancionesPage() {
     const { data, error } = await supabase
       .from("sanction_settings")
       .select(
-        "id, yellow_cards_classification, yellow_cards_final, yellow_suspension_games, carry_yellows_to_final, red_card_games, double_yellow_as_red, updated_at"
+        `
+        id,
+        yellow_cards_classification,
+        yellow_suspension_games_classification,
+        red_card_games_classification,
+        yellow_cards_final,
+        yellow_suspension_games_final,
+        red_card_games_final,
+        carry_yellows_to_final,
+        updated_at
+      `,
       )
       .order("updated_at", { ascending: false })
       .limit(1)
@@ -187,7 +207,7 @@ export default function AdminSancionesPage() {
     if (error) {
       console.error("Error cargando configuración de sanciones:", error);
       setMensaje(
-        "No se ha podido cargar la configuración de sanciones. Revisa que exista la tabla sanction_settings."
+        "No se ha podido cargar la configuración de sanciones. Revisa que estén creadas las columnas nuevas.",
       );
       return;
     }
@@ -197,14 +217,24 @@ export default function AdminSancionesPage() {
     const settings = data as SanctionSettings;
 
     setSettingsId(settings.id);
+
     setYellowCardsClassification(
-      settings.yellow_cards_classification.toString()
+      settings.yellow_cards_classification.toString(),
     );
+    setYellowSuspensionGamesClassification(
+      settings.yellow_suspension_games_classification.toString(),
+    );
+    setRedCardGamesClassification(
+      settings.red_card_games_classification.toString(),
+    );
+
     setYellowCardsFinal(settings.yellow_cards_final.toString());
-    setYellowSuspensionGames(settings.yellow_suspension_games.toString());
+    setYellowSuspensionGamesFinal(
+      settings.yellow_suspension_games_final.toString(),
+    );
+    setRedCardGamesFinal(settings.red_card_games_final.toString());
+
     setCarryYellowsToFinal(Boolean(settings.carry_yellows_to_final));
-    setRedCardGames(settings.red_card_games.toString());
-    setDoubleYellowAsRed(Boolean(settings.double_yellow_as_red));
   }
 
   async function cargarDatos() {
@@ -241,7 +271,7 @@ export default function AdminSancionesPage() {
     const { data: suspensionsData, error: suspensionsError } = await supabase
       .from("suspensions")
       .select(
-        "id, player_id, team_id, match_id, final_match_id, reason, games, served, status, created_at"
+        "id, player_id, team_id, match_id, final_match_id, reason, games, served, status, created_at",
       )
       .order("created_at", { ascending: false });
 
@@ -263,7 +293,7 @@ export default function AdminSancionesPage() {
         field,
         home_team:teams!matches_home_team_id_fkey(name),
         away_team:teams!matches_away_team_id_fkey(name)
-      `
+      `,
       )
       .order("match_date", { ascending: true })
       .order("match_time", { ascending: true });
@@ -286,7 +316,7 @@ export default function AdminSancionesPage() {
     const { data: finalData, error: finalError } = await supabase
       .from("final_matches")
       .select(
-        "id, phase, title, home_ref, away_ref, match_date, match_time, field"
+        "id, phase, title, home_ref, away_ref, match_date, match_time, field",
       )
       .order("match_date", { ascending: true })
       .order("match_time", { ascending: true })
@@ -313,7 +343,7 @@ export default function AdminSancionesPage() {
       setTeamId(primerEquipo);
 
       const primerJugador = jugadores.find(
-        (player) => player.team_id === primerEquipo
+        (player) => player.team_id === primerEquipo,
       );
 
       setPlayerId(primerJugador?.id ?? "");
@@ -336,7 +366,7 @@ export default function AdminSancionesPage() {
 
         if (suspension.match_id) {
           const match = groupMatches.find(
-            (item) => item.id === suspension.match_id
+            (item) => item.id === suspension.match_id,
           );
 
           if (match) {
@@ -346,7 +376,7 @@ export default function AdminSancionesPage() {
 
         if (suspension.final_match_id) {
           const finalMatch = finalMatches.find(
-            (item) => item.id === suspension.final_match_id
+            (item) => item.id === suspension.final_match_id,
           );
 
           if (finalMatch) {
@@ -390,16 +420,12 @@ export default function AdminSancionesPage() {
   }
 
   function partidosSegunMotivo(nuevoMotivo: string) {
-    if (nuevoMotivo === "Roja directa") {
-      return redCardGames;
-    }
-
-    if (nuevoMotivo === "Doble amarilla") {
-      return doubleYellowAsRed ? redCardGames : yellowSuspensionGames;
+    if (nuevoMotivo === "Roja directa" || nuevoMotivo === "Doble amarilla") {
+      return redCardGamesClassification;
     }
 
     if (nuevoMotivo === "Acumulación de amarillas") {
-      return yellowSuspensionGames;
+      return yellowSuspensionGamesClassification;
     }
 
     return partidos;
@@ -413,7 +439,7 @@ export default function AdminSancionesPage() {
   function limpiarFormulario() {
     setMotivo("Doble amarilla");
     setDetalle("");
-    setPartidos(doubleYellowAsRed ? redCardGames : yellowSuspensionGames);
+    setPartidos(redCardGamesClassification);
     setOrigenPartido("none");
   }
 
@@ -442,23 +468,38 @@ export default function AdminSancionesPage() {
     setMensaje("");
 
     const amarillasClasificacion = numeroConfiguracion(
-      yellowCardsClassification
+      yellowCardsClassification,
     );
+    const partidosAmarillasClasificacion = numeroConfiguracion(
+      yellowSuspensionGamesClassification,
+    );
+    const partidosRojaClasificacion = numeroConfiguracion(
+      redCardGamesClassification,
+    );
+
     const amarillasFinal = numeroConfiguracion(yellowCardsFinal);
-    const partidosAmarillas = numeroConfiguracion(yellowSuspensionGames);
-    const partidosRoja = numeroConfiguracion(redCardGames);
+    const partidosAmarillasFinal = numeroConfiguracion(
+      yellowSuspensionGamesFinal,
+    );
+    const partidosRojaFinal = numeroConfiguracion(redCardGamesFinal);
 
     if (
       amarillasClasificacion === null ||
       amarillasClasificacion <= 0 ||
+      partidosAmarillasClasificacion === null ||
+      partidosAmarillasClasificacion <= 0 ||
+      partidosRojaClasificacion === null ||
+      partidosRojaClasificacion <= 0 ||
       amarillasFinal === null ||
       amarillasFinal <= 0 ||
-      partidosAmarillas === null ||
-      partidosAmarillas <= 0 ||
-      partidosRoja === null ||
-      partidosRoja <= 0
+      partidosAmarillasFinal === null ||
+      partidosAmarillasFinal <= 0 ||
+      partidosRojaFinal === null ||
+      partidosRojaFinal <= 0
     ) {
-      setMensaje("Revisa la configuración: todos los valores deben ser mayores que cero.");
+      setMensaje(
+        "Revisa la configuración: todos los valores deben ser mayores que cero.",
+      );
       return;
     }
 
@@ -466,11 +507,12 @@ export default function AdminSancionesPage() {
 
     const payload = {
       yellow_cards_classification: amarillasClasificacion,
+      yellow_suspension_games_classification: partidosAmarillasClasificacion,
+      red_card_games_classification: partidosRojaClasificacion,
       yellow_cards_final: amarillasFinal,
-      yellow_suspension_games: partidosAmarillas,
+      yellow_suspension_games_final: partidosAmarillasFinal,
+      red_card_games_final: partidosRojaFinal,
       carry_yellows_to_final: carryYellowsToFinal,
-      red_card_games: partidosRoja,
-      double_yellow_as_red: doubleYellowAsRed,
       updated_at: new Date().toISOString(),
     };
 
@@ -484,7 +526,9 @@ export default function AdminSancionesPage() {
 
       if (error) {
         console.error("Error guardando configuración:", error);
-        setMensaje(`No se ha podido guardar la configuración: ${error.message}`);
+        setMensaje(
+          `No se ha podido guardar la configuración: ${error.message}`,
+        );
         return;
       }
     } else {
@@ -647,71 +691,120 @@ export default function AdminSancionesPage() {
 
                 <p className="mt-2 text-sm font-bold text-slate-500">
                   Estas reglas se aplicarán al guardar nuevas fichas de partido.
+                  La doble amarilla se trata siempre como roja directa.
                 </p>
 
-                <div className="mt-5 grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-black uppercase text-slate-500">
-                      Amarillas clasificación
-                    </label>
+                <div className="mt-5 rounded-3xl bg-slate-100 p-4">
+                  <p className="text-sm font-black uppercase tracking-widest text-red-600">
+                    Clasificación
+                  </p>
 
-                    <input
-                      type="number"
-                      min="1"
-                      value={yellowCardsClassification}
-                      onChange={(event) =>
-                        setYellowCardsClassification(event.target.value)
-                      }
-                      className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
-                    />
-                  </div>
+                  <div className="mt-4 space-y-4">
+                    <div>
+                      <label className="text-xs font-black uppercase text-slate-500">
+                        Cada cuántas amarillas hay sanción
+                      </label>
 
-                  <div>
-                    <label className="text-xs font-black uppercase text-slate-500">
-                      Amarillas eliminatorias
-                    </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={yellowCardsClassification}
+                        onChange={(event) =>
+                          setYellowCardsClassification(event.target.value)
+                        }
+                        className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-xl font-black"
+                      />
+                    </div>
 
-                    <input
-                      type="number"
-                      min="1"
-                      value={yellowCardsFinal}
-                      onChange={(event) =>
-                        setYellowCardsFinal(event.target.value)
-                      }
-                      className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
-                    />
+                    <div>
+                      <label className="text-xs font-black uppercase text-slate-500">
+                        Partidos de sanción por acumulación
+                      </label>
+
+                      <input
+                        type="number"
+                        min="1"
+                        value={yellowSuspensionGamesClassification}
+                        onChange={(event) =>
+                          setYellowSuspensionGamesClassification(
+                            event.target.value,
+                          )
+                        }
+                        className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-xl font-black"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-black uppercase text-slate-500">
+                        Roja directa / doble amarilla
+                      </label>
+
+                      <input
+                        type="number"
+                        min="1"
+                        value={redCardGamesClassification}
+                        onChange={(event) =>
+                          setRedCardGamesClassification(event.target.value)
+                        }
+                        className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-xl font-black"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-black uppercase text-slate-500">
-                      Sanción por amarillas
-                    </label>
+                <div className="mt-4 rounded-3xl bg-slate-100 p-4">
+                  <p className="text-sm font-black uppercase tracking-widest text-red-600">
+                    Eliminatorias
+                  </p>
 
-                    <input
-                      type="number"
-                      min="1"
-                      value={yellowSuspensionGames}
-                      onChange={(event) =>
-                        setYellowSuspensionGames(event.target.value)
-                      }
-                      className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
-                    />
-                  </div>
+                  <div className="mt-4 space-y-4">
+                    <div>
+                      <label className="text-xs font-black uppercase text-slate-500">
+                        Cada cuántas amarillas hay sanción
+                      </label>
 
-                  <div>
-                    <label className="text-xs font-black uppercase text-slate-500">
-                      Roja directa
-                    </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={yellowCardsFinal}
+                        onChange={(event) =>
+                          setYellowCardsFinal(event.target.value)
+                        }
+                        className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-xl font-black"
+                      />
+                    </div>
 
-                    <input
-                      type="number"
-                      min="1"
-                      value={redCardGames}
-                      onChange={(event) => setRedCardGames(event.target.value)}
-                      className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-center text-xl font-black"
-                    />
+                    <div>
+                      <label className="text-xs font-black uppercase text-slate-500">
+                        Partidos de sanción por acumulación
+                      </label>
+
+                      <input
+                        type="number"
+                        min="1"
+                        value={yellowSuspensionGamesFinal}
+                        onChange={(event) =>
+                          setYellowSuspensionGamesFinal(event.target.value)
+                        }
+                        className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-xl font-black"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-black uppercase text-slate-500">
+                        Roja directa / doble amarilla
+                      </label>
+
+                      <input
+                        type="number"
+                        min="1"
+                        value={redCardGamesFinal}
+                        onChange={(event) =>
+                          setRedCardGamesFinal(event.target.value)
+                        }
+                        className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-xl font-black"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -725,21 +818,6 @@ export default function AdminSancionesPage() {
                     checked={carryYellowsToFinal}
                     onChange={(event) =>
                       setCarryYellowsToFinal(event.target.checked)
-                    }
-                    className="h-6 w-6 shrink-0"
-                  />
-                </label>
-
-                <label className="mt-3 flex items-center justify-between rounded-2xl bg-slate-100 p-4 font-black">
-                  <span className="pr-4 text-sm">
-                    Doble amarilla cuenta como roja directa
-                  </span>
-
-                  <input
-                    type="checkbox"
-                    checked={doubleYellowAsRed}
-                    onChange={(event) =>
-                      setDoubleYellowAsRed(event.target.checked)
                     }
                     className="h-6 w-6 shrink-0"
                   />
@@ -871,7 +949,7 @@ export default function AdminSancionesPage() {
                     value={detalle}
                     onChange={(event) => setDetalle(event.target.value)}
                     className="mt-2 min-h-[90px] w-full rounded-xl border border-slate-300 p-3 font-bold"
-                    placeholder="Ejemplo: agresión a rival al finalizar el partido"
+                    placeholder="Ejemplo: insultos al árbitro después del partido"
                   />
                 </div>
 

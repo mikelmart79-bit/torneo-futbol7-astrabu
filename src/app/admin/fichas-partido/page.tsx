@@ -173,20 +173,22 @@ type AdminCalendarMatch = {
 
 type SanctionSettings = {
   yellow_cards_classification: number;
+  yellow_suspension_games_classification: number;
+  red_card_games_classification: number;
   yellow_cards_final: number;
-  yellow_suspension_games: number;
+  yellow_suspension_games_final: number;
+  red_card_games_final: number;
   carry_yellows_to_final: boolean;
-  red_card_games: number;
-  double_yellow_as_red: boolean;
 };
 
 const DEFAULT_SANCTION_SETTINGS: SanctionSettings = {
   yellow_cards_classification: 2,
+  yellow_suspension_games_classification: 1,
+  red_card_games_classification: 1,
   yellow_cards_final: 2,
-  yellow_suspension_games: 1,
+  yellow_suspension_games_final: 1,
+  red_card_games_final: 1,
   carry_yellows_to_final: false,
-  red_card_games: 1,
-  double_yellow_as_red: false,
 };
 
 const DEFAULT_MONTHS: CalendarMonth[] = [
@@ -597,7 +599,15 @@ export default function AdminFichasPartidoPage() {
     const { data, error } = await supabase
       .from("sanction_settings")
       .select(
-        "yellow_cards_classification, yellow_cards_final, yellow_suspension_games, carry_yellows_to_final, red_card_games, double_yellow_as_red",
+        `
+        yellow_cards_classification,
+        yellow_suspension_games_classification,
+        red_card_games_classification,
+        yellow_cards_final,
+        yellow_suspension_games_final,
+        red_card_games_final,
+        carry_yellows_to_final
+      `,
       )
       .order("updated_at", { ascending: false })
       .limit(1)
@@ -610,25 +620,38 @@ export default function AdminFichasPartidoPage() {
 
     if (!data) return DEFAULT_SANCTION_SETTINGS;
 
-    const settings = {
+    const settings: SanctionSettings = {
       yellow_cards_classification:
         Number(data.yellow_cards_classification) > 0
           ? Number(data.yellow_cards_classification)
           : DEFAULT_SANCTION_SETTINGS.yellow_cards_classification,
+
+      yellow_suspension_games_classification:
+        Number(data.yellow_suspension_games_classification) > 0
+          ? Number(data.yellow_suspension_games_classification)
+          : DEFAULT_SANCTION_SETTINGS.yellow_suspension_games_classification,
+
+      red_card_games_classification:
+        Number(data.red_card_games_classification) > 0
+          ? Number(data.red_card_games_classification)
+          : DEFAULT_SANCTION_SETTINGS.red_card_games_classification,
+
       yellow_cards_final:
         Number(data.yellow_cards_final) > 0
           ? Number(data.yellow_cards_final)
           : DEFAULT_SANCTION_SETTINGS.yellow_cards_final,
-      yellow_suspension_games:
-        Number(data.yellow_suspension_games) > 0
-          ? Number(data.yellow_suspension_games)
-          : DEFAULT_SANCTION_SETTINGS.yellow_suspension_games,
+
+      yellow_suspension_games_final:
+        Number(data.yellow_suspension_games_final) > 0
+          ? Number(data.yellow_suspension_games_final)
+          : DEFAULT_SANCTION_SETTINGS.yellow_suspension_games_final,
+
+      red_card_games_final:
+        Number(data.red_card_games_final) > 0
+          ? Number(data.red_card_games_final)
+          : DEFAULT_SANCTION_SETTINGS.red_card_games_final,
+
       carry_yellows_to_final: Boolean(data.carry_yellows_to_final),
-      red_card_games:
-        Number(data.red_card_games) > 0
-          ? Number(data.red_card_games)
-          : DEFAULT_SANCTION_SETTINGS.red_card_games,
-      double_yellow_as_red: Boolean(data.double_yellow_as_red),
     };
 
     setSanctionSettings(settings);
@@ -1603,7 +1626,13 @@ export default function AdminFichasPartidoPage() {
         ? sanctionSettings.yellow_cards_classification
         : sanctionSettings.yellow_cards_final;
 
+    const partidosSancion =
+      matchType === "grupo"
+        ? sanctionSettings.yellow_suspension_games_classification
+        : sanctionSettings.yellow_suspension_games_final;
+
     if (!umbral || umbral <= 0) return null;
+    if (!partidosSancion || partidosSancion <= 0) return null;
 
     const { data: cardsData, error: cardsError } = await supabase
       .from("match_cards")
@@ -1638,13 +1667,11 @@ export default function AdminFichasPartidoPage() {
     });
 
     const amarillasRelevantes = amarillasBase.filter((card) => {
-      if (sanctionSettings.double_yellow_as_red) {
-        const key = yellowCardKey(card);
-        const amarillasEnEsePartido = amarillasPorPartido.get(key) ?? 0;
+      const key = yellowCardKey(card);
+      const amarillasEnEsePartido = amarillasPorPartido.get(key) ?? 0;
 
-        if (amarillasEnEsePartido >= 2) {
-          return false;
-        }
+      if (amarillasEnEsePartido >= 2) {
+        return false;
       }
 
       if (matchType === "grupo") {
@@ -1709,7 +1736,7 @@ export default function AdminFichasPartidoPage() {
           player_id: player.id,
           team_id: player.team_id,
           reason: "Acumulación de amarillas",
-          games: sanctionSettings.yellow_suspension_games,
+          games: partidosSancion,
           served: 0,
           status: "Activa",
           created_at: new Date().toISOString(),
@@ -2123,6 +2150,11 @@ export default function AdminFichasPartidoPage() {
       }
     > = [];
 
+    const partidosRoja =
+      matchType === "grupo"
+        ? sanctionSettings.red_card_games_classification
+        : sanctionSettings.red_card_games_final;
+
     rows.forEach((row) => {
       if (row.suspended) return;
 
@@ -2132,20 +2164,22 @@ export default function AdminFichasPartidoPage() {
           player_id: row.player.id,
           team_id: row.player.team_id,
           reason: "Roja directa",
-          games: sanctionSettings.red_card_games,
+          games: partidosRoja,
           served: 0,
           status: "Activa",
           created_at: new Date().toISOString(),
         });
+
+        return;
       }
 
-      if (sanctionSettings.double_yellow_as_red && row.yellow >= 2) {
+      if (row.yellow >= 2) {
         filasSanciones.push({
           ...payloadPartido(matchType, selectedId),
           player_id: row.player.id,
           team_id: row.player.team_id,
           reason: "Doble amarilla",
-          games: sanctionSettings.red_card_games,
+          games: partidosRoja,
           served: 0,
           status: "Activa",
           created_at: new Date().toISOString(),

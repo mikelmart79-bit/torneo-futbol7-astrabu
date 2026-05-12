@@ -151,6 +151,7 @@ export default function AdminSancionesPage() {
   const [finalMatches, setFinalMatches] = useState<FinalMatch[]>([]);
 
   const [settingsId, setSettingsId] = useState("");
+  const [configuracionAbierta, setConfiguracionAbierta] = useState(false);
 
   const [yellowCardsClassification, setYellowCardsClassification] =
     useState("2");
@@ -356,7 +357,7 @@ export default function AdminSancionesPage() {
     return players.filter((player) => player.team_id === teamId);
   }, [players, teamId]);
 
-  const rows = useMemo<SuspensionRow[]>(() => {
+  const rows = useMemo<SuspensionRow[]>((() => {
     return suspensions
       .map((suspension) => {
         const player = players.find((item) => item.id === suspension.player_id);
@@ -409,7 +410,13 @@ export default function AdminSancionesPage() {
 
         return a.playerName.localeCompare(b.playerName);
       });
-  }, [suspensions, players, teams, groupMatches, finalMatches]);
+  }) as () => SuspensionRow[], [
+    suspensions,
+    players,
+    teams,
+    groupMatches,
+    finalMatches,
+  ]);
 
   function cambiarEquipo(id: string) {
     setTeamId(id);
@@ -549,6 +556,7 @@ export default function AdminSancionesPage() {
       setSettingsId(data.id);
     }
 
+    setConfiguracionAbierta(false);
     setMensaje("Configuración de sanciones guardada correctamente.");
   }
 
@@ -684,154 +692,177 @@ export default function AdminSancionesPage() {
             </div>
           ) : (
             <>
-              <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
-                <h2 className="text-xl font-black">
-                  Configuración de sanciones
-                </h2>
-
-                <p className="mt-2 text-sm font-bold text-slate-500">
-                  Estas reglas se aplicarán al guardar nuevas fichas de partido.
-                  La doble amarilla se trata siempre como roja directa.
-                </p>
-
-                <div className="mt-5 rounded-3xl bg-slate-100 p-4">
-                  <p className="text-sm font-black uppercase tracking-widest text-red-600">
-                    Clasificación
-                  </p>
-
-                  <div className="mt-4 space-y-4">
-                    <div>
-                      <label className="text-xs font-black uppercase text-slate-500">
-                        Cada cuántas amarillas hay sanción
-                      </label>
-
-                      <input
-                        type="number"
-                        min="1"
-                        value={yellowCardsClassification}
-                        onChange={(event) =>
-                          setYellowCardsClassification(event.target.value)
-                        }
-                        className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-xl font-black"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-black uppercase text-slate-500">
-                        Partidos de sanción por acumulación
-                      </label>
-
-                      <input
-                        type="number"
-                        min="1"
-                        value={yellowSuspensionGamesClassification}
-                        onChange={(event) =>
-                          setYellowSuspensionGamesClassification(
-                            event.target.value,
-                          )
-                        }
-                        className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-xl font-black"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-black uppercase text-slate-500">
-                        Roja directa / doble amarilla
-                      </label>
-
-                      <input
-                        type="number"
-                        min="1"
-                        value={redCardGamesClassification}
-                        onChange={(event) =>
-                          setRedCardGamesClassification(event.target.value)
-                        }
-                        className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-xl font-black"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 rounded-3xl bg-slate-100 p-4">
-                  <p className="text-sm font-black uppercase tracking-widest text-red-600">
-                    Eliminatorias
-                  </p>
-
-                  <div className="mt-4 space-y-4">
-                    <div>
-                      <label className="text-xs font-black uppercase text-slate-500">
-                        Cada cuántas amarillas hay sanción
-                      </label>
-
-                      <input
-                        type="number"
-                        min="1"
-                        value={yellowCardsFinal}
-                        onChange={(event) =>
-                          setYellowCardsFinal(event.target.value)
-                        }
-                        className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-xl font-black"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-black uppercase text-slate-500">
-                        Partidos de sanción por acumulación
-                      </label>
-
-                      <input
-                        type="number"
-                        min="1"
-                        value={yellowSuspensionGamesFinal}
-                        onChange={(event) =>
-                          setYellowSuspensionGamesFinal(event.target.value)
-                        }
-                        className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-xl font-black"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-black uppercase text-slate-500">
-                        Roja directa / doble amarilla
-                      </label>
-
-                      <input
-                        type="number"
-                        min="1"
-                        value={redCardGamesFinal}
-                        onChange={(event) =>
-                          setRedCardGamesFinal(event.target.value)
-                        }
-                        className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-xl font-black"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <label className="mt-4 flex items-center justify-between rounded-2xl bg-slate-100 p-4 font-black">
-                  <span className="pr-4 text-sm">
-                    Arrastrar amarillas de clasificación a eliminatorias
-                  </span>
-
-                  <input
-                    type="checkbox"
-                    checked={carryYellowsToFinal}
-                    onChange={(event) =>
-                      setCarryYellowsToFinal(event.target.checked)
-                    }
-                    className="h-6 w-6 shrink-0"
-                  />
-                </label>
-
+              <div className="mt-6 overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
                 <button
-                  onClick={guardarConfiguracionSanciones}
-                  disabled={guardandoConfig}
-                  className="mt-5 w-full rounded-xl bg-slate-950 py-3 font-black text-white shadow disabled:bg-slate-300"
+                  type="button"
+                  onClick={() =>
+                    setConfiguracionAbierta((actual) => !actual)
+                  }
+                  className="flex w-full items-center justify-between gap-4 p-5 text-left"
                 >
-                  {guardandoConfig
-                    ? "Guardando configuración..."
-                    : "Guardar configuración de sanciones"}
+                  <div>
+                    <h2 className="text-xl font-black">
+                      Configuración de sanciones
+                    </h2>
+
+                    <p className="mt-1 text-sm font-bold text-slate-500">
+                      Normalmente solo se configura una vez.
+                    </p>
+                  </div>
+
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-950 text-xl font-black text-white">
+                    {configuracionAbierta ? "−" : "+"}
+                  </div>
                 </button>
+
+                {configuracionAbierta && (
+                  <div className="border-t border-slate-200 p-5 pt-4">
+                    <p className="text-sm font-bold text-slate-500">
+                      Estas reglas se aplicarán al guardar nuevas fichas de
+                      partido. La doble amarilla se trata siempre como roja
+                      directa.
+                    </p>
+
+                    <div className="mt-5 rounded-3xl bg-slate-100 p-4">
+                      <p className="text-sm font-black uppercase tracking-widest text-red-600">
+                        Clasificación
+                      </p>
+
+                      <div className="mt-4 space-y-4">
+                        <div>
+                          <label className="text-xs font-black uppercase text-slate-500">
+                            Cada cuántas amarillas hay sanción
+                          </label>
+
+                          <input
+                            type="number"
+                            min="1"
+                            value={yellowCardsClassification}
+                            onChange={(event) =>
+                              setYellowCardsClassification(event.target.value)
+                            }
+                            className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-xl font-black"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-black uppercase text-slate-500">
+                            Partidos de sanción por acumulación
+                          </label>
+
+                          <input
+                            type="number"
+                            min="1"
+                            value={yellowSuspensionGamesClassification}
+                            onChange={(event) =>
+                              setYellowSuspensionGamesClassification(
+                                event.target.value,
+                              )
+                            }
+                            className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-xl font-black"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-black uppercase text-slate-500">
+                            Roja directa / doble amarilla
+                          </label>
+
+                          <input
+                            type="number"
+                            min="1"
+                            value={redCardGamesClassification}
+                            onChange={(event) =>
+                              setRedCardGamesClassification(event.target.value)
+                            }
+                            className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-xl font-black"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 rounded-3xl bg-slate-100 p-4">
+                      <p className="text-sm font-black uppercase tracking-widest text-red-600">
+                        Eliminatorias
+                      </p>
+
+                      <div className="mt-4 space-y-4">
+                        <div>
+                          <label className="text-xs font-black uppercase text-slate-500">
+                            Cada cuántas amarillas hay sanción
+                          </label>
+
+                          <input
+                            type="number"
+                            min="1"
+                            value={yellowCardsFinal}
+                            onChange={(event) =>
+                              setYellowCardsFinal(event.target.value)
+                            }
+                            className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-xl font-black"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-black uppercase text-slate-500">
+                            Partidos de sanción por acumulación
+                          </label>
+
+                          <input
+                            type="number"
+                            min="1"
+                            value={yellowSuspensionGamesFinal}
+                            onChange={(event) =>
+                              setYellowSuspensionGamesFinal(event.target.value)
+                            }
+                            className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-xl font-black"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-black uppercase text-slate-500">
+                            Roja directa / doble amarilla
+                          </label>
+
+                          <input
+                            type="number"
+                            min="1"
+                            value={redCardGamesFinal}
+                            onChange={(event) =>
+                              setRedCardGamesFinal(event.target.value)
+                            }
+                            className="mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-center text-xl font-black"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <label className="mt-4 flex items-center justify-between rounded-2xl bg-slate-100 p-4 font-black">
+                      <span className="pr-4 text-sm">
+                        Arrastrar amarillas de clasificación a eliminatorias
+                      </span>
+
+                      <input
+                        type="checkbox"
+                        checked={carryYellowsToFinal}
+                        onChange={(event) =>
+                          setCarryYellowsToFinal(event.target.checked)
+                        }
+                        className="h-6 w-6 shrink-0"
+                      />
+                    </label>
+
+                    <button
+                      onClick={guardarConfiguracionSanciones}
+                      disabled={guardandoConfig}
+                      className="mt-5 w-full rounded-xl bg-slate-950 py-3 font-black text-white shadow disabled:bg-slate-300"
+                    >
+                      {guardandoConfig
+                        ? "Guardando configuración..."
+                        : "Guardar configuración de sanciones"}
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">

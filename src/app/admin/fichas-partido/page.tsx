@@ -1291,6 +1291,11 @@ export default function AdminFichasPartidoPage() {
         red: 0,
       })),
     );
+
+    setHomeScore("");
+    setAwayScore("");
+    setHomePenalties("");
+    setAwayPenalties("");
   }
 
   function golesEquipo(teamId: string | undefined) {
@@ -2799,7 +2804,7 @@ export default function AdminFichasPartidoPage() {
                         disabled={fichaBloqueada}
                         className="rounded-xl bg-slate-200 py-3 text-sm font-black text-slate-900 shadow disabled:opacity-50"
                       >
-                        Limpiar ficha
+                        Limpiar ficha y marcador
                       </button>
 
                       <button

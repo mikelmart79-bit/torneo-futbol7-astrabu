@@ -570,6 +570,9 @@ export default function AdminFichasPartidoPage() {
   const [fichaAviso, setFichaAviso] = useState("");
 
   const [rows, setRows] = useState<FichaRow[]>([]);
+  const [bloquesEquipoAbiertos, setBloquesEquipoAbiertos] = useState<
+    Record<string, boolean>
+  >({});
   const [estado, setEstado] = useState("Pendiente");
   const [estadoGuardado, setEstadoGuardado] = useState("Pendiente");
 
@@ -686,6 +689,7 @@ export default function AdminFichasPartidoPage() {
     setFichaSubtitulo("");
     setFichaAviso("");
     setRows([]);
+    setBloquesEquipoAbiertos({});
     setEstado("Pendiente");
     setEstadoGuardado("Pendiente");
     setHomeScore("");
@@ -985,6 +989,7 @@ export default function AdminFichasPartidoPage() {
 
     if (teamIds.length === 0) {
       setRows([]);
+      setBloquesEquipoAbiertos({});
       setLoadingFicha(false);
       return;
     }
@@ -1192,6 +1197,7 @@ export default function AdminFichasPartidoPage() {
     });
 
     setRows(rowsFicha);
+    setBloquesEquipoAbiertos({});
     setLoadingFicha(false);
   }
 
@@ -2266,6 +2272,13 @@ export default function AdminFichasPartidoPage() {
       row.player.team_id !== awayTeam?.id,
   );
 
+  function cambiarBloqueEquipo(bloqueId: string) {
+    setBloquesEquipoAbiertos((actuales) => ({
+      ...actuales,
+      [bloqueId]: !actuales[bloqueId],
+    }));
+  }
+
   function renderJugadorFicha(row: FichaRow) {
     return (
       <div
@@ -2385,27 +2398,47 @@ export default function AdminFichasPartidoPage() {
     titulo: string,
     equipo: string,
     jugadores: FichaRow[],
+    bloqueId: string,
   ) {
+    const abierto = Boolean(bloquesEquipoAbiertos[bloqueId]);
+
     return (
       <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-        <div className="bg-slate-950 px-4 py-4 text-white">
-          <p className="text-xs font-black uppercase tracking-widest text-red-300">
-            {titulo}
-          </p>
-          <h3 className="mt-1 break-words text-xl font-black leading-tight">
-            {equipo}
-          </h3>
-        </div>
-
-        <div className="space-y-3 p-3">
-          {jugadores.length === 0 ? (
-            <p className="rounded-2xl bg-slate-100 p-4 text-sm font-bold text-slate-500">
-              No hay jugadores en este equipo.
+        <button
+          type="button"
+          onClick={() => cambiarBloqueEquipo(bloqueId)}
+          className="flex w-full items-center justify-between gap-3 bg-slate-950 px-4 py-4 text-left text-white"
+        >
+          <div className="min-w-0">
+            <p className="text-xs font-black uppercase tracking-widest text-red-300">
+              {titulo}
             </p>
-          ) : (
-            jugadores.map((row) => renderJugadorFicha(row))
-          )}
-        </div>
+
+            <h3 className="mt-1 break-words text-xl font-black leading-tight">
+              {equipo}
+            </h3>
+
+            <p className="mt-1 text-xs font-bold text-slate-300">
+              {jugadores.length} jugador{jugadores.length === 1 ? "" : "es"}
+            </p>
+          </div>
+
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15 text-2xl font-black">
+            {abierto ? "−" : "+"}
+          </div>
+        </button>
+
+        {abierto && (
+          <div className="space-y-3 p-3">
+            {jugadores.length === 0 ? (
+              <p className="rounded-2xl bg-slate-100 p-4 text-sm font-bold text-slate-500">
+                No hay jugadores en este equipo.
+              </p>
+            ) : (
+              jugadores.map((row) => renderJugadorFicha(row))
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -2834,12 +2867,14 @@ export default function AdminFichasPartidoPage() {
                           "Equipo local",
                           homeTeam?.name ?? "Local",
                           rowsLocal,
+                          "local",
                         )}
 
                         {renderBloqueEquipo(
                           "Equipo visitante",
                           awayTeam?.name ?? "Visitante",
                           rowsVisitante,
+                          "visitante",
                         )}
 
                         {rowsOtros.length > 0 &&
@@ -2847,6 +2882,7 @@ export default function AdminFichasPartidoPage() {
                             "Otros jugadores",
                             "Sin equipo asignado",
                             rowsOtros,
+                            "otros",
                           )}
                       </div>
                     )}

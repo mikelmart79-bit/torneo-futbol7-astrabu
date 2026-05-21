@@ -85,6 +85,7 @@ const extras: AdminLink[] = [
 ];
 
 const BACKUP_TABLES = [
+  "groups",
   "teams",
   "players",
   "matches",
@@ -94,11 +95,14 @@ const BACKUP_TABLES = [
   "match_cards",
   "suspensions",
   "suspension_served_matches",
+  "mvp_nominees",
   "mvp_votes",
   "rules",
+  "sanction_settings",
 ];
 
 const RESTORE_INSERT_ORDER = [
+  "groups",
   "teams",
   "players",
   "matches",
@@ -108,8 +112,10 @@ const RESTORE_INSERT_ORDER = [
   "match_cards",
   "suspensions",
   "suspension_served_matches",
+  "mvp_nominees",
   "mvp_votes",
   "rules",
+  "sanction_settings",
 ];
 
 const OCTAVOS_BASE_REFS: FinalBaseRef[] = [
@@ -384,6 +390,11 @@ export default function AdminPage() {
     );
 
     await comprobarError(
+      db.from("mvp_nominees").delete().not("match_id", "is", null),
+      "Borrando candidatos MVP de clasificación",
+    );
+
+    await comprobarError(
       db
         .from("suspension_served_matches")
         .delete()
@@ -418,6 +429,11 @@ export default function AdminPage() {
     await comprobarError(
       db.from("mvp_votes").delete().not("final_match_id", "is", null),
       "Borrando votos MVP de eliminatorias",
+    );
+
+    await comprobarError(
+      db.from("mvp_nominees").delete().not("final_match_id", "is", null),
+      "Borrando candidatos MVP de eliminatorias",
     );
 
     await comprobarError(
@@ -596,6 +612,14 @@ export default function AdminPage() {
 
     await comprobarError(
       db
+        .from("mvp_nominees")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000"),
+      "Borrando candidatos MVP",
+    );
+
+    await comprobarError(
+      db
         .from("suspension_served_matches")
         .delete()
         .neq("id", "00000000-0000-0000-0000-000000000000"),
@@ -741,18 +765,44 @@ export default function AdminPage() {
         .neq("id", "00000000-0000-0000-0000-000000000000"),
       "Borrando equipos",
     );
+
+    await comprobarError(
+      db
+        .from("groups")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000"),
+      "Borrando grupos",
+    );
   }
 
   async function borrarDatosTorneo() {
     await ejecutarOperacion(
       "Borrar TODO el torneo",
-      "Se eliminarán equipos, jugadores, calendario, eliminatorias, fichas, goles, tarjetas, sanciones, votos MVP y normativa.",
+      "Se eliminarán grupos, equipos, jugadores, calendario, eliminatorias, fichas, goles, tarjetas, sanciones, candidatos MVP, votos MVP, normativa y configuración de sanciones.",
       async () => {
         const { error } = await supabase.rpc("reset_torneo");
 
         if (error) {
           throw new Error(error.message);
         }
+
+        const db = supabase as any;
+
+        await comprobarError(
+          db
+            .from("rules")
+            .delete()
+            .neq("id", "00000000-0000-0000-0000-000000000000"),
+          "Borrando normativa",
+        );
+
+        await comprobarError(
+          db
+            .from("sanction_settings")
+            .delete()
+            .neq("id", "00000000-0000-0000-0000-000000000000"),
+          "Borrando configuración de sanciones",
+        );
 
         sessionStorage.removeItem("zonaPeligrosaAdmin");
       },
@@ -765,7 +815,7 @@ export default function AdminPage() {
     if (trabajando) return;
 
     const confirmar = window.confirm(
-      "Se descargará una copia de seguridad en formato JSON con los datos principales del torneo.\n\n¿Continuar?",
+      "Se descargará una copia de seguridad en formato JSON con todos los datos principales del torneo: grupos, equipos, jugadores, partidos, eliminatorias, fichas, goles, tarjetas, sanciones, MVP, normativa y configuración.\n\n¿Continuar?",
     );
 
     if (!confirmar) return;
@@ -856,6 +906,14 @@ export default function AdminPage() {
 
       await comprobarError(
         db
+          .from("sanction_settings")
+          .delete()
+          .neq("id", "00000000-0000-0000-0000-000000000000"),
+        "Borrando configuración de sanciones",
+      );
+
+      await comprobarError(
+        db
           .from("players")
           .delete()
           .neq("id", "00000000-0000-0000-0000-000000000000"),
@@ -868,6 +926,14 @@ export default function AdminPage() {
           .delete()
           .neq("id", "00000000-0000-0000-0000-000000000000"),
         "Borrando equipos",
+      );
+
+      await comprobarError(
+        db
+          .from("groups")
+          .delete()
+          .neq("id", "00000000-0000-0000-0000-000000000000"),
+        "Borrando grupos",
       );
 
       for (const tableName of RESTORE_INSERT_ORDER) {
@@ -991,7 +1057,9 @@ export default function AdminPage() {
                 </p>
 
                 <p className="mt-2 text-sm font-bold text-slate-600">
-                  Descarga o restaura los datos principales del torneo.
+                  Descarga o restaura todos los datos principales del torneo:
+                  grupos, equipos, jugadores, partidos, eliminatorias, fichas,
+                  goles, tarjetas, sanciones, MVP, normativa y configuración.
                 </p>
 
                 <button
@@ -1029,7 +1097,7 @@ export default function AdminPage() {
                     onClick={() =>
                       ejecutarOperacion(
                         "Borrar equipos",
-                        "Se borrarán equipos, jugadores, calendario, eliminatorias, fichas, resultados, sanciones y votos asociados.",
+                        "Se borrarán grupos, equipos, jugadores, calendario, eliminatorias, fichas, resultados, sanciones y votos asociados.",
                         borrarEquipos,
                       )
                     }
@@ -1057,7 +1125,7 @@ export default function AdminPage() {
                     onClick={() =>
                       ejecutarOperacion(
                         "Quitar resultados de clasificación",
-                        "Se pondrán a cero los marcadores, estados, MVP, incidencias, fichas, goles, tarjetas, sanciones y votos de los partidos de clasificación. También se restaurarán las eliminatorias a referencias iniciales.",
+                        "Se pondrán a cero los marcadores, estados, MVP, incidencias, fichas, goles, tarjetas, sanciones, candidatos MVP y votos de los partidos de clasificación. También se restaurarán las eliminatorias a referencias iniciales.",
                         borrarResultadosClasificacion,
                       )
                     }
@@ -1071,7 +1139,7 @@ export default function AdminPage() {
                     onClick={() =>
                       ejecutarOperacion(
                         "Quitar resultados de eliminatorias",
-                        "Se pondrán a cero los marcadores, penaltis, estados, MVP, incidencias, fichas, goles, tarjetas, sanciones y votos de eliminatorias. También se restaurarán los cruces a referencias iniciales.",
+                        "Se pondrán a cero los marcadores, penaltis, estados, MVP, incidencias, fichas, goles, tarjetas, sanciones, candidatos MVP y votos de eliminatorias. También se restaurarán los cruces a referencias iniciales.",
                         borrarResultadosEliminatorias,
                       )
                     }
@@ -1113,7 +1181,7 @@ export default function AdminPage() {
                     onClick={() =>
                       ejecutarOperacion(
                         "Borrar actas y fichas",
-                        "Se borrarán participantes, goles, tarjetas, incidencias, sanciones y votos MVP asociados a las fichas.",
+                        "Se borrarán participantes, goles, tarjetas, incidencias, sanciones, candidatos MVP y votos MVP asociados a las fichas.",
                         borrarActasYFichas,
                       )
                     }

@@ -109,6 +109,10 @@ function normalizarEquipo(equipo: RawGroupMatch["home_team"]): TeamRef | null {
 function estadoPendiente(status: string) {
   const limpio = status.trim().toLowerCase();
 
+  if (limpio.includes("anulada") || limpio.includes("cancelada")) {
+    return false;
+  }
+
   return (
     limpio !== "cumplida" &&
     limpio !== "completada" &&
@@ -357,7 +361,7 @@ export default function AdminSancionesPage() {
     return players.filter((player) => player.team_id === teamId);
   }, [players, teamId]);
 
-  const rows = useMemo<SuspensionRow[]>((() => {
+  const rows = useMemo<SuspensionRow[]>(() => {
     return suspensions
       .map((suspension) => {
         const player = players.find((item) => item.id === suspension.player_id);
@@ -410,13 +414,7 @@ export default function AdminSancionesPage() {
 
         return a.playerName.localeCompare(b.playerName);
       });
-  }) as () => SuspensionRow[], [
-    suspensions,
-    players,
-    teams,
-    groupMatches,
-    finalMatches,
-  ]);
+  }, [suspensions, players, teams, groupMatches, finalMatches]);
 
   function cambiarEquipo(id: string) {
     setTeamId(id);

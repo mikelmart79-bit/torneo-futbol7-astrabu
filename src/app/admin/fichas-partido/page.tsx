@@ -349,12 +349,22 @@ function nombreResueltoOReferencia(
 function estadoPendiente(status: string | null | undefined) {
   const limpio = normalizarTexto(status);
 
+  if (limpio.includes("anulada") || limpio.includes("cancelada")) {
+    return false;
+  }
+
   return (
     limpio !== "cumplida" &&
     limpio !== "completada" &&
     limpio !== "served" &&
     limpio !== "completed"
   );
+}
+
+function estadoAnulado(status: string | null | undefined) {
+  const limpio = normalizarTexto(status);
+
+  return limpio.includes("anulada") || limpio.includes("cancelada");
 }
 
 function estadoCuentaComoCumplido(status: string | null | undefined) {
@@ -1045,20 +1055,39 @@ export default function AdminFichasPartidoPage() {
       return;
     }
 
-    const sanciones = ((suspensionRequest.data ?? []) as Suspension[]).filter(
-      (suspension) =>
-        estadoPendiente(suspension.status) &&
-        Math.max(suspension.games - suspension.served, 0) > 0,
-    );
+    const todasLasSanciones = (suspensionRequest.data ?? []) as Suspension[];
 
     function sancionParaJugador(player: Player): SuspensionInfo | null {
-      const sancionesJugador = sanciones.filter(
-        (suspension) => suspension.player_id === player.id,
-      );
+      const sancionesJugador = todasLasSanciones
+        .filter((suspension) => suspension.player_id === player.id)
+        .filter((suspension) => Number(suspension.games) > 0)
+        .filter((suspension) => !estadoAnulado(suspension.status))
+        .sort((a, b) => {
+          const origenA = origenSancionValor(a, partidosBase, eliminatoriasBase);
+          const origenB = origenSancionValor(b, partidosBase, eliminatoriasBase);
+
+          if (origenA !== origenB) return origenA - origenB;
+
+          const creadaA = fechaCreacionValor(a.created_at);
+          const creadaB = fechaCreacionValor(b.created_at);
+
+          if (creadaA !== creadaB) return creadaA - creadaB;
+
+          return a.id.localeCompare(b.id);
+        });
+
+      if (sancionesJugador.length === 0) return null;
+
+      const slotsOcupados = new Set<string>();
 
       for (const suspension of sancionesJugador) {
-        const restantes = Math.max(suspension.games - suspension.served, 0);
-        if (restantes <= 0) continue;
+        const totalPartidos = Math.max(Number(suspension.games) || 0, 0);
+        const cumplidos = Math.min(
+          Math.max(Number(suspension.served) || 0, 0),
+          totalPartidos,
+        );
+
+        if (totalPartidos <= 0) continue;
 
         const teamName =
           equiposBase.find((team) => team.id === suspension.team_id)?.name ??
@@ -1077,29 +1106,43 @@ export default function AdminFichasPartidoPage() {
           eliminatoriasBase,
         );
 
-        const partidosPendientesDeSancion = partidosEquipo
-          .filter((match) => match.dateValue > origenValor)
-          .slice(suspension.served, suspension.games);
+        const partidosAsignados: SuspensionMatchRef[] = [];
 
-        const indicePartidoSancion = partidosPendientesDeSancion.findIndex(
-          (match) => match.tipo === tipo && match.id === id,
+        for (const partido of partidosEquipo) {
+          if (partido.dateValue <= origenValor) continue;
+
+          const slotKey = `${partido.tipo}:${partido.id}`;
+
+          if (slotsOcupados.has(slotKey)) continue;
+
+          partidosAsignados.push(partido);
+          slotsOcupados.add(slotKey);
+
+          if (partidosAsignados.length >= totalPartidos) break;
+        }
+
+        const indicePartidoSancion = partidosAsignados.findIndex(
+          (partido) => partido.tipo === tipo && partido.id === id,
         );
 
-        const afectaEstePartido = indicePartidoSancion !== -1;
+        if (indicePartidoSancion === -1) continue;
 
-        if (afectaEstePartido) {
-          return {
-            id: suspension.id,
-            reason: suspension.reason,
-            games: suspension.games,
-            served: suspension.served,
-            restantes,
-            partidoActual: Math.min(
-              suspension.served + indicePartidoSancion + 1,
-              suspension.games,
-            ),
-          };
-        }
+        const pendiente =
+          estadoPendiente(suspension.status) &&
+          Math.max(totalPartidos - cumplidos, 0) > 0;
+
+        if (!pendiente) continue;
+
+        if (indicePartidoSancion < cumplidos) continue;
+
+        return {
+          id: suspension.id,
+          reason: suspension.reason,
+          games: totalPartidos,
+          served: cumplidos,
+          restantes: Math.max(totalPartidos - cumplidos, 0),
+          partidoActual: indicePartidoSancion + 1,
+        };
       }
 
       return null;

@@ -228,6 +228,7 @@ export default function EquipoDetalle() {
   const [jugadoresFavoritos, setJugadoresFavoritos] = useState<string[]>([]);
   const [jugadoresAbiertos, setJugadoresAbiertos] = useState<string[]>([]);
   const [calendarioAbierto, setCalendarioAbierto] = useState(false);
+  const [plantillaAbierta, setPlantillaAbierta] = useState(false);
   const [partidosEquipo, setPartidosEquipo] = useState<TeamCalendarMatch[]>([]);
   const [estadisticas, setEstadisticas] = useState<Record<string, PlayerStats>>(
     {},
@@ -270,6 +271,7 @@ export default function EquipoDetalle() {
       setLoading(true);
       setErrorCarga("");
       setCalendarioAbierto(false);
+      setPlantillaAbierta(false);
 
       const { data: teamData, error: teamError } = await supabase
         .from("teams")
@@ -687,6 +689,30 @@ export default function EquipoDetalle() {
           {esFavorito ? "★ Equipo favorito" : "☆ Añadir a favoritos"}
         </button>
 
+        <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
+          <h2 className="text-xl font-black">Equipaciones</h2>
+
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-slate-50 p-4 text-center shadow">
+              <div className="flex justify-center">
+                <ShirtIcon color={colorLocal} />
+              </div>
+
+              <p className="mt-2 text-sm font-black text-slate-700">Local</p>
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 p-4 text-center shadow">
+              <div className="flex justify-center">
+                <ShirtIcon color={colorVisitante} />
+              </div>
+
+              <p className="mt-2 text-sm font-black text-slate-700">
+                Visitante
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className="mt-5 overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
           <button
             type="button"
@@ -767,163 +793,153 @@ export default function EquipoDetalle() {
           )}
         </div>
 
-        <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
-          <h2 className="text-xl font-black">Equipaciones</h2>
+        <div className="mt-5 overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
+          <button
+            type="button"
+            onClick={() => setPlantillaAbierta((actual) => !actual)}
+            className="flex w-full items-center justify-between gap-4 bg-red-600 p-5 text-left text-white"
+          >
+            <div>
+              <h2 className="text-xl font-black">Plantilla</h2>
 
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <div className="rounded-2xl bg-slate-50 p-4 text-center shadow">
-              <div className="flex justify-center">
-                <ShirtIcon color={colorLocal} />
-              </div>
-
-              <p className="mt-2 text-sm font-black text-slate-700">Local</p>
-            </div>
-
-            <div className="rounded-2xl bg-slate-50 p-4 text-center shadow">
-              <div className="flex justify-center">
-                <ShirtIcon color={colorVisitante} />
-              </div>
-
-              <p className="mt-2 text-sm font-black text-slate-700">
-                Visitante
+              <p className="mt-1 text-sm font-bold text-red-100">
+                {jugadores.length} jugador{jugadores.length === 1 ? "" : "es"}
               </p>
             </div>
-          </div>
-        </div>
 
-        <div className="mt-5 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-xl font-black">Plantilla</h2>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 text-2xl font-black text-white">
+              {plantillaAbierta ? "−" : "+"}
+            </div>
+          </button>
 
-            <p className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-500">
-              {jugadores.length}
-            </p>
-          </div>
+          {plantillaAbierta && (
+            <div className="border-t border-slate-200 p-5 pt-4">
+              {jugadores.length === 0 ? (
+                <p className="rounded-2xl bg-slate-50 p-4 font-bold text-slate-500">
+                  Este equipo todavía no tiene jugadores añadidos.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {jugadores.map((player) => {
+                    const tipo = normalizarTipoJugador(player.player_type);
+                    const esJugadorFavorito = jugadoresFavoritos.includes(
+                      player.id,
+                    );
+                    const abierto = jugadoresAbiertos.includes(player.id);
+                    const stats = statsJugador(player.id);
 
-          {jugadores.length === 0 ? (
-            <p className="mt-4 rounded-2xl bg-slate-50 p-4 font-bold text-slate-500">
-              Este equipo todavía no tiene jugadores añadidos.
-            </p>
-          ) : (
-            <div className="mt-5 space-y-3">
-              {jugadores.map((player) => {
-                const tipo = normalizarTipoJugador(player.player_type);
-                const esJugadorFavorito = jugadoresFavoritos.includes(
-                  player.id,
-                );
-                const abierto = jugadoresAbiertos.includes(player.id);
-                const stats = statsJugador(player.id);
-
-                return (
-                  <div
-                    key={player.id}
-                    className="rounded-3xl bg-slate-50 p-4 shadow-sm"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-red-600 text-2xl font-black text-white shadow">
-                        {player.number ?? "-"}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <p className="break-words text-[1.15rem] font-black leading-tight text-slate-950">
-                          {player.name}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-3 gap-3">
-                      <button
-                        onClick={() => toggleJugadorAbierto(player.id)}
-                        className={`flex h-12 w-full items-center justify-center rounded-2xl text-xl font-black shadow ${
-                          abierto
-                            ? "bg-red-600 text-white"
-                            : "bg-white text-slate-600"
-                        }`}
-                        aria-label={
-                          abierto
-                            ? "Ocultar estadísticas del jugador"
-                            : "Ver estadísticas del jugador"
-                        }
-                      >
-                        {abierto ? "−" : "+"}
-                      </button>
-
+                    return (
                       <div
-                        className={`flex h-12 w-full items-center justify-center rounded-2xl text-sm font-black shadow ${claseTipoJugador(
-                          tipo,
-                        )}`}
+                        key={player.id}
+                        className="rounded-3xl bg-slate-50 p-4 shadow-sm"
                       >
-                        {tipo}
+                        <div className="flex items-center gap-4">
+                          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-red-600 text-2xl font-black text-white shadow">
+                            {player.number ?? "-"}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <p className="break-words text-[1.15rem] font-black leading-tight text-slate-950">
+                              {player.name}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-3 gap-3">
+                          <button
+                            onClick={() => toggleJugadorAbierto(player.id)}
+                            className={`flex h-12 w-full items-center justify-center rounded-2xl text-xl font-black shadow ${
+                              abierto
+                                ? "bg-red-600 text-white"
+                                : "bg-white text-slate-600"
+                            }`}
+                            aria-label={
+                              abierto
+                                ? "Ocultar estadísticas del jugador"
+                                : "Ver estadísticas del jugador"
+                            }
+                          >
+                            {abierto ? "−" : "+"}
+                          </button>
+
+                          <div
+                            className={`flex h-12 w-full items-center justify-center rounded-2xl text-sm font-black shadow ${claseTipoJugador(
+                              tipo,
+                            )}`}
+                          >
+                            {tipo}
+                          </div>
+
+                          <button
+                            onClick={() => toggleJugadorFavorito(player.id)}
+                            className={`flex h-12 w-full items-center justify-center rounded-2xl text-2xl font-black shadow ${
+                              esJugadorFavorito
+                                ? "bg-yellow-300 text-slate-950"
+                                : "bg-white text-slate-400"
+                            }`}
+                            aria-label={
+                              esJugadorFavorito
+                                ? "Quitar jugador de favoritos"
+                                : "Añadir jugador a favoritos"
+                            }
+                          >
+                            {esJugadorFavorito ? "★" : "☆"}
+                          </button>
+                        </div>
+
+                        {abierto && (
+                          <div className="mt-4 grid grid-cols-2 gap-2">
+                            <div className="rounded-2xl bg-white p-3 text-center shadow-sm">
+                              <p className="text-xs font-black uppercase text-slate-500">
+                                Jugados
+                              </p>
+                              <p className="mt-1 text-2xl font-black text-slate-950">
+                                {stats.played}
+                              </p>
+                            </div>
+
+                            <div className="rounded-2xl bg-white p-3 text-center shadow-sm">
+                              <p className="text-xs font-black uppercase text-slate-500">
+                                Goles
+                              </p>
+                              <p className="mt-1 text-2xl font-black text-red-600">
+                                {stats.goals}
+                              </p>
+                            </div>
+
+                            <div className="rounded-2xl bg-white p-3 text-center shadow-sm">
+                              <p className="text-xs font-black uppercase text-slate-500">
+                                Amarillas
+                              </p>
+                              <p className="mt-1 text-2xl font-black text-yellow-500">
+                                {stats.yellow}
+                              </p>
+                            </div>
+
+                            <div className="rounded-2xl bg-white p-3 text-center shadow-sm">
+                              <p className="text-xs font-black uppercase text-slate-500">
+                                Rojas
+                              </p>
+                              <p className="mt-1 text-2xl font-black text-red-700">
+                                {stats.red}
+                              </p>
+                            </div>
+
+                            <div className="col-span-2 rounded-2xl bg-white p-3 text-center shadow-sm">
+                              <p className="text-xs font-black uppercase text-slate-500">
+                                Sanciones
+                              </p>
+                              <p className="mt-1 text-2xl font-black text-slate-950">
+                                {stats.suspensions}
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
-
-                      <button
-                        onClick={() => toggleJugadorFavorito(player.id)}
-                        className={`flex h-12 w-full items-center justify-center rounded-2xl text-2xl font-black shadow ${
-                          esJugadorFavorito
-                            ? "bg-yellow-300 text-slate-950"
-                            : "bg-white text-slate-400"
-                        }`}
-                        aria-label={
-                          esJugadorFavorito
-                            ? "Quitar jugador de favoritos"
-                            : "Añadir jugador a favoritos"
-                        }
-                      >
-                        {esJugadorFavorito ? "★" : "☆"}
-                      </button>
-                    </div>
-
-                    {abierto && (
-                      <div className="mt-4 grid grid-cols-2 gap-2">
-                        <div className="rounded-2xl bg-white p-3 text-center shadow-sm">
-                          <p className="text-xs font-black uppercase text-slate-500">
-                            Jugados
-                          </p>
-                          <p className="mt-1 text-2xl font-black text-slate-950">
-                            {stats.played}
-                          </p>
-                        </div>
-
-                        <div className="rounded-2xl bg-white p-3 text-center shadow-sm">
-                          <p className="text-xs font-black uppercase text-slate-500">
-                            Goles
-                          </p>
-                          <p className="mt-1 text-2xl font-black text-red-600">
-                            {stats.goals}
-                          </p>
-                        </div>
-
-                        <div className="rounded-2xl bg-white p-3 text-center shadow-sm">
-                          <p className="text-xs font-black uppercase text-slate-500">
-                            Amarillas
-                          </p>
-                          <p className="mt-1 text-2xl font-black text-yellow-500">
-                            {stats.yellow}
-                          </p>
-                        </div>
-
-                        <div className="rounded-2xl bg-white p-3 text-center shadow-sm">
-                          <p className="text-xs font-black uppercase text-slate-500">
-                            Rojas
-                          </p>
-                          <p className="mt-1 text-2xl font-black text-red-700">
-                            {stats.red}
-                          </p>
-                        </div>
-
-                        <div className="col-span-2 rounded-2xl bg-white p-3 text-center shadow-sm">
-                          <p className="text-xs font-black uppercase text-slate-500">
-                            Sanciones
-                          </p>
-                          <p className="mt-1 text-2xl font-black text-slate-950">
-                            {stats.suspensions}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>

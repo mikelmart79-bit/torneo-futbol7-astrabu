@@ -331,7 +331,9 @@ export default function EquipoDetalle() {
         away_team:teams!matches_away_team_id_fkey(id, name)
       `,
       )
-      .or(`home_team_id.eq.${equipoActual.id},away_team_id.eq.${equipoActual.id}`)
+      .or(
+        `home_team_id.eq.${equipoActual.id},away_team_id.eq.${equipoActual.id}`,
+      )
       .order("match_date", { ascending: true })
       .order("match_time", { ascending: true });
 
@@ -689,17 +691,17 @@ export default function EquipoDetalle() {
           <button
             type="button"
             onClick={() => setCalendarioAbierto((actual) => !actual)}
-            className="flex w-full items-center justify-between gap-4 p-5 text-left"
+            className="flex w-full items-center justify-between gap-4 bg-red-600 p-5 text-left text-white"
           >
             <div>
               <h2 className="text-xl font-black">Calendario del equipo</h2>
 
-              <p className="mt-1 text-sm font-bold text-slate-500">
+              <p className="mt-1 text-sm font-bold text-red-100">
                 Resultados y próximos partidos
               </p>
             </div>
 
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-950 text-2xl font-black text-white">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 text-2xl font-black text-white">
               {calendarioAbierto ? "−" : "+"}
             </div>
           </button>

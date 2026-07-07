@@ -66,8 +66,8 @@ type CalendarMonth = {
 };
 
 const DEFAULT_MONTHS: CalendarMonth[] = [
-  { year: 2026, monthIndex: 6 }, // julio
-  { year: 2026, monthIndex: 7 }, // agosto
+  { year: 2026, monthIndex: 6 },
+  { year: 2026, monthIndex: 7 },
 ];
 
 const WEEK_DAYS = ["L", "M", "X", "J", "V", "S", "D"];
@@ -107,9 +107,9 @@ function labelFase(partidos: CalendarMatch[]) {
   const fases = Array.from(
     new Set(
       partidos.map((partido) =>
-        partido.tipo === "clasificacion" ? "Clasificación" : partido.phase
-      )
-    )
+        partido.tipo === "clasificacion" ? "Clasificación" : partido.phase,
+      ),
+    ),
   );
 
   if (fases.length === 0) return "";
@@ -159,6 +159,67 @@ function mismoMes(fecha: string, month: CalendarMonth) {
   return parts.year === month.year && parts.monthIndex === month.monthIndex;
 }
 
+function hoyLocalISO() {
+  const now = new Date();
+
+  return fechaDesdeParts(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+function elegirFechaInicial(partidos: CalendarMatch[]) {
+  if (partidos.length === 0) return "";
+
+  const hoy = hoyLocalISO();
+
+  const partidoHoy = partidos.find((partido) => partido.match_date === hoy);
+
+  if (partidoHoy) {
+    return partidoHoy.match_date;
+  }
+
+  const siguientePartido = partidos.find(
+    (partido) => partido.match_date > hoy,
+  );
+
+  if (siguientePartido) {
+    return siguientePartido.match_date;
+  }
+
+  return partidos[partidos.length - 1].match_date;
+}
+
+function construirMeses(partidos: CalendarMatch[]) {
+  const uniqueMonths = new Map<string, CalendarMonth>();
+
+  DEFAULT_MONTHS.forEach((month) => {
+    uniqueMonths.set(`${month.year}-${month.monthIndex}`, month);
+  });
+
+  partidos.forEach((match) => {
+    const { year, monthIndex } = fechaToParts(match.match_date);
+    const key = `${year}-${monthIndex}`;
+
+    uniqueMonths.set(key, { year, monthIndex });
+  });
+
+  return Array.from(uniqueMonths.values()).sort((a, b) => {
+    if (a.year !== b.year) return a.year - b.year;
+    return a.monthIndex - b.monthIndex;
+  });
+}
+
+function posicionMesPorFecha(meses: CalendarMonth[], fecha: string) {
+  if (!fecha) return 0;
+
+  const parts = fechaToParts(fecha);
+
+  const index = meses.findIndex(
+    (month) =>
+      month.year === parts.year && month.monthIndex === parts.monthIndex,
+  );
+
+  return index === -1 ? 0 : index;
+}
+
 function tituloPartido(match: CalendarMatch) {
   if (match.tipo === "clasificacion") return "Clasificación";
   return match.title || match.phase || "Eliminatoria";
@@ -206,7 +267,7 @@ export default function CalendarioPage() {
         mvp_open,
         home_team:teams!matches_home_team_id_fkey(name),
         away_team:teams!matches_away_team_id_fkey(name)
-      `
+      `,
       )
       .order("match_date", { ascending: true })
       .order("match_time", { ascending: true });
@@ -237,7 +298,7 @@ export default function CalendarioPage() {
         status,
         sort_order,
         mvp_open
-      `
+      `,
       )
       .order("sort_order", { ascending: true });
 
@@ -298,16 +359,12 @@ export default function CalendarioPage() {
       }));
 
     const todos = ordenarPartidos([...partidosGrupo, ...partidosFinales]);
+    const fechaInicial = elegirFechaInicial(todos);
+    const mesesIniciales = construirMeses(todos);
 
     setMatches(todos);
-
-    if (todos.length > 0) {
-      setSelectedDate(todos[0].match_date);
-    } else {
-      setSelectedDate("");
-    }
-
-    setActiveMonthPosition(0);
+    setSelectedDate(fechaInicial);
+    setActiveMonthPosition(posicionMesPorFecha(mesesIniciales, fechaInicial));
     setLoading(false);
   }
 
@@ -326,25 +383,7 @@ export default function CalendarioPage() {
     return grouped;
   }, [matches]);
 
-  const months = useMemo(() => {
-    const uniqueMonths = new Map<string, CalendarMonth>();
-
-    DEFAULT_MONTHS.forEach((month) => {
-      uniqueMonths.set(`${month.year}-${month.monthIndex}`, month);
-    });
-
-    matches.forEach((match) => {
-      const { year, monthIndex } = fechaToParts(match.match_date);
-      const key = `${year}-${monthIndex}`;
-
-      uniqueMonths.set(key, { year, monthIndex });
-    });
-
-    return Array.from(uniqueMonths.values()).sort((a, b) => {
-      if (a.year !== b.year) return a.year - b.year;
-      return a.monthIndex - b.monthIndex;
-    });
-  }, [matches]);
+  const months = useMemo(() => construirMeses(matches), [matches]);
 
   const activeMonth = months[activeMonthPosition] ?? months[0];
 
@@ -368,7 +407,7 @@ export default function CalendarioPage() {
     setActiveMonthPosition(nuevaPosicion);
 
     const primerPartidoMes = matches.find((match) =>
-      mismoMes(match.match_date, nuevoMes)
+      mismoMes(match.match_date, nuevoMes),
     );
 
     setSelectedDate(primerPartidoMes?.match_date ?? "");
@@ -448,8 +487,8 @@ export default function CalendarioPage() {
                     selected
                       ? "bg-red-600 text-white"
                       : hasMatches
-                      ? "bg-slate-950 text-white"
-                      : "bg-slate-100 text-slate-400"
+                        ? "bg-slate-950 text-white"
+                        : "bg-slate-100 text-slate-400"
                   }`}
                 >
                   <p className="text-sm font-black">{day}</p>
@@ -499,9 +538,7 @@ export default function CalendarioPage() {
             Torneo Fútbol 7 Astrabudua
           </p>
 
-          <h1 className="mt-2 text-center text-3xl font-black">
-            Calendario
-          </h1>
+          <h1 className="mt-2 text-center text-3xl font-black">Calendario</h1>
 
           <p className="mt-2 text-center text-sm font-bold text-emerald-100">
             Toca un día para ver sus partidos
@@ -632,9 +669,7 @@ export default function CalendarioPage() {
 
                               {match.mvp_open && (
                                 <Link
-                                  href={`/votar-mvp?match=${
-                                    match.id
-                                  }&type=${
+                                  href={`/votar-mvp?match=${match.id}&type=${
                                     match.tipo === "final" ? "final" : "grupo"
                                   }`}
                                   className="mt-3 block rounded-xl bg-red-600 py-3 text-center text-sm font-black text-white shadow"

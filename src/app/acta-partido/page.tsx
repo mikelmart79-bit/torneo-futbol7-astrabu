@@ -259,7 +259,7 @@ function ActaPartidoContent() {
           incidents,
           home_team:teams!matches_home_team_id_fkey(id, name),
           away_team:teams!matches_away_team_id_fkey(id, name)
-        `
+        `,
         )
         .eq("id", matchId)
         .single();
@@ -313,7 +313,7 @@ function ActaPartidoContent() {
           away_penalties,
           status,
           incidents
-        `
+        `,
         )
         .eq("id", matchId)
         .single();
@@ -328,11 +328,11 @@ function ActaPartidoContent() {
       const match = data as FinalMatch;
 
       const local = equipos.find(
-        (team) => normalizarTexto(team.name) === normalizarTexto(match.home_ref)
+        (team) => normalizarTexto(team.name) === normalizarTexto(match.home_ref),
       );
 
       const visitante = equipos.find(
-        (team) => normalizarTexto(team.name) === normalizarTexto(match.away_ref)
+        (team) => normalizarTexto(team.name) === normalizarTexto(match.away_ref),
       );
 
       actaBase = {
@@ -448,9 +448,9 @@ function ActaPartidoContent() {
     return 2;
   }
 
-  function ordenarPorEquipoYJugador<T extends { player_id: string; team_id: string }>(
-    lista: T[]
-  ) {
+  function ordenarPorEquipoYJugador<
+    T extends { player_id: string; team_id: string },
+  >(lista: T[]) {
     return [...lista].sort((a, b) => {
       const ordenA = ordenEquipo(a.team_id);
       const ordenB = ordenEquipo(b.team_id);
@@ -478,7 +478,7 @@ function ActaPartidoContent() {
       otros: ordenados.filter(
         (row) =>
           row.team_id !== acta?.home_team_id &&
-          row.team_id !== acta?.away_team_id
+          row.team_id !== acta?.away_team_id,
       ),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -489,19 +489,73 @@ function ActaPartidoContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [goals, players, acta]);
 
-  const amarillasAgrupadas = useMemo(() => {
-    return ordenarPorEquipoYJugador(
-      sumarPorJugador(cards.filter((card) => card.card_type === "yellow"))
-    );
+  const tarjetasCorregidas = useMemo(() => {
+    const agrupadas: Record<
+      string,
+      {
+        player_id: string;
+        team_id: string;
+        yellow: number;
+        red: number;
+      }
+    > = {};
+
+    cards.forEach((card) => {
+      const key = `${card.player_id}-${card.team_id}`;
+
+      if (!agrupadas[key]) {
+        agrupadas[key] = {
+          player_id: card.player_id,
+          team_id: card.team_id,
+          yellow: 0,
+          red: 0,
+        };
+      }
+
+      if (card.card_type === "yellow") {
+        agrupadas[key].yellow += 1;
+      }
+
+      if (card.card_type === "red") {
+        agrupadas[key].red += 1;
+      }
+    });
+
+    const amarillas: CountRow[] = [];
+    const rojas: CountRow[] = [];
+
+    Object.values(agrupadas).forEach((row) => {
+      const dobleAmarilla = row.yellow >= 2;
+
+      const amarillasMostradas = dobleAmarilla ? 0 : row.yellow;
+      const rojasMostradas = row.red + (dobleAmarilla ? 1 : 0);
+
+      if (amarillasMostradas > 0) {
+        amarillas.push({
+          player_id: row.player_id,
+          team_id: row.team_id,
+          total: amarillasMostradas,
+        });
+      }
+
+      if (rojasMostradas > 0) {
+        rojas.push({
+          player_id: row.player_id,
+          team_id: row.team_id,
+          total: rojasMostradas,
+        });
+      }
+    });
+
+    return {
+      amarillas: ordenarPorEquipoYJugador(amarillas),
+      rojas: ordenarPorEquipoYJugador(rojas),
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cards, players, acta]);
 
-  const rojasAgrupadas = useMemo(() => {
-    return ordenarPorEquipoYJugador(
-      sumarPorJugador(cards.filter((card) => card.card_type === "red"))
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cards, players, acta]);
+  const amarillasAgrupadas = tarjetasCorregidas.amarillas;
+  const rojasAgrupadas = tarjetasCorregidas.rojas;
 
   const sancionesOrdenadas = useMemo(() => {
     return [...suspensions].sort((a, b) => {
@@ -541,7 +595,7 @@ function ActaPartidoContent() {
   function renderParticipantesEquipo(
     titulo: string,
     equipo: string,
-    rows: MatchPlayerRow[]
+    rows: MatchPlayerRow[],
   ) {
     return (
       <div className="overflow-hidden rounded-2xl bg-white print:border print:border-slate-200">
@@ -660,15 +714,15 @@ function ActaPartidoContent() {
                   cerrada
                     ? "bg-emerald-500 text-white"
                     : finalizada
-                    ? "bg-yellow-300 text-slate-950"
-                    : "bg-white/20 text-white print:bg-slate-100 print:text-slate-700"
+                      ? "bg-yellow-300 text-slate-950"
+                      : "bg-white/20 text-white print:bg-slate-100 print:text-slate-700"
                 }`}
               >
                 {cerrada
                   ? "Acta cerrada"
                   : finalizada
-                  ? "Acta provisional"
-                  : "Acta pendiente"}
+                    ? "Acta provisional"
+                    : "Acta pendiente"}
               </span>
             </div>
           </div>
@@ -771,13 +825,13 @@ function ActaPartidoContent() {
                   {renderParticipantesEquipo(
                     "Local",
                     acta.home_name,
-                    participantesAgrupados.local
+                    participantesAgrupados.local,
                   )}
 
                   {renderParticipantesEquipo(
                     "Visitante",
                     acta.away_name,
-                    participantesAgrupados.visitante
+                    participantesAgrupados.visitante,
                   )}
 
                   {participantesAgrupados.otros.length > 0 && (
@@ -974,8 +1028,8 @@ function ActaPartidoContent() {
                 {cerrada
                   ? "Acta cerrada y definitiva."
                   : finalizada
-                  ? "Acta provisional pendiente de cierre definitivo."
-                  : "Acta pendiente de finalización."}
+                    ? "Acta provisional pendiente de cierre definitivo."
+                    : "Acta pendiente de finalización."}
               </p>
             </section>
           </div>

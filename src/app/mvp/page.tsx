@@ -118,10 +118,49 @@ function formatearFechaSegura(fecha: string | null) {
   return formatearFecha(fecha);
 }
 
+async function cargarTodosLosVotosMvp() {
+  const pageSize = 1000;
+  let desde = 0;
+  let totalReal: number | null = null;
+  let todosLosVotos: Vote[] = [];
+
+  while (true) {
+    const { data, error, count } = await supabase
+      .from("mvp_votes")
+      .select("id, match_id, final_match_id, player_id, user_id, team_id", {
+        count: "exact",
+      })
+      .range(desde, desde + pageSize - 1);
+
+    if (error) {
+      throw error;
+    }
+
+    if (totalReal === null) {
+      totalReal = count ?? null;
+    }
+
+    const votosPagina = (data ?? []) as Vote[];
+    todosLosVotos = [...todosLosVotos, ...votosPagina];
+
+    if (votosPagina.length < pageSize) break;
+
+    desde += pageSize;
+
+    if (totalReal !== null && todosLosVotos.length >= totalReal) break;
+  }
+
+  return {
+    votos: todosLosVotos,
+    total: totalReal ?? todosLosVotos.length,
+  };
+}
+
 export default function MvpPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [votes, setVotes] = useState<Vote[]>([]);
+  const [totalVotes, setTotalVotes] = useState(0);
   const [openMatches, setOpenMatches] = useState<OpenMatch[]>([]);
   const [userId, setUserId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -138,122 +177,137 @@ export default function MvpPage() {
       setLoading(true);
       setErrorCarga("");
 
-      const { data: playersData, error: playersError } = await supabase
-        .from("players")
-        .select("id, team_id, name, number")
-        .order("number", { ascending: true });
+      try {
+        const [
+          playersResult,
+          teamsResult,
+          votesResult,
+          matchesResult,
+          finalResult,
+        ] = await Promise.all([
+          supabase
+            .from("players")
+            .select("id, team_id, name, number")
+            .order("number", { ascending: true }),
 
-      const { data: teamsData, error: teamsError } = await supabase
-        .from("teams")
-        .select("id, name")
-        .order("name", { ascending: true });
+          supabase
+            .from("teams")
+            .select("id, name")
+            .order("name", { ascending: true }),
 
-      const { data: votesData, error: votesError } = await supabase
-        .from("mvp_votes")
-        .select("id, match_id, final_match_id, player_id, user_id, team_id");
+          cargarTodosLosVotosMvp(),
 
-      const { data: matchesData, error: matchesError } = await supabase
-        .from("matches")
-        .select(
-          `
-          id,
-          group_name,
-          match_date,
-          match_time,
-          field,
-          home_team_id,
-          away_team_id,
-          home_score,
-          away_score,
-          mvp_open,
-          home_team:teams!matches_home_team_id_fkey(id, name),
-          away_team:teams!matches_away_team_id_fkey(id, name)
-        `
+          supabase
+            .from("matches")
+            .select(
+              `
+              id,
+              group_name,
+              match_date,
+              match_time,
+              field,
+              home_team_id,
+              away_team_id,
+              home_score,
+              away_score,
+              mvp_open,
+              home_team:teams!matches_home_team_id_fkey(id, name),
+              away_team:teams!matches_away_team_id_fkey(id, name)
+            `,
+            )
+            .eq("mvp_open", true)
+            .order("match_date", { ascending: true })
+            .order("match_time", { ascending: true }),
+
+          supabase
+            .from("final_matches")
+            .select(
+              "id, phase, title, home_ref, away_ref, match_date, match_time, field, home_score, away_score, mvp_open",
+            )
+            .eq("mvp_open", true)
+            .order("sort_order", { ascending: true }),
+        ]);
+
+        if (
+          playersResult.error ||
+          teamsResult.error ||
+          matchesResult.error ||
+          finalResult.error
+        ) {
+          console.error(
+            "Error cargando MVP:",
+            playersResult.error ||
+              teamsResult.error ||
+              matchesResult.error ||
+              finalResult.error,
+          );
+          setErrorCarga("No se han podido cargar los datos MVP.");
+          setLoading(false);
+          return;
+        }
+
+        const equipos = (teamsResult.data ?? []) as Team[];
+
+        const partidosGrupo: OpenMatch[] = (
+          (matchesResult.data as unknown as RawGroupMatch[]) || []
+        ).map((match) => ({
+          id: match.id,
+          tipo: "grupo" as const,
+          group_name: match.group_name ?? "Clasificación",
+          match_date: match.match_date,
+          match_time: match.match_time,
+          field: match.field,
+          home_team_id: match.home_team_id,
+          away_team_id: match.away_team_id,
+          home_score: match.home_score,
+          away_score: match.away_score,
+          home_team: normalizarEquipo(match.home_team),
+          away_team: normalizarEquipo(match.away_team),
+        }));
+
+        const eliminatorias: OpenMatch[] = (
+          (finalResult.data ?? []) as FinalMatch[]
         )
-        .eq("mvp_open", true)
-        .order("match_date", { ascending: true })
-        .order("match_time", { ascending: true });
+          .map((match): OpenMatch | null => {
+            const local = buscarEquipoPorNombre(match.home_ref, equipos);
+            const visitante = buscarEquipoPorNombre(match.away_ref, equipos);
 
-      const { data: finalData, error: finalError } = await supabase
-        .from("final_matches")
-        .select(
-          "id, phase, title, home_ref, away_ref, match_date, match_time, field, home_score, away_score, mvp_open"
-        )
-        .eq("mvp_open", true)
-        .order("sort_order", { ascending: true });
+            if (!local || !visitante) return null;
 
-      if (
-        playersError ||
-        teamsError ||
-        votesError ||
-        matchesError ||
-        finalError
-      ) {
-        console.error(
-          "Error cargando MVP:",
-          playersError || teamsError || votesError || matchesError || finalError
-        );
-        setErrorCarga("No se han podido cargar los datos MVP.");
+            return {
+              id: match.id,
+              tipo: "final" as const,
+              group_name: "Eliminatorias",
+              phase: match.phase,
+              title: match.title,
+              match_date: match.match_date,
+              match_time: match.match_time,
+              field: match.field,
+              home_team_id: local.id,
+              away_team_id: visitante.id,
+              home_score: match.home_score,
+              away_score: match.away_score,
+              home_team: { name: local.name },
+              away_team: { name: visitante.name },
+            };
+          })
+          .filter((match): match is OpenMatch => match !== null);
+
+        setPlayers((playersResult.data ?? []) as Player[]);
+        setTeams(equipos);
+        setVotes(votesResult.votos);
+        setTotalVotes(votesResult.total);
+        setOpenMatches([...partidosGrupo, ...eliminatorias]);
         setLoading(false);
-        return;
+      } catch (error) {
+        console.error("Error cargando votos MVP:", error);
+        setErrorCarga("No se han podido cargar los votos MVP.");
+        setLoading(false);
       }
-
-      const equipos = (teamsData ?? []) as Team[];
-
-      const partidosGrupo: OpenMatch[] = (
-        (matchesData as unknown as RawGroupMatch[]) || []
-      ).map((match) => ({
-        id: match.id,
-        tipo: "grupo" as const,
-        group_name: match.group_name ?? "Clasificación",
-        match_date: match.match_date,
-        match_time: match.match_time,
-        field: match.field,
-        home_team_id: match.home_team_id,
-        away_team_id: match.away_team_id,
-        home_score: match.home_score,
-        away_score: match.away_score,
-        home_team: normalizarEquipo(match.home_team),
-        away_team: normalizarEquipo(match.away_team),
-      }));
-
-      const eliminatorias: OpenMatch[] = ((finalData ?? []) as FinalMatch[])
-        .map((match): OpenMatch | null => {
-          const local = buscarEquipoPorNombre(match.home_ref, equipos);
-          const visitante = buscarEquipoPorNombre(match.away_ref, equipos);
-
-          if (!local || !visitante) return null;
-
-          return {
-            id: match.id,
-            tipo: "final" as const,
-            group_name: "Eliminatorias",
-            phase: match.phase,
-            title: match.title,
-            match_date: match.match_date,
-            match_time: match.match_time,
-            field: match.field,
-            home_team_id: local.id,
-            away_team_id: visitante.id,
-            home_score: match.home_score,
-            away_score: match.away_score,
-            home_team: { name: local.name },
-            away_team: { name: visitante.name },
-          };
-        })
-        .filter((match): match is OpenMatch => match !== null);
-
-      setPlayers((playersData ?? []) as Player[]);
-      setTeams(equipos);
-      setVotes((votesData ?? []) as Vote[]);
-      setOpenMatches([...partidosGrupo, ...eliminatorias]);
-      setLoading(false);
     }
 
     cargarDatos();
   }, []);
-
-  const totalVotes = votes.length;
 
   const partidosPendientesVoto = useMemo(() => {
     return openMatches.filter((match) => {
@@ -276,7 +330,7 @@ export default function MvpPage() {
 
     const rows: PlayerRow[] = players.map((player) => {
       const playerVotes = votes.filter(
-        (vote) => vote.player_id === player.id
+        (vote) => vote.player_id === player.id,
       ).length;
 
       return {
@@ -494,7 +548,7 @@ export default function MvpPage() {
                       </p>
                     ) : (
                       partidosPendientesVoto.map((match) =>
-                        renderPartidoAbierto(match)
+                        renderPartidoAbierto(match),
                       )
                     )}
                   </div>
@@ -529,7 +583,7 @@ export default function MvpPage() {
                       </p>
                     ) : (
                       equipoIdeal.map((player, index) =>
-                        renderPlayer(player, index)
+                        renderPlayer(player, index),
                       )
                     )}
                   </div>
@@ -562,7 +616,7 @@ export default function MvpPage() {
                       </p>
                     ) : (
                       restoJugadores.map((player, index) =>
-                        renderPlayer(player, index + 7)
+                        renderPlayer(player, index + 7),
                       )
                     )}
                   </div>

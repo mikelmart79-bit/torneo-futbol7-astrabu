@@ -382,7 +382,7 @@ export default function InicioPage() {
 
           <a
             href="/equipos"
-            className="flex min-h-[58px] items-center justify-center gap-2 rounded-2xl bg-white/95 px-4 py-3 text-center text-lg font-black leading-tight shadow"
+            className="flex min-h-[58px] items-center justify-center gap-2 rounded-2xl bg-white/95 px-4 py-3 text-center text-lg font-black leading-tight text-slate-900 shadow"
           >
             <span className="text-2xl">🛡️</span>
             <span>Equipos</span>
@@ -390,7 +390,7 @@ export default function InicioPage() {
 
           <a
             href="/mvp"
-            className="flex min-h-[58px] items-center justify-center gap-2 rounded-2xl bg-white/95 px-4 py-3 text-center text-lg font-black leading-tight shadow"
+            className="flex min-h-[58px] items-center justify-center gap-2 rounded-2xl bg-white/95 px-4 py-3 text-center text-lg font-black leading-tight text-slate-900 shadow"
           >
             <span className="text-2xl">⭐</span>
             <span>MVP</span>
@@ -398,15 +398,15 @@ export default function InicioPage() {
 
           <a
             href="/bota-oro"
-            className="flex min-h-[58px] items-center justify-center gap-2 rounded-2xl bg-white/95 px-4 py-3 text-center text-lg font-black leading-tight shadow"
+            className="flex min-h-[58px] items-center justify-center gap-2 rounded-2xl bg-white/95 px-4 py-3 text-center text-lg font-black leading-tight text-slate-900 shadow"
           >
             <span className="text-2xl">⚽</span>
-            <span className=Bota de Oro</span>
+            <span>Bota de Oro</span>
           </a>
 
           <a
             href="/sancionados"
-            className="flex min-h-[58px] items-center justify-center gap-2 rounded-2xl bg-white/95 px-4 py-3 text-center text-lg font-black leading-tight shadow"
+            className="flex min-h-[58px] items-center justify-center gap-2 rounded-2xl bg-white/95 px-4 py-3 text-center text-lg font-black leading-tight text-slate-900 shadow"
           >
             <span className="text-2xl">🟥</span>
             <span>Sancionados</span>

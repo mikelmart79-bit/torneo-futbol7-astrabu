@@ -87,14 +87,12 @@ export default function EquiposPage() {
           Volver al inicio
         </Link>
 
-        {favoritos.length > 0 && (
-          <Link
-            href="/favoritos"
-            className="mt-4 block rounded-2xl bg-red-600 p-4 text-center text-base font-black text-white shadow-2xl"
-          >
-            Ver mis favoritos
-          </Link>
-        )}
+        <Link
+          href="/jugadores/buscar"
+          className="mt-4 block rounded-2xl bg-red-600 p-4 text-center text-base font-black text-white shadow-2xl"
+        >
+          Buscar jugador
+        </Link>
 
         {loading ? (
           <div className="mt-6 rounded-2xl bg-white/95 p-5 font-bold shadow">

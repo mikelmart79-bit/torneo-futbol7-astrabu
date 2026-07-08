@@ -374,37 +374,42 @@ export default function InicioPage() {
         <div className="mt-4 grid grid-cols-2 gap-2">
           <a
             href="/calendario"
-            className="col-span-2 flex min-h-[58px] items-center justify-center rounded-2xl bg-red-600 px-4 py-3 text-center text-lg font-black leading-tight text-white shadow"
+            className="col-span-2 flex min-h-[58px] items-center justify-center gap-3 rounded-2xl bg-red-600 px-4 py-3 text-center text-lg font-black leading-tight text-white shadow"
           >
-            Calendario
+            <span className="text-2xl">📅</span>
+            <span>Calendario</span>
           </a>
 
           <a
             href="/equipos"
-            className="flex min-h-[58px] items-center justify-center rounded-2xl bg-white/95 px-4 py-3 text-center text-lg font-black leading-tight shadow"
+            className="flex min-h-[58px] items-center justify-center gap-2 rounded-2xl bg-white/95 px-4 py-3 text-center text-lg font-black leading-tight shadow"
           >
-            Equipos
+            <span className="text-2xl">🛡️</span>
+            <span>Equipos</span>
           </a>
 
           <a
             href="/mvp"
-            className="flex min-h-[58px] items-center justify-center rounded-2xl bg-white/95 px-4 py-3 text-center text-lg font-black leading-tight shadow"
+            className="flex min-h-[58px] items-center justify-center gap-2 rounded-2xl bg-white/95 px-4 py-3 text-center text-lg font-black leading-tight shadow"
           >
-            MVP
+            <span className="text-2xl">⭐</span>
+            <span>MVP</span>
           </a>
 
           <a
             href="/bota-oro"
-            className="flex min-h-[58px] items-center justify-center rounded-2xl bg-white/95 px-4 py-3 text-center text-lg font-black leading-tight shadow"
+            className="flex min-h-[58px] items-center justify-center gap-2 rounded-2xl bg-white/95 px-4 py-3 text-center text-lg font-black leading-tight shadow"
           >
-            Bota de Oro
+            <span className="text-2xl">⚽</span>
+            <span>Bota de Oro</span>
           </a>
 
           <a
             href="/sancionados"
-            className="flex min-h-[58px] items-center justify-center rounded-2xl bg-white/95 px-4 py-3 text-center text-lg font-black leading-tight shadow"
+            className="flex min-h-[58px] items-center justify-center gap-2 rounded-2xl bg-white/95 px-4 py-3 text-center text-lg font-black leading-tight shadow"
           >
-            Sancionados
+            <span className="text-2xl">🟥</span>
+            <span>Sancionados</span>
           </a>
         </div>
       </section>

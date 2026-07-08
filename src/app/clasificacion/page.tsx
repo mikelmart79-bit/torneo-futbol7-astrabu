@@ -35,6 +35,7 @@ export default function ClasificacionPage() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorCarga, setErrorCarga] = useState("");
+  const [mostrarAmpliada, setMostrarAmpliada] = useState(false);
   const [equipoAmpliadoId, setEquipoAmpliadoId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -187,21 +188,28 @@ export default function ClasificacionPage() {
             </div>
 
             <div className="border-b border-slate-200 bg-white px-4 py-3">
-              <div className="rounded-2xl bg-slate-950 px-4 py-3 text-white shadow">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-black">Clasificación ampliada</span>
-
-                  <span className="text-xs font-black uppercase text-slate-300">
-                    Toca un equipo
-                  </span>
+              <button
+                onClick={() => setMostrarAmpliada((actual) => !actual)}
+                className="flex w-full items-center justify-between rounded-2xl bg-slate-950 px-4 py-3 text-left font-black text-white shadow"
+              >
+                <div>
+                  <p>Clasificación ampliada</p>
+                  <p className="mt-1 text-xs font-bold text-slate-300">
+                    Ver detalle de todos los equipos
+                  </p>
                 </div>
-              </div>
+
+                <span className="text-2xl leading-none">
+                  {mostrarAmpliada ? "−" : "+"}
+                </span>
+              </button>
             </div>
 
             <div className="space-y-3 p-4">
               {clasificacion.map((team, index) => {
                 const entraOctavos = index < 16;
-                const abierto = equipoAmpliadoId === team.teamId;
+                const individualAbierto = equipoAmpliadoId === team.teamId;
+                const mostrarDetalle = mostrarAmpliada || individualAbierto;
 
                 return (
                   <div
@@ -228,7 +236,9 @@ export default function ClasificacionPage() {
                           </p>
 
                           <p className="mt-1 text-xs font-black uppercase text-slate-400">
-                            {abierto ? "Ocultar detalle" : "Ver detalle"}
+                            {individualAbierto
+                              ? "Ocultar detalle individual"
+                              : "Ver detalle individual"}
                           </p>
                         </div>
 
@@ -243,12 +253,12 @@ export default function ClasificacionPage() {
                         </div>
 
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-2xl font-black text-slate-950 shadow-sm">
-                          {abierto ? "−" : "+"}
+                          {mostrarDetalle ? "−" : "+"}
                         </div>
                       </div>
                     </button>
 
-                    {abierto && (
+                    {mostrarDetalle && (
                       <div className="border-t border-slate-200 px-4 pb-4">
                         <div className="rounded-2xl bg-white/90 px-3 py-3 shadow-sm">
                           <div className="grid grid-cols-7 gap-1 text-center">

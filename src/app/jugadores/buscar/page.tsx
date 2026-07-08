@@ -180,7 +180,7 @@ export default function BuscarJugadorPage() {
           </p>
 
           <h1 className="mt-2 text-center text-3xl font-black">
-            Buscar jugador
+            🔎 Buscar jugador
           </h1>
 
           <p className="mt-2 text-center text-sm font-bold text-emerald-100">

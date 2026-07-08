@@ -50,8 +50,32 @@ type FinalMatch = {
   sort_order: number;
 };
 
+function BalonClasicoIcon() {
+  return (
+    <svg
+      viewBox="0 0 64 64"
+      className="h-7 w-7 shrink-0"
+      aria-hidden="true"
+    >
+      <circle
+        cx="32"
+        cy="32"
+        r="30"
+        fill="#ffffff"
+        stroke="#111827"
+        strokeWidth="2.5"
+      />
+      <polygon points="32,14 24,20 27,30 37,30 40,20" fill="#111827" />
+      <polygon points="21,22 14,28 18,38 27,34 27,30" fill="#111827" />
+      <polygon points="43,22 50,28 46,38 37,34 37,30" fill="#111827" />
+      <polygon points="22,41 18,50 28,54 32,46 26,38" fill="#111827" />
+      <polygon points="42,41 46,50 36,54 32,46 38,38" fill="#111827" />
+    </svg>
+  );
+}
+
 function normalizarEquipo(
-  equipo: RawMatch["home_team"]
+  equipo: RawMatch["home_team"],
 ): { name: string } | null {
   if (!equipo) return null;
   if (Array.isArray(equipo)) return equipo[0] ?? null;
@@ -208,7 +232,7 @@ export default function InicioPage() {
               sort_order: index + 1,
               home_team: normalizarEquipo(match.home_team),
               away_team: normalizarEquipo(match.away_team),
-            })
+            }),
           ));
 
       const partidosFinales: Match[] = finalError
@@ -265,7 +289,7 @@ export default function InicioPage() {
     if (partidos.length <= 1) return;
 
     setIndicePartido((actual) =>
-      actual === 0 ? partidos.length - 1 : actual - 1
+      actual === 0 ? partidos.length - 1 : actual - 1,
     );
   }
 
@@ -273,7 +297,7 @@ export default function InicioPage() {
     if (partidos.length <= 1) return;
 
     setIndicePartido((actual) =>
-      actual === partidos.length - 1 ? 0 : actual + 1
+      actual === partidos.length - 1 ? 0 : actual + 1,
     );
   }
 
@@ -400,7 +424,7 @@ export default function InicioPage() {
             href="/bota-oro"
             className="flex min-h-[58px] items-center justify-center gap-2 rounded-2xl bg-white/95 px-4 py-3 text-center text-lg font-black leading-tight shadow"
           >
-            <span className="text-2xl">⚽</span>
+            <BalonClasicoIcon />
             <span>Bota de Oro</span>
           </a>
 

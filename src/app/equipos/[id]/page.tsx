@@ -227,6 +227,7 @@ export default function EquipoDetalle() {
   const [favoritos, setFavoritos] = useState<string[]>([]);
   const [jugadoresFavoritos, setJugadoresFavoritos] = useState<string[]>([]);
   const [jugadoresAbiertos, setJugadoresAbiertos] = useState<string[]>([]);
+  const [equipacionesAbiertas, setEquipacionesAbiertas] = useState(false);
   const [calendarioAbierto, setCalendarioAbierto] = useState(false);
   const [plantillaAbierta, setPlantillaAbierta] = useState(false);
   const [partidosEquipo, setPartidosEquipo] = useState<TeamCalendarMatch[]>([]);
@@ -270,6 +271,7 @@ export default function EquipoDetalle() {
 
       setLoading(true);
       setErrorCarga("");
+      setEquipacionesAbiertas(false);
       setCalendarioAbierto(false);
       setPlantillaAbierta(false);
 
@@ -672,10 +674,6 @@ export default function EquipoDetalle() {
           <h1 className="mt-2 break-words text-center text-3xl font-black leading-tight">
             {equipo.name}
           </h1>
-
-          <p className="mt-2 text-center text-sm font-bold text-emerald-100">
-            Equipo participante
-          </p>
         </div>
 
         <button
@@ -689,28 +687,50 @@ export default function EquipoDetalle() {
           {esFavorito ? "★ Equipo favorito" : "☆ Añadir a favoritos"}
         </button>
 
-        <div className="mt-6 rounded-3xl bg-white/95 p-5 shadow-2xl backdrop-blur">
-          <h2 className="text-xl font-black">Equipaciones</h2>
+        <div className="mt-5 overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">
+          <button
+            type="button"
+            onClick={() => setEquipacionesAbiertas((actual) => !actual)}
+            className="flex w-full items-center justify-between gap-4 bg-red-600 p-5 text-left text-white"
+          >
+            <div>
+              <h2 className="text-xl font-black">Equipaciones</h2>
 
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <div className="rounded-2xl bg-slate-50 p-4 text-center shadow">
-              <div className="flex justify-center">
-                <ShirtIcon color={colorLocal} />
-              </div>
-
-              <p className="mt-2 text-sm font-black text-slate-700">Local</p>
-            </div>
-
-            <div className="rounded-2xl bg-slate-50 p-4 text-center shadow">
-              <div className="flex justify-center">
-                <ShirtIcon color={colorVisitante} />
-              </div>
-
-              <p className="mt-2 text-sm font-black text-slate-700">
-                Visitante
+              <p className="mt-1 text-sm font-bold text-red-100">
+                Colores local y visitante
               </p>
             </div>
-          </div>
+
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 text-2xl font-black text-white">
+              {equipacionesAbiertas ? "−" : "+"}
+            </div>
+          </button>
+
+          {equipacionesAbiertas && (
+            <div className="border-t border-slate-200 p-5 pt-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-2xl bg-slate-50 p-4 text-center shadow">
+                  <div className="flex justify-center">
+                    <ShirtIcon color={colorLocal} />
+                  </div>
+
+                  <p className="mt-2 text-sm font-black text-slate-700">
+                    Local
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-slate-50 p-4 text-center shadow">
+                  <div className="flex justify-center">
+                    <ShirtIcon color={colorVisitante} />
+                  </div>
+
+                  <p className="mt-2 text-sm font-black text-slate-700">
+                    Visitante
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="mt-5 overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">

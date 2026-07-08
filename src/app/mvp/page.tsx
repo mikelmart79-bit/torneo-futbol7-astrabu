@@ -382,7 +382,7 @@ export default function MvpPage() {
             <div className="min-w-0">
               {esPrimero && (
                 <p className="mb-1 inline-flex rounded-full bg-yellow-400 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-950">
-                  Premio individual
+                  MVP
                 </p>
               )}
 

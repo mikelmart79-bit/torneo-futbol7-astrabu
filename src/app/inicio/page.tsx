@@ -60,16 +60,96 @@ function BalonClasicoIcon() {
       <circle
         cx="32"
         cy="32"
-        r="30"
+        r="29"
         fill="#ffffff"
-        stroke="#111827"
+        stroke="#991b1b"
         strokeWidth="2.5"
       />
-      <polygon points="32,14 24,20 27,30 37,30 40,20" fill="#111827" />
-      <polygon points="21,22 14,28 18,38 27,34 27,30" fill="#111827" />
-      <polygon points="43,22 50,28 46,38 37,34 37,30" fill="#111827" />
-      <polygon points="22,41 18,50 28,54 32,46 26,38" fill="#111827" />
-      <polygon points="42,41 46,50 36,54 32,46 38,38" fill="#111827" />
+
+      <path
+        d="M32 9c5.8 3.4 9.8 7.6 12 12.5"
+        fill="none"
+        stroke="#fecaca"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+      <path
+        d="M55 27c-4.5 1.2-8.9 1.2-13.3 0"
+        fill="none"
+        stroke="#fecaca"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+      <path
+        d="M48 51c-3.2-4.4-5.2-8.8-6-13.4"
+        fill="none"
+        stroke="#fecaca"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+      <path
+        d="M16 51c3.2-4.4 5.2-8.8 6-13.4"
+        fill="none"
+        stroke="#fecaca"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+      <path
+        d="M9 27c4.5 1.2 8.9 1.2 13.3 0"
+        fill="none"
+        stroke="#fecaca"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+      <path
+        d="M32 9c-5.8 3.4-9.8 7.6-12 12.5"
+        fill="none"
+        stroke="#fecaca"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+
+      <polygon
+        points="32,17 23,24 27,35 37,35 41,24"
+        fill="#dc2626"
+        stroke="#991b1b"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+
+      <path
+        d="M23 24 14 27 13 39 22 38 27 35"
+        fill="#ef4444"
+        stroke="#991b1b"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+
+      <path
+        d="M41 24 50 27 51 39 42 38 37 35"
+        fill="#ef4444"
+        stroke="#991b1b"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+
+      <path
+        d="M22 38 21 49 31 55 32 45 27 35"
+        fill="#f87171"
+        stroke="#991b1b"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+
+      <path
+        d="M42 38 43 49 33 55 32 45 37 35"
+        fill="#f87171"
+        stroke="#991b1b"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+
+      <circle cx="32" cy="32" r="29" fill="none" stroke="#991b1b" strokeWidth="2.5" />
     </svg>
   );
 }

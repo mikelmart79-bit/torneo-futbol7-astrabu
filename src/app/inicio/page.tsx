@@ -294,13 +294,7 @@ export default function InicioPage() {
             Torneo Fútbol 7 Astrabudua
           </p>
 
-          <h1 className="mt-2 text-center text-3xl font-black">
-            Inicio
-          </h1>
-
-          <p className="mt-2 text-center text-sm font-bold text-emerald-100">
-            Calendario, equipos, MVP y clasificaciones
-          </p>
+          <h1 className="mt-2 text-center text-3xl font-black">Inicio</h1>
         </div>
 
         <div className="mt-4 overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">

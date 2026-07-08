@@ -286,13 +286,21 @@ export default function InicioPage() {
       />
 
       <section className="relative z-10 mx-auto flex min-h-screen max-w-md flex-col px-4 py-3 pb-8">
-        <div className="rounded-3xl bg-black/60 px-4 py-4 text-white shadow-2xl backdrop-blur">
-          <h1
+        <div className="rounded-3xl bg-black/60 px-4 py-5 text-white shadow-2xl backdrop-blur">
+          <p
             onClick={accesoAdminOculto}
-            className="cursor-default select-none whitespace-nowrap text-center text-base font-black sm:text-lg"
+            className="cursor-default select-none text-center text-xs font-black uppercase tracking-[0.2em] text-emerald-100"
           >
             Torneo Fútbol 7 Astrabudua
+          </p>
+
+          <h1 className="mt-2 text-center text-3xl font-black">
+            Inicio
           </h1>
+
+          <p className="mt-2 text-center text-sm font-bold text-emerald-100">
+            Calendario, equipos, MVP y clasificaciones
+          </p>
         </div>
 
         <div className="mt-4 overflow-hidden rounded-3xl bg-white/95 shadow-2xl backdrop-blur">

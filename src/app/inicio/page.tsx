@@ -401,7 +401,7 @@ export default function InicioPage() {
             className="flex min-h-[58px] items-center justify-center gap-2 rounded-2xl bg-white/95 px-4 py-3 text-center text-lg font-black leading-tight shadow"
           >
             <span className="text-2xl">⚽</span>
-            <span className="text-amber-500 drop-shadow-sm">Bota de Oro</span>
+            <span className=Bota de Oro</span>
           </a>
 
           <a

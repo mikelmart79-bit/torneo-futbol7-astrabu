@@ -50,106 +50,45 @@ type FinalMatch = {
   sort_order: number;
 };
 
-function BalonClasicoIcon() {
+function BotaFutbolIcon() {
   return (
     <svg
       viewBox="0 0 64 64"
-      className="h-7 w-7 shrink-0"
+      className="h-8 w-8 shrink-0"
       aria-hidden="true"
+      fill="none"
     >
-      <circle
-        cx="32"
-        cy="32"
-        r="29"
-        fill="#ffffff"
-        stroke="#991b1b"
-        strokeWidth="2.5"
+      <path
+        d="M8 40.5c6.4-.9 11.5-3.2 15.8-7.3l8.1-7.8c1.7-1.6 4.3-1.5 5.8.3l4.5 5.4c2.5 3 6.1 4.8 10 5.1l4.5.4c2.5.2 4.3 2.6 3.7 5.1l-1 4.3c-.7 3-3.4 5.1-6.5 5.1H14.5C10.9 51.1 8 48.2 8 44.6v-4.1Z"
+        fill="#111827"
       />
 
       <path
-        d="M32 9c5.8 3.4 9.8 7.6 12 12.5"
-        fill="none"
-        stroke="#fecaca"
-        strokeWidth="3"
+        d="M31.5 25.2 34.8 15c.7-2 2.9-3 4.8-2.2l4.4 1.9c1.7.7 2.6 2.5 2.2 4.3l-2.9 13.2"
+        stroke="#111827"
+        strokeWidth="4"
         strokeLinecap="round"
-      />
-      <path
-        d="M55 27c-4.5 1.2-8.9 1.2-13.3 0"
-        fill="none"
-        stroke="#fecaca"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-      <path
-        d="M48 51c-3.2-4.4-5.2-8.8-6-13.4"
-        fill="none"
-        stroke="#fecaca"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-      <path
-        d="M16 51c3.2-4.4 5.2-8.8 6-13.4"
-        fill="none"
-        stroke="#fecaca"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-      <path
-        d="M9 27c4.5 1.2 8.9 1.2 13.3 0"
-        fill="none"
-        stroke="#fecaca"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-      <path
-        d="M32 9c-5.8 3.4-9.8 7.6-12 12.5"
-        fill="none"
-        stroke="#fecaca"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-
-      <polygon
-        points="32,17 23,24 27,35 37,35 41,24"
-        fill="#dc2626"
-        stroke="#991b1b"
-        strokeWidth="1.5"
         strokeLinejoin="round"
       />
 
       <path
-        d="M23 24 14 27 13 39 22 38 27 35"
-        fill="#ef4444"
-        stroke="#991b1b"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
+        d="M20 37.5h13.5M17.5 42h21"
+        stroke="#ffffff"
+        strokeWidth="2.8"
+        strokeLinecap="round"
       />
 
       <path
-        d="M41 24 50 27 51 39 42 38 37 35"
-        fill="#ef4444"
-        stroke="#991b1b"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
+        d="M37 29.5 42 24M33 27.5 38 22M29 30.5 34 25"
+        stroke="#ffffff"
+        strokeWidth="2.4"
+        strokeLinecap="round"
       />
 
-      <path
-        d="M22 38 21 49 31 55 32 45 27 35"
-        fill="#f87171"
-        stroke="#991b1b"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-
-      <path
-        d="M42 38 43 49 33 55 32 45 37 35"
-        fill="#f87171"
-        stroke="#991b1b"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-
-      <circle cx="32" cy="32" r="29" fill="none" stroke="#991b1b" strokeWidth="2.5" />
+      <circle cx="19" cy="54" r="2.3" fill="#111827" />
+      <circle cx="29" cy="54" r="2.3" fill="#111827" />
+      <circle cx="39" cy="54" r="2.3" fill="#111827" />
+      <circle cx="50" cy="53" r="2.3" fill="#111827" />
     </svg>
   );
 }
@@ -504,7 +443,7 @@ export default function InicioPage() {
             href="/bota-oro"
             className="flex min-h-[58px] items-center justify-center gap-2 rounded-2xl bg-white/95 px-4 py-3 text-center text-lg font-black leading-tight shadow"
           >
-            <BalonClasicoIcon />
+            <BotaFutbolIcon />
             <span>Bota de Oro</span>
           </a>
 

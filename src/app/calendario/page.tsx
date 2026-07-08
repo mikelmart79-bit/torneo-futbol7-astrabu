@@ -187,6 +187,39 @@ function elegirFechaInicial(partidos: CalendarMatch[]) {
   return partidos[partidos.length - 1].match_date;
 }
 
+function elegirFechaParaMes(partidos: CalendarMatch[], month: CalendarMonth) {
+  const partidosMes = partidos.filter((partido) =>
+    mismoMes(partido.match_date, month),
+  );
+
+  if (partidosMes.length === 0) return "";
+
+  const hoy = hoyLocalISO();
+  const hoyParts = fechaToParts(hoy);
+  const esMesActual =
+    hoyParts.year === month.year && hoyParts.monthIndex === month.monthIndex;
+
+  if (!esMesActual) {
+    return partidosMes[0].match_date;
+  }
+
+  const partidoHoy = partidosMes.find((partido) => partido.match_date === hoy);
+
+  if (partidoHoy) {
+    return partidoHoy.match_date;
+  }
+
+  const siguientePartido = partidosMes.find(
+    (partido) => partido.match_date > hoy,
+  );
+
+  if (siguientePartido) {
+    return siguientePartido.match_date;
+  }
+
+  return partidosMes[partidosMes.length - 1].match_date;
+}
+
 function construirMeses(partidos: CalendarMatch[]) {
   const uniqueMonths = new Map<string, CalendarMonth>();
 
@@ -405,12 +438,7 @@ export default function CalendarioPage() {
     const nuevoMes = months[nuevaPosicion];
 
     setActiveMonthPosition(nuevaPosicion);
-
-    const primerPartidoMes = matches.find((match) =>
-      mismoMes(match.match_date, nuevoMes),
-    );
-
-    setSelectedDate(primerPartidoMes?.match_date ?? "");
+    setSelectedDate(elegirFechaParaMes(matches, nuevoMes));
   }
 
   function renderMonth(month: CalendarMonth) {

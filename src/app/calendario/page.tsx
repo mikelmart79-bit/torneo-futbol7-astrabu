@@ -640,16 +640,16 @@ export default function CalendarioPage() {
                             </div>
 
                             <div className="p-4">
-                              <div className="grid grid-cols-[minmax(0,1fr)_46px_minmax(0,1fr)] items-center gap-2">
+                              <div className="grid grid-cols-[minmax(0,1fr)_74px_minmax(0,1fr)] items-center gap-2">
                                 <p className="min-w-0 break-words text-center text-sm font-black leading-tight text-slate-950">
                                   {match.home_name}
                                 </p>
 
-                                <div className="rounded-xl bg-slate-950 px-1 py-2 text-center text-white shadow">
+                                <div className="rounded-xl bg-slate-950 px-2 py-2 text-center text-white shadow">
                                   <p
                                     className={`font-black leading-none ${
                                       hayResultado
-                                        ? "text-base"
+                                        ? "whitespace-nowrap text-lg"
                                         : "text-sm uppercase"
                                     }`}
                                   >

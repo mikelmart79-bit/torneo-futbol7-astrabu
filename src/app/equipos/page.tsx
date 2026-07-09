@@ -91,7 +91,7 @@ export default function EquiposPage() {
           href="/jugadores/buscar"
           className="mt-4 block rounded-2xl bg-red-600 p-4 text-center text-base font-black text-white shadow-2xl"
         >
-          🔎 Buscar jugador
+          🔎 Buscar jugador o equipo
         </Link>
 
         {loading ? (
